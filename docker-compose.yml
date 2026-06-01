@@ -1,0 +1,14 @@
+services:
+  simplelogin-mcp:
+    build: .
+    image: "${SIMPLELOGIN_MCP_IMAGE:-ghcr.io/enthouan/simplelogin-mcp:latest}"
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
