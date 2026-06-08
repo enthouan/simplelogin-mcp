@@ -16,8 +16,8 @@ into a container and self-host.
 | `alias_create_random` | Create a random alias (`uuid` or `word` mode).                              |
 | `alias_create_custom` | Create a custom alias from a prefix + signed suffix + mailboxes.            |
 | `alias_update`        | Update note, name, owning mailbox(es), PGP, or pinned state.                |
-| `alias_delete`        | Permanently delete an alias.                                                |
-| `alias_toggle`        | Enable/disable an alias.                                                    |
+| `alias_delete`        | Permanently delete an alias (requires `confirm: true`).                     |
+| `alias_set_enabled`   | Explicitly enable or disable an alias (idempotent).                         |
 | `alias_options_get`   | Get creation options (can_create, suffixes, signed suffixes).               |
 | `alias_domains_list`  | List domains usable for alias creation.                                     |
 | `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).              |

@@ -44,6 +44,18 @@ export class SimpleLoginAPIError extends Error {
   }
 }
 
+/**
+ * Thrown when an alias mutation is rejected locally — before any network call —
+ * because the requested change is a no-op or has conflicting inputs. Carries no
+ * HTTP status because SimpleLogin was never contacted.
+ */
+export class AliasMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AliasMutationError';
+  }
+}
+
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -162,6 +174,26 @@ export class SimpleLoginClient {
       pinned?: boolean;
     },
   ): Promise<{ ok: true }> {
+    // Guardrails enforced before any network call: SimpleLogin would otherwise
+    // silently accept a no-op PATCH or arbitrarily pick one of two mailbox fields.
+    if (patch.mailboxId !== undefined && patch.mailboxIds !== undefined) {
+      throw new AliasMutationError(
+        'Provide either mailbox_id or mailbox_ids, not both — they are mutually exclusive.',
+      );
+    }
+    const hasChange =
+      patch.note !== undefined ||
+      patch.name !== undefined ||
+      patch.mailboxId !== undefined ||
+      patch.mailboxIds !== undefined ||
+      patch.disablePgp !== undefined ||
+      patch.pinned !== undefined;
+    if (!hasChange) {
+      throw new AliasMutationError(
+        'No changes provided; supply at least one field to update (note, name, mailbox_id, mailbox_ids, disable_pgp, or pinned).',
+      );
+    }
+
     // undefined fields are dropped by JSON.stringify, so only provided fields are sent.
     await this.request({
       method: 'PATCH',
@@ -193,6 +225,18 @@ export class SimpleLoginClient {
       endpoint: aliasTogglePath(aliasId),
       schema: AliasToggleResponseSchema,
     });
+  }
+
+  /**
+   * Set an alias's enabled state explicitly and idempotently. SimpleLogin only
+   * exposes a toggle, so this reads the current state first and toggles solely
+   * when it differs from the target — re-setting an already-correct state is a
+   * no-op that still returns the resulting state.
+   */
+  async setAliasEnabled(aliasId: number, enabled: boolean): Promise<AliasToggleResponse> {
+    const alias = await this.getAlias(aliasId);
+    if (alias.enabled === enabled) return { enabled };
+    return this.toggleAlias(aliasId);
   }
 
   getAliasOptions(hostname?: string): Promise<AliasOptions> {
