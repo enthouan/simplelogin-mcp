@@ -48,11 +48,19 @@ type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
 
+/**
+ * The subset of the global `fetch` signature the client depends on. Tests inject a
+ * stub to assert request shape and drive error paths without live network calls.
+ */
+export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
 /** Options accepted by the {@link SimpleLoginClient} constructor. */
 export interface SimpleLoginClientOptions {
   apiUrl: string;
   apiKey: string;
   timeoutMs: number;
+  /** Fetch implementation to use. Defaults to the global `fetch`. */
+  fetch?: FetchLike;
 }
 
 interface RequestOptions<S extends z.ZodTypeAny> {
@@ -70,11 +78,14 @@ export class SimpleLoginClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
+  private readonly fetchImpl: FetchLike;
 
   constructor(options: SimpleLoginClientOptions) {
     this.baseUrl = options.apiUrl.replace(/\/+$/, '');
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs;
+    // Bind to globalThis so the default fetch keeps its expected receiver.
+    this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
   }
 
   // --- Aliases ---------------------------------------------------------------
@@ -233,7 +244,7 @@ export class SimpleLoginClient {
 
     let response: Response;
     try {
-      response = await fetch(url, {
+      response = await this.fetchImpl(url, {
         method: options.method,
         headers,
         body: bodyInit,
