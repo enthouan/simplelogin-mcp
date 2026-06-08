@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   SimpleLoginClient,
   SimpleLoginAPIError,
+  AliasMutationError,
   type FetchLike,
 } from '../src/client/simplelogin.js';
 
@@ -172,6 +173,57 @@ describe('alias mutations', () => {
     await expect(client.toggleAlias(9)).resolves.toEqual({ enabled: false });
     expect(calls[0]!.method).toBe('POST');
     expect(calls[0]!.url.pathname).toBe('/api/aliases/9/toggle');
+  });
+});
+
+describe('alias update guardrails', () => {
+  it('rejects a no-op update before any network call', async () => {
+    const { client, calls } = stubClient(jsonResponse({}));
+    const error = await client.updateAlias(7, {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AliasMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects an update that sets both mailbox_id and mailbox_ids', async () => {
+    const { client, calls } = stubClient(jsonResponse({}));
+    const error = await client
+      .updateAlias(7, { mailboxId: 1, mailboxIds: [2] })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AliasMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('allows an update that sets only one of the mailbox fields', async () => {
+    const { client, calls } = stubClient(new Response(null, { status: 200 }));
+    await expect(client.updateAlias(7, { mailboxIds: [2, 3] })).resolves.toEqual({ ok: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toEqual({ mailbox_ids: [2, 3] });
+  });
+});
+
+describe('alias set enabled', () => {
+  it('reads the alias then toggles when the current state differs from the target', async () => {
+    const { client, calls } = stubClient((call) =>
+      call.url.pathname.endsWith('/toggle')
+        ? jsonResponse({ enabled: true })
+        : jsonResponse({ ...ALIAS, enabled: false }),
+    );
+    await expect(client.setAliasEnabled(5, true)).resolves.toEqual({ enabled: true });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.method).toBe('GET');
+    expect(calls[0]!.url.pathname).toBe('/api/aliases/5');
+    expect(calls[1]!.method).toBe('POST');
+    expect(calls[1]!.url.pathname).toBe('/api/aliases/5/toggle');
+  });
+
+  it('skips the toggle and stays a no-op when already in the target state', async () => {
+    const { client, calls } = stubClient(jsonResponse({ ...ALIAS, enabled: true }));
+    await expect(client.setAliasEnabled(5, true)).resolves.toEqual({ enabled: true });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe('GET');
+    expect(calls[0]!.url.pathname).toBe('/api/aliases/5');
   });
 });
 
