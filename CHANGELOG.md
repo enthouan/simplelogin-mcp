@@ -2,7 +2,19 @@
 
 ## Unreleased
 
-- Track future release notes here before cutting the next version.
+### Changed
+
+- **Breaking:** Replace the stateless `alias_toggle` tool with `alias_set_enabled`, which takes an
+  explicit `enabled` boolean. Setting an alias to a state it is already in is a no-op, so agents can
+  set enabled state predictably without first reading the alias.
+- **Breaking:** `alias_delete` now requires `confirm: true` to guard against accidental permanent
+  deletion.
+
+### Fixed
+
+- Reject no-op `alias_update` calls (no fields to change) before contacting SimpleLogin.
+- Reject `alias_update` calls that pass both `mailbox_id` and `mailbox_ids`, which are mutually
+  exclusive.
 
 ## v0.1.0
 

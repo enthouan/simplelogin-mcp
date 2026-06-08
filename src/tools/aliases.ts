@@ -1,7 +1,8 @@
 /**
  * @module tools/aliases
- * Alias workflow tools: list, get, create (random/custom), update, delete, toggle,
- * plus the supporting options/domains lookups needed to drive custom creation.
+ * Alias workflow tools: list, get, create (random/custom), update, delete,
+ * set-enabled, plus the supporting options/domains lookups needed to drive custom
+ * creation.
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -128,9 +129,11 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
     {
       title: 'Update alias',
       description:
-        'Update an existing alias. Any subset of fields may be provided: note, display name, ' +
+        'Update an existing alias. Provide at least one field to change: note, display name, ' +
         'the owning mailbox (mailbox_id) or full mailbox set (mailbox_ids), whether PGP is ' +
-        'disabled, and whether the alias is pinned. Only the provided fields change.',
+        'disabled, and whether the alias is pinned. Only the provided fields change. ' +
+        'mailbox_id and mailbox_ids are mutually exclusive, and a call that changes nothing ' +
+        'is rejected without contacting SimpleLogin.',
       inputSchema: {
         alias_id: z.number().int().describe('Numeric id of the alias to update.'),
         note: z.string().optional().describe('Replace the alias note.'),
@@ -166,9 +169,13 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
       title: 'Delete alias',
       description:
         'Permanently delete a SimpleLogin alias by id. This cannot be undone; mail sent to the ' +
-        'address afterwards is rejected. Prefer alias_toggle to merely disable an alias.',
+        'address afterwards is rejected. Prefer alias_set_enabled with enabled=false to merely ' +
+        'disable an alias. Requires confirm=true as an explicit acknowledgement of the deletion.',
       inputSchema: {
         alias_id: z.number().int().describe('Numeric id of the alias to delete.'),
+        confirm: z
+          .literal(true)
+          .describe('Must be set to true to confirm this permanent, irreversible deletion.'),
       },
       annotations: { destructiveHint: true },
     },
@@ -176,18 +183,23 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
   );
 
   server.registerTool(
-    'alias_toggle',
+    'alias_set_enabled',
     {
       title: 'Enable/disable alias',
       description:
-        'Toggle a SimpleLogin alias between enabled and disabled. A disabled alias silently ' +
-        'blocks incoming mail without being deleted. Returns the new enabled state.',
+        'Set a SimpleLogin alias to a specific enabled state. Pass enabled=true to enable or ' +
+        'enabled=false to disable. A disabled alias silently blocks incoming mail without being ' +
+        'deleted. Idempotent: setting the state it is already in changes nothing. Returns the ' +
+        'resulting enabled state.',
       inputSchema: {
-        alias_id: z.number().int().describe('Numeric id of the alias to toggle.'),
+        alias_id: z.number().int().describe('Numeric id of the alias to update.'),
+        enabled: z
+          .boolean()
+          .describe('Desired state: true to enable the alias, false to disable it.'),
       },
-      annotations: { destructiveHint: true },
+      annotations: { destructiveHint: true, idempotentHint: true },
     },
-    (args) => runTool(() => client.toggleAlias(args.alias_id)),
+    (args) => runTool(() => client.setAliasEnabled(args.alias_id, args.enabled)),
   );
 
   server.registerTool(
