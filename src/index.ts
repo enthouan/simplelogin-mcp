@@ -15,6 +15,7 @@ import { loadConfig, type AppConfig } from './config.js';
 import { SimpleLoginClient } from './client/simplelogin.js';
 import { buildServer } from './server.js';
 import { logger } from './logger.js';
+import { isAllowedOrigin, isLoopbackHost } from './security.js';
 import { VERSION } from './version.js';
 
 async function main(): Promise<void> {
@@ -53,6 +54,14 @@ function startHttp(config: AppConfig, client: SimpleLoginClient): void {
   app.get('/health', (c) => c.json({ status: 'ok', version: VERSION }));
 
   app.post('/mcp', async (c) => {
+    // Reject cross-origin browser requests (DNS-rebinding / CSRF defense). Non-browser
+    // MCP clients send no Origin header and are unaffected; only a present, disallowed
+    // Origin is blocked.
+    const origin = c.req.header('origin');
+    if (origin && !isAllowedOrigin(origin, config.allowedOrigins)) {
+      return c.json({ error: 'Forbidden origin' }, 403);
+    }
+
     if (config.mcpAuthToken && !isAuthorized(c.req.header('authorization'), config.mcpAuthToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
@@ -74,9 +83,26 @@ function startHttp(config: AppConfig, client: SimpleLoginClient): void {
     return RESPONSE_ALREADY_SENT;
   });
 
-  const httpServer = serve({ fetch: app.fetch, port: config.port }, (info) => {
-    logger.info(`v${VERSION} listening on http://0.0.0.0:${info.port} (POST /mcp, GET /health)`);
-  });
+  const httpServer = serve(
+    { fetch: app.fetch, port: config.port, hostname: config.host },
+    (info) => {
+      logger.info(
+        `v${VERSION} listening on http://${config.host}:${info.port} (POST /mcp, GET /health)`,
+      );
+      if (!config.mcpAuthToken) {
+        if (isLoopbackHost(config.host)) {
+          logger.info(
+            'MCP_AUTH_TOKEN not set; POST /mcp is unauthenticated but bound to loopback.',
+          );
+        } else {
+          logger.warn(
+            'MCP_AUTH_TOKEN not set on a non-loopback bind; POST /mcp is unauthenticated. ' +
+              'Confirm exposure is restricted at another layer (loopback publish, proxy, firewall).',
+          );
+        }
+      }
+    },
+  );
 
   const shutdown = (signal: string): void => {
     logger.info(`received ${signal}, shutting down`);

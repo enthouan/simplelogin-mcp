@@ -8,8 +8,19 @@ services:
     container_name: simplelogin-mcp
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Inside the container the app must bind all interfaces, otherwise Docker's
+      # published port can't reach it. Exposure is contained by the loopback-only
+      # `ports` mapping below (NOT left wide open), so the unauthenticated-bind
+      # guard is explicitly acknowledged here.
+      HOST: 0.0.0.0
+      ALLOW_UNAUTHENTICATED_EXPOSURE: 'true'
     ports:
-      - '3000:3000'
+      # Published on the host's loopback only: the server is reachable from this
+      # machine but NOT from your LAN. To expose it on the LAN, set MCP_AUTH_TOKEN
+      # in .env and change this to '3000:3000' (or 'YOUR_LAN_IP:3000:3000'). See
+      # SECURITY.md before doing so.
+      - '127.0.0.1:3000:3000'
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 30s

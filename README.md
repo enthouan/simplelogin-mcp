@@ -53,18 +53,25 @@ The server now listens on `http://localhost:3000` with the MCP endpoint at `POST
 All configuration is via environment variables (see [`.env.example`](.env.example)). The server
 validates them at startup and exits with a readable message if anything required is missing.
 
-| Variable                | Required | Default                      | Description                                                                      |
-| ----------------------- | -------- | ---------------------------- | -------------------------------------------------------------------------------- |
-| `SL_API_KEY`            | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call. |
-| `TRANSPORT`             | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                           |
-| `PORT`                  | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode.                                 |
-| `SL_API_URL`            | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                   |
-| `MCP_AUTH_TOKEN`        | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`.                    |
-| `SL_REQUEST_TIMEOUT_MS` | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                     |
+| Variable                         | Required | Default                      | Description                                                                                          |
+| -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
+| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                                               |
+| `HOST`                           | No       | `127.0.0.1`                  | Interface the HTTP server binds to. Loopback by default; `0.0.0.0` exposes it (requires a token).    |
+| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode.                                                     |
+| `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
+| `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
+| `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
+| `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
+| `SL_REQUEST_TIMEOUT_MS`          | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                                         |
 
 > **Two distinct secrets:** `SL_API_KEY` authenticates the server **to SimpleLogin** (the
 > `Authentication` header on outbound calls). `MCP_AUTH_TOKEN` authenticates clients **to this
 > server** (the standard `Authorization: Bearer` header on `POST /mcp`). They are unrelated.
+
+> **Safe by default:** the HTTP server binds `127.0.0.1` and is reachable only from the local
+> machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup, so exposing
+> the endpoint is always an explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
 
 ## Getting a SimpleLogin API key
 
@@ -175,6 +182,13 @@ The client's shared `request()` helper handles the `Authentication` header, time
 The API surface follows the in-app SimpleLogin reference
 ([`docs/api.md`](https://github.com/simple-login/app/blob/master/docs/api.md)), which is the source
 of truth for request/response shapes.
+
+## Security
+
+The `SL_API_KEY` grants full control of your SimpleLogin account, so treat it like a password.
+The HTTP server is safe by default (loopback bind) and refuses to start exposed without a token.
+For the credential risk model, network exposure patterns, and how to report a vulnerability, see
+[SECURITY.md](SECURITY.md).
 
 ## License
 

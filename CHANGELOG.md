@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Security
+
+- **Breaking:** The HTTP server now binds `127.0.0.1` by default (was `0.0.0.0`), so a fresh
+  deployment is reachable only from the local machine. Set the new `HOST` variable to expose it.
+- Refuse to start when bound to a non-loopback address without `MCP_AUTH_TOKEN`, preventing
+  accidental unauthenticated exposure of full SimpleLogin account control. Override with
+  `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when exposure is contained elsewhere.
+- Validate the `Origin` header on `POST /mcp` (DNS-rebinding / CSRF defense); loopback origins are
+  allowed by default and extra origins can be added via `MCP_ALLOWED_ORIGINS`.
+- Publish the Docker Compose port on the host's loopback only (`127.0.0.1:3000:3000`).
+- Add `SECURITY.md` documenting the credential risk model, network exposure model, and vulnerability
+  reporting.
+
 ### Changed
 
 - **Breaking:** Replace the stateless `alias_toggle` tool with `alias_set_enabled`, which takes an
