@@ -1,6 +1,6 @@
 {
   "name": "simplelogin-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-hostable Model Context Protocol (MCP) server for the SimpleLogin API.",
   "license": "MIT",
   "author": "Antoine Ménard",
