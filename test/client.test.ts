@@ -9,6 +9,7 @@ import {
   SimpleLoginClient,
   SimpleLoginAPIError,
   AliasMutationError,
+  ContactMutationError,
   type FetchLike,
 } from '../src/client/simplelogin.js';
 
@@ -261,6 +262,129 @@ describe('alias set enabled', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.method).toBe('GET');
     expect(calls[0]!.url.pathname).toBe('/api/aliases/5');
+  });
+});
+
+describe('alias contacts', () => {
+  /** A minimal valid contact payload satisfying ContactSchema. */
+  const CONTACT = {
+    id: 7,
+    contact: 'marketing@example.com',
+    creation_timestamp: 1582284900,
+    reverse_alias: 'marketing at example.com <reply+abc@sl.co>',
+    reverse_alias_address: 'reply+abc@sl.co',
+    block_forward: false,
+  };
+
+  it('list uses GET with the contacts path and a page_id query, no body', async () => {
+    const { client, calls } = stubClient(jsonResponse({ contacts: [CONTACT] }));
+    await client.listAliasContacts({ aliasId: 42, pageId: 2 });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/aliases/42/contacts');
+    expect(call.url.searchParams.get('page_id')).toBe('2');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('list parses a contact with the optional/nullable fields omitted', async () => {
+    const minimal = {
+      id: 1,
+      contact: 'a@b.io',
+      creation_timestamp: 1,
+      reverse_alias: 'a at b.io <reply+x@sl.co>',
+      block_forward: true,
+    };
+    const { client } = stubClient(jsonResponse({ contacts: [minimal] }));
+    await expect(client.listAliasContacts({ aliasId: 1, pageId: 0 })).resolves.toEqual({
+      contacts: [minimal],
+    });
+  });
+
+  it('create POSTs the contact in the body to the alias contacts path', async () => {
+    const { client, calls } = stubClient(jsonResponse({ ...CONTACT, existed: false }, 201));
+    await client.createContact({ aliasId: 9, contact: 'First Last <first@example.com>' });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('POST');
+    expect(call.url.pathname).toBe('/api/aliases/9/contacts');
+    expect(call.body).toEqual({ contact: 'First Last <first@example.com>' });
+  });
+
+  it('create accepts the existed-only response when the contact already exists', async () => {
+    const { client } = stubClient(jsonResponse({ existed: true }));
+    await expect(
+      client.createContact({ aliasId: 9, contact: 'first@example.com' }),
+    ).resolves.toEqual({ existed: true });
+  });
+
+  it('toggle issues a POST to the contact toggle path', async () => {
+    const { client, calls } = stubClient(jsonResponse({ block_forward: true }));
+    await expect(client.toggleContactBlock(7)).resolves.toEqual({ block_forward: true });
+    expect(calls[0]!.method).toBe('POST');
+    expect(calls[0]!.url.pathname).toBe('/api/contacts/7/toggle');
+  });
+
+  it('delete issues a DELETE to the contact path', async () => {
+    const { client, calls } = stubClient(jsonResponse({ deleted: true }));
+    await expect(client.deleteContact(7)).resolves.toEqual({ deleted: true });
+    expect(calls[0]!.method).toBe('DELETE');
+    expect(calls[0]!.url.pathname).toBe('/api/contacts/7');
+  });
+});
+
+describe('contact set blocked', () => {
+  const CONTACT = {
+    id: 7,
+    contact: 'marketing@example.com',
+    creation_timestamp: 1582284900,
+    reverse_alias: 'marketing at example.com <reply+abc@sl.co>',
+    block_forward: false,
+  };
+
+  it('reads the contact list then toggles when the current state differs', async () => {
+    const { client, calls } = stubClient((call) =>
+      call.url.pathname.endsWith('/toggle')
+        ? jsonResponse({ block_forward: true })
+        : jsonResponse({ contacts: [CONTACT] }),
+    );
+    await expect(client.setContactBlocked(42, 7, true)).resolves.toEqual({ block_forward: true });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.method).toBe('GET');
+    expect(calls[0]!.url.pathname).toBe('/api/aliases/42/contacts');
+    expect(calls[1]!.method).toBe('POST');
+    expect(calls[1]!.url.pathname).toBe('/api/contacts/7/toggle');
+  });
+
+  it('skips the toggle and stays a no-op when already in the target state', async () => {
+    const { client, calls } = stubClient(jsonResponse({ contacts: [CONTACT] }));
+    await expect(client.setContactBlocked(42, 7, false)).resolves.toEqual({ block_forward: false });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe('GET');
+  });
+
+  it('pages through the contact list to find a contact beyond the first page', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, i) => ({ ...CONTACT, id: i + 100 }));
+    const { client, calls } = stubClient((call) => {
+      if (call.url.pathname.endsWith('/toggle')) return jsonResponse({ block_forward: true });
+      const page = call.url.searchParams.get('page_id');
+      return jsonResponse({ contacts: page === '0' ? firstPage : [CONTACT] });
+    });
+    await expect(client.setContactBlocked(42, 7, true)).resolves.toEqual({ block_forward: true });
+
+    expect(calls[0]!.url.searchParams.get('page_id')).toBe('0');
+    expect(calls[1]!.url.searchParams.get('page_id')).toBe('1');
+    expect(calls[2]!.url.pathname).toBe('/api/contacts/7/toggle');
+  });
+
+  it('throws ContactMutationError without toggling when the contact is absent', async () => {
+    const { client, calls } = stubClient(jsonResponse({ contacts: [] }));
+    const error = await client.setContactBlocked(42, 7, true).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ContactMutationError);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url.pathname).toBe('/api/aliases/42/contacts');
   });
 });
 

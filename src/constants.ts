@@ -31,3 +31,12 @@ export const aliasTogglePath = (aliasId: number): string => `/api/aliases/${alia
 /** Paginated forward/reply/block activity log for a single alias (GET). */
 export const aliasActivitiesPath = (aliasId: number): string =>
   `/api/aliases/${aliasId}/activities`;
+
+/** An alias's contacts (reverse aliases): GET to list (paginated), POST to create. */
+export const aliasContactsPath = (aliasId: number): string => `/api/aliases/${aliasId}/contacts`;
+
+/** Block/unblock forwarding toggle for a single contact (POST). */
+export const contactTogglePath = (contactId: number): string => `/api/contacts/${contactId}/toggle`;
+
+/** Per-contact resource path (DELETE). */
+export const contactPath = (contactId: number): string => `/api/contacts/${contactId}`;

@@ -7,6 +7,11 @@
 - Add `alias_activity_list`, a read-only tool that returns an alias's forward/reply/block activity
   history. Results are paginated at 20 entries per page (`page_id`, zero-based) so responses stay
   bounded, making it suitable for auditing how a specific alias has been used.
+- Add alias contact (reverse-alias) tools: `contact_list` (read-only, paginated at 20 per page),
+  `contact_create` to make a reverse alias for sending mail from an alias, `contact_set_blocked` to
+  block or unblock forwarding from a contact, and `contact_delete` to remove one. `contact_set_blocked`
+  is idempotent (it reads the contact's current state first, so setting a state it is already in is a
+  no-op), and `contact_delete` requires `confirm: true` to guard the permanent, irreversible removal.
 
 ## v0.2.0
 

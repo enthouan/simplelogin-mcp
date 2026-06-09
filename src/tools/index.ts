@@ -6,12 +6,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
 import { registerAliasTools } from './aliases.js';
+import { registerContactTools } from './contacts.js';
 import { registerMailboxTools } from './mailboxes.js';
 import { registerAccountTools } from './account.js';
 
 /** Wire all SimpleLogin tools onto the given server. */
 export function registerAllTools(server: McpServer, client: SimpleLoginClient): void {
   registerAliasTools(server, client);
+  registerContactTools(server, client);
   registerMailboxTools(server, client);
   registerAccountTools(server, client);
 }
