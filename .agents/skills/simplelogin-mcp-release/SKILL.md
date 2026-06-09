@@ -13,8 +13,8 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
 - Never push directly to `main`; the branch is protected. Use a PR and wait for the required
   `check` status.
 - Use branch names like `release-0.3.0`.
-- Use the squash commit subject `vX.Y.Z release`. Do not use `Prepare vX.Y.Z release`; that reads
-  badly in the permanent git history.
+- Use the PR title and squash commit subject `vX.Y.Z release`. GitHub can derive the squash commit
+  subject from the PR title, so the PR title must not be `Prepare vX.Y.Z release`.
 - Tag only after the release PR is merged to `main`, and tag the fetched `origin/main` merge commit.
 - Match the existing lightweight tag style unless the repo changes its tag policy.
 - Do not rewrite `main`, force-push, delete/move a published tag, or replace a GitHub Release
