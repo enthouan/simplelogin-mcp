@@ -30,9 +30,11 @@ into a container and self-host.
 git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
 
-# 2. Create your .env from the template and add your SimpleLogin API key
+# 2. Create your .env from the template and add your secrets
 cp .env.example .env
-# then edit .env and set SL_API_KEY=...
+# then edit .env and set:
+#   SL_API_KEY=...
+#   MCP_AUTH_TOKEN=<output of: openssl rand -hex 32>
 
 # 3. Build and run
 docker compose up -d
@@ -53,18 +55,27 @@ The server now listens on `http://localhost:3000` with the MCP endpoint at `POST
 All configuration is via environment variables (see [`.env.example`](.env.example)). The server
 validates them at startup and exits with a readable message if anything required is missing.
 
-| Variable                | Required | Default                      | Description                                                                      |
-| ----------------------- | -------- | ---------------------------- | -------------------------------------------------------------------------------- |
-| `SL_API_KEY`            | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call. |
-| `TRANSPORT`             | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                           |
-| `PORT`                  | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode.                                 |
-| `SL_API_URL`            | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                   |
-| `MCP_AUTH_TOKEN`        | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`.                    |
-| `SL_REQUEST_TIMEOUT_MS` | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                     |
+| Variable                         | Required | Default                      | Description                                                                                          |
+| -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
+| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                                               |
+| `HOST`                           | No       | `127.0.0.1`                  | Interface the HTTP server binds to. Loopback by default; `0.0.0.0` exposes it (requires a token).    |
+| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode.                                                     |
+| `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
+| `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
+| `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
+| `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
+| `SL_REQUEST_TIMEOUT_MS`          | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                                         |
 
 > **Two distinct secrets:** `SL_API_KEY` authenticates the server **to SimpleLogin** (the
 > `Authentication` header on outbound calls). `MCP_AUTH_TOKEN` authenticates clients **to this
 > server** (the standard `Authorization: Bearer` header on `POST /mcp`). They are unrelated.
+
+> **Safe by default:** the HTTP server binds `127.0.0.1` and is reachable only from the local
+> machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup, so exposing
+> the endpoint is always an explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
+> Docker Compose sets `HOST=0.0.0.0` inside the container for port forwarding, so its quick start
+> requires `MCP_AUTH_TOKEN` even though the host port is published on loopback.
 
 ## Getting a SimpleLogin API key
 
@@ -76,17 +87,17 @@ validates them at startup and exits with a readable message if anything required
 
 ### Claude Code (HTTP)
 
-With the server running (see Quick start), register it:
-
-```bash
-claude mcp add --transport http simplelogin http://localhost:3000/mcp
-```
-
-If you set `MCP_AUTH_TOKEN`, include it:
+With the server running (see Quick start), register it with the token from `.env`:
 
 ```bash
 claude mcp add --transport http simplelogin http://localhost:3000/mcp \
   --header "Authorization: Bearer YOUR_MCP_AUTH_TOKEN"
+```
+
+For loopback-only, non-container use with no `MCP_AUTH_TOKEN`, omit the header:
+
+```bash
+claude mcp add --transport http simplelogin http://localhost:3000/mcp
 ```
 
 ### Claude Desktop (stdio)
@@ -175,6 +186,13 @@ The client's shared `request()` helper handles the `Authentication` header, time
 The API surface follows the in-app SimpleLogin reference
 ([`docs/api.md`](https://github.com/simple-login/app/blob/master/docs/api.md)), which is the source
 of truth for request/response shapes.
+
+## Security
+
+The `SL_API_KEY` grants full control of your SimpleLogin account, so treat it like a password.
+The HTTP server is safe by default (loopback bind) and refuses to start exposed without a token.
+For the credential risk model, network exposure patterns, and how to report a vulnerability, see
+[SECURITY.md](SECURITY.md).
 
 ## License
 
