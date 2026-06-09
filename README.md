@@ -21,6 +21,10 @@ into a container and self-host.
 | `alias_set_enabled`   | Explicitly enable or disable an alias (idempotent).                         |
 | `alias_options_get`   | Get creation options (can_create, suffixes, signed suffixes).               |
 | `alias_domains_list`  | List domains usable for alias creation.                                     |
+| `contact_list`        | List an alias's contacts/reverse aliases (paginated, 20 per page).          |
+| `contact_create`      | Create a contact (reverse alias) to send mail from an alias.                |
+| `contact_set_blocked` | Block or unblock forwarding from a contact (idempotent).                    |
+| `contact_delete`      | Permanently delete a contact (requires `confirm: true`).                    |
 | `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).              |
 | `account_get_info`    | Get user info; doubles as an API-key sanity check.                          |
 
@@ -36,6 +40,26 @@ into a container and self-host.
    event you are investigating is found.
 4. For reply investigations, use `reverse_alias` for the display form and `reverse_alias_address`
    for the address clients should reply to.
+
+### Send mail from an alias with a reverse alias
+
+A _contact_ is a reverse alias: an address SimpleLogin generates so you can email someone _from_ an
+alias without revealing your real mailbox. Mail you send to the reverse-alias address is rewritten to
+come from the alias; the recipient only ever sees the alias.
+
+1. Find the `alias_id` (via `alias_list` or `alias_get`).
+2. Call `contact_create` with that `alias_id` and the recipient as `contact`, e.g.
+   `"Acme Support <support@acme.com>"` (a bare `support@acme.com` works too).
+3. Read `reverse_alias_address` from the result, e.g. `reply+abc123@simplelogin.io`. Send your email
+   to that address from the alias; the recipient sees it as coming from the alias. An `existed: true`
+   result means the contact already existed and the same reverse alias is reused.
+4. To stop a noisy sender, call `contact_set_blocked` with `blocked: true` (it is idempotent, so
+   re-blocking is a no-op); set `blocked: false` to allow forwarding again.
+5. To remove a reverse alias for good, call `contact_delete` with `confirm: true`. This is permanent
+   and breaks the reverse-alias address, so prefer blocking when you only want to silence a contact.
+
+> Creating reverse aliases may require a premium SimpleLogin plan; `contact_create` surfaces the
+> API's "please upgrade" error when it does.
 
 ## Quick start (Docker Compose)
 

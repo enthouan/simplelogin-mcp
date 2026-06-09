@@ -6,7 +6,15 @@
  * small, obvious change: one constant in constants.ts, one schema, one method here.
  */
 import { z } from 'zod';
-import { API_PATHS, aliasPath, aliasTogglePath, aliasActivitiesPath } from '../constants.js';
+import {
+  API_PATHS,
+  aliasPath,
+  aliasTogglePath,
+  aliasActivitiesPath,
+  aliasContactsPath,
+  contactTogglePath,
+  contactPath,
+} from '../constants.js';
 import { logger } from '../logger.js';
 import {
   AliasSchema,
@@ -23,6 +31,17 @@ import {
   type AliasDeleteResponse,
   type AliasActivitiesResponse,
 } from '../schemas/alias.js';
+import {
+  ContactListResponseSchema,
+  ContactCreateResponseSchema,
+  ContactToggleResponseSchema,
+  ContactDeleteResponseSchema,
+  type Contact,
+  type ContactListResponse,
+  type ContactCreateResponse,
+  type ContactToggleResponse,
+  type ContactDeleteResponse,
+} from '../schemas/contact.js';
 import { MailboxListResponseSchema, type MailboxListResponse } from '../schemas/mailbox.js';
 import { DomainListResponseSchema, type DomainListResponse } from '../schemas/domain.js';
 import { UserInfoSchema, type UserInfo } from '../schemas/account.js';
@@ -55,6 +74,19 @@ export class AliasMutationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'AliasMutationError';
+  }
+}
+
+/**
+ * Thrown when a contact block/unblock cannot proceed because the target contact
+ * could not be located on its alias. SimpleLogin exposes no single-contact read,
+ * so {@link SimpleLoginClient.setContactBlocked} locates the contact by paging the
+ * alias's contact list; this signals that the id was absent from that list.
+ */
+export class ContactMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ContactMutationError';
   }
 }
 
@@ -264,6 +296,89 @@ export class SimpleLoginClient {
       query: { page_id: params.pageId },
       schema: AliasActivitiesResponseSchema,
     });
+  }
+
+  // --- Contacts --------------------------------------------------------------
+
+  /**
+   * Read one page (max 20 entries) of an alias's contacts (reverse aliases).
+   * Pagination is the bound that keeps the result from growing unbounded.
+   */
+  listAliasContacts(params: { aliasId: number; pageId: number }): Promise<ContactListResponse> {
+    return this.request({
+      method: 'GET',
+      endpoint: aliasContactsPath(params.aliasId),
+      query: { page_id: params.pageId },
+      schema: ContactListResponseSchema,
+    });
+  }
+
+  /**
+   * Create a contact (reverse alias) so the user can send mail *from* the alias to
+   * `contact`. The value may be a bare address or an RFC-5322 "Name <addr>" form.
+   * When the contact already exists the response is simply `{ existed: true }`.
+   */
+  createContact(params: { aliasId: number; contact: string }): Promise<ContactCreateResponse> {
+    return this.request({
+      method: 'POST',
+      endpoint: aliasContactsPath(params.aliasId),
+      body: { contact: params.contact },
+      schema: ContactCreateResponseSchema,
+    });
+  }
+
+  toggleContactBlock(contactId: number): Promise<ContactToggleResponse> {
+    return this.request({
+      method: 'POST',
+      endpoint: contactTogglePath(contactId),
+      schema: ContactToggleResponseSchema,
+    });
+  }
+
+  /**
+   * Set a contact's forward-blocking state explicitly and idempotently. As with
+   * {@link setAliasEnabled}, SimpleLogin only exposes a toggle (and offers no
+   * single-contact read), so this locates the contact in the alias's contact list
+   * to learn its current state, then toggles solely when it differs from the
+   * target. Re-setting an already-correct state is a no-op that still returns the
+   * resulting state. Throws {@link ContactMutationError} if the contact is not on
+   * the alias.
+   */
+  async setContactBlocked(
+    aliasId: number,
+    contactId: number,
+    blocked: boolean,
+  ): Promise<ContactToggleResponse> {
+    const contact = await this.findContact(aliasId, contactId);
+    if (contact === undefined) {
+      throw new ContactMutationError(
+        `Contact ${contactId} was not found on alias ${aliasId}; use contact_list to confirm the id.`,
+      );
+    }
+    if (contact.block_forward === blocked) return { block_forward: blocked };
+    return this.toggleContactBlock(contactId);
+  }
+
+  deleteContact(contactId: number): Promise<ContactDeleteResponse> {
+    return this.request({
+      method: 'DELETE',
+      endpoint: contactPath(contactId),
+      schema: ContactDeleteResponseSchema,
+    });
+  }
+
+  /**
+   * Find a contact on an alias by walking the paginated contact list (20 per
+   * page). Stops at the first match, or once a short/empty page proves the id is
+   * absent. Used by {@link setContactBlocked} because no single-contact read exists.
+   */
+  private async findContact(aliasId: number, contactId: number): Promise<Contact | undefined> {
+    for (let pageId = 0; ; pageId++) {
+      const { contacts } = await this.listAliasContacts({ aliasId, pageId });
+      const match = contacts.find((contact) => contact.id === contactId);
+      if (match) return match;
+      if (contacts.length < 20) return undefined;
+    }
   }
 
   // --- Domains & mailboxes ---------------------------------------------------
