@@ -14,7 +14,8 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
   `check` status.
 - Never merge a PR unless the user explicitly approves merging that specific PR. Passing checks,
   GitHub review approval, or a release request is not enough by itself.
-- Use branch names like `release-v0.3.0`.
+- Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
+  the tag and PR title.
 - Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
   the squash commit subject from the PR title, so the PR title must not be `Prepare vX.Y.Z release`.
 - Tag only after the release PR is merged to `main`, and tag the fetched `origin/main` merge commit.
@@ -84,9 +85,30 @@ PATH=/Users/enthouan/.cache/codex-runtimes/codex-primary-runtime/dependencies/no
 Smoke-test the compiled runtime:
 
 ```bash
-SL_API_KEY=sl-test TRANSPORT=http HOST=127.0.0.1 PORT=34712 node dist/index.js
-curl -sS http://127.0.0.1:34712/health
-SL_API_KEY=sl-test TRANSPORT=http HOST=0.0.0.0 PORT=34713 node dist/index.js
+SL_API_KEY=sl-test TRANSPORT=http HOST=127.0.0.1 PORT=34712 node dist/index.js &
+server_pid=$!
+trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+
+for _ in 1 2 3 4 5; do
+  curl -fsS http://127.0.0.1:34712/health && break
+  sleep 1
+done
+curl -fsS http://127.0.0.1:34712/health | grep "\"version\":\"X.Y.Z\""
+
+kill "$server_pid"
+wait "$server_pid" 2>/dev/null || true
+trap - EXIT
+
+SL_API_KEY=sl-test TRANSPORT=http HOST=0.0.0.0 PORT=34713 node dist/index.js &
+guard_pid=$!
+sleep 2
+if kill -0 "$guard_pid" 2>/dev/null; then
+  kill "$guard_pid"
+  wait "$guard_pid" 2>/dev/null || true
+  echo "expected non-loopback exposure refusal" >&2
+  exit 1
+fi
+wait "$guard_pid" || true
 ```
 
 Expected results:
@@ -134,7 +156,16 @@ gh pr merge <pr-number> --repo enthouan/simplelogin-mcp --squash --delete-branch
 
 Verify the merged PR is Done in the project before tagging.
 
+After the merge, stop and report the merged PR and main-branch verification.
+Do not push a release tag, create a GitHub Release, or close a milestone unless
+the user explicitly approves publishing that exact `vX.Y.Z` release. Merge
+approval is not publish approval.
+
 ## Tag And Publish
+
+Proceed only after the user explicitly approves the release-side effects for
+the exact `vX.Y.Z`: tag push, GHCR publish, GitHub Release creation, and
+milestone closure.
 
 Fetch the merged main commit and ensure the tag does not already exist:
 
@@ -159,6 +190,7 @@ publishes `X.Y.Z`, moving minor `X.Y`, and `sha-<full-main-sha>`.
 ```bash
 gh run list --repo enthouan/simplelogin-mcp --limit 10 \
   --json databaseId,name,headBranch,headSha,status,conclusion,event,createdAt,url
+gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
 
