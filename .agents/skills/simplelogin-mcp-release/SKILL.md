@@ -14,6 +14,9 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
   `check` status.
 - Never merge a PR unless the user explicitly approves merging that specific PR. Passing checks,
   GitHub review approval, or a release request is not enough by itself.
+- The release PR merge approval is the only normal approval boundary. After the approved release PR
+  is merged, continue through tag push, workflow/GHCR verification, GitHub Release creation, and
+  milestone closure for that exact version without asking for a second publish approval.
 - Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
   the tag and PR title.
 - Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
@@ -156,16 +159,20 @@ gh pr merge <pr-number> --repo enthouan/simplelogin-mcp --squash --delete-branch
 
 Verify the merged PR is Done in the project before tagging.
 
-After the merge, stop and report the merged PR and main-branch verification.
-Do not push a release tag, create a GitHub Release, or close a milestone unless
-the user explicitly approves publishing that exact `vX.Y.Z` release. Merge
-approval is not publish approval.
+After the merge, verify the main-branch state, then continue directly to
+Tag And Publish. Do not pause for a second approval before pushing the release
+tag, creating the GitHub Release, or closing the milestone.
 
 ## Tag And Publish
 
-Proceed only after the user explicitly approves the release-side effects for
-the exact `vX.Y.Z`: tag push, GHCR publish, GitHub Release creation, and
-milestone closure.
+Run this immediately after the approved release PR is merged and the merged PR
+is verified as Done in the project. The prior merge approval covers the normal
+release-side effects for the exact `vX.Y.Z`: tag push, GHCR publish
+verification, GitHub Release creation, and milestone closure.
+
+Stop and ask for explicit approval only when a corrective action would rewrite
+history or replace published release state, such as moving/deleting a tag,
+force-pushing, rewriting `main`, or replacing an existing GitHub Release.
 
 Fetch the merged main commit and ensure the tag does not already exist:
 
