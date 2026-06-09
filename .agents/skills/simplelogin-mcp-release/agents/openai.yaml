@@ -1,0 +1,4 @@
+interface:
+  display_name: 'SimpleLogin MCP Release'
+  short_description: 'Release simplelogin-mcp safely'
+  default_prompt: 'Release simplelogin-mcp using the repo checklist'
