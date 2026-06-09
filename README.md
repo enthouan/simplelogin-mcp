@@ -41,13 +41,13 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3000/health
-# -> {"status":"ok","version":"0.1.0"}
+# -> {"status":"ok","version":"0.2.0"}
 ```
 
 The server now listens on `http://localhost:3000` with the MCP endpoint at `POST /mcp`.
 
-> **Prebuilt image:** once this repo's `release` workflow has run, a multi-arch image is published
-> to `ghcr.io/enthouan/simplelogin-mcp`. To use it instead of building locally, comment out the
+> **Prebuilt image:** each tagged release publishes a multi-arch image to
+> `ghcr.io/enthouan/simplelogin-mcp`. To use it instead of building locally, comment out the
 > `build: .` line in `docker-compose.yml` and uncomment the `image:` line.
 
 ## Configuration
