@@ -12,11 +12,14 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
 
 - Never push directly to `main`; the branch is protected. Use a PR and wait for the required
   `check` status.
-- Use branch names like `release-0.3.0`.
-- Use the PR title and squash commit subject `vX.Y.Z release`. GitHub can derive the squash commit
-  subject from the PR title, so the PR title must not be `Prepare vX.Y.Z release`.
+- Never merge a PR unless the user explicitly approves merging that specific PR. Passing checks,
+  GitHub review approval, or a release request is not enough by itself.
+- Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
+  the tag and PR title.
+- Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
+  the squash commit subject from the PR title, so the PR title must not be `Prepare vX.Y.Z release`.
 - Tag only after the release PR is merged to `main`, and tag the fetched `origin/main` merge commit.
-- Match the existing lightweight tag style unless the repo changes its tag policy.
+- Use annotated tags with the message exactly `vX.Y.Z`.
 - Do not rewrite `main`, force-push, delete/move a published tag, or replace a GitHub Release
   without explicit user approval.
 - If a bad commit subject is already merged and tagged, explain that fixing it requires rewriting
@@ -82,9 +85,30 @@ PATH=/Users/enthouan/.cache/codex-runtimes/codex-primary-runtime/dependencies/no
 Smoke-test the compiled runtime:
 
 ```bash
-SL_API_KEY=sl-test TRANSPORT=http HOST=127.0.0.1 PORT=34712 node dist/index.js
-curl -sS http://127.0.0.1:34712/health
-SL_API_KEY=sl-test TRANSPORT=http HOST=0.0.0.0 PORT=34713 node dist/index.js
+SL_API_KEY=sl-test TRANSPORT=http HOST=127.0.0.1 PORT=34712 node dist/index.js &
+server_pid=$!
+trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+
+for _ in 1 2 3 4 5; do
+  curl -fsS http://127.0.0.1:34712/health && break
+  sleep 1
+done
+curl -fsS http://127.0.0.1:34712/health | grep "\"version\":\"X.Y.Z\""
+
+kill "$server_pid"
+wait "$server_pid" 2>/dev/null || true
+trap - EXIT
+
+SL_API_KEY=sl-test TRANSPORT=http HOST=0.0.0.0 PORT=34713 node dist/index.js &
+guard_pid=$!
+sleep 2
+if kill -0 "$guard_pid" 2>/dev/null; then
+  kill "$guard_pid"
+  wait "$guard_pid" 2>/dev/null || true
+  echo "expected non-loopback exposure refusal" >&2
+  exit 1
+fi
+wait "$guard_pid" || true
 ```
 
 Expected results:
@@ -99,38 +123,49 @@ Create the release branch from fetched `origin/main`:
 
 ```bash
 git switch --detach origin/main
-git switch -c release-X.Y.Z
+git switch -c release-vX.Y.Z
 git add CHANGELOG.md README.md package.json src/version.ts
-git commit -m "vX.Y.Z release"
+git commit -m "vX.Y.Z"
 git push -u origin HEAD
 ```
 
 Open the PR with:
 
-- title: `vX.Y.Z release`
+- title: `vX.Y.Z`
 - milestone: target milestone, for example `simplelogin-mcp 0.3`
 - labels: `codex`, `documentation`, `area:docs`, and `area:docker`
 - project: add to the `simplelogin-mcp` GitHub Project
 - validation: list portable commands only, without machine-local PATH prefixes unless needed to
   explain the Rolldown workaround
 
-Wait for PR checks:
+Wait for PR checks, then report the result and stop unless the user explicitly approves merging
+that PR:
 
 ```bash
 gh pr checks <pr-number> --repo enthouan/simplelogin-mcp --watch
 ```
 
-When checks pass, merge through the protected-branch path:
+Only after the user explicitly approves merging the specific PR and checks pass, merge through the
+protected-branch path:
 
 ```bash
 gh pr ready <pr-number> --repo enthouan/simplelogin-mcp
 gh pr merge <pr-number> --repo enthouan/simplelogin-mcp --squash --delete-branch \
-  --subject "vX.Y.Z release"
+  --subject "vX.Y.Z"
 ```
 
 Verify the merged PR is Done in the project before tagging.
 
+After the merge, stop and report the merged PR and main-branch verification.
+Do not push a release tag, create a GitHub Release, or close a milestone unless
+the user explicitly approves publishing that exact `vX.Y.Z` release. Merge
+approval is not publish approval.
+
 ## Tag And Publish
+
+Proceed only after the user explicitly approves the release-side effects for
+the exact `vX.Y.Z`: tag push, GHCR publish, GitHub Release creation, and
+milestone closure.
 
 Fetch the merged main commit and ensure the tag does not already exist:
 
@@ -144,25 +179,36 @@ git tag --list "vX.Y.Z"
 Create and push the tag:
 
 ```bash
-git tag vX.Y.Z origin/main
+git tag -a vX.Y.Z origin/main -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Watch release workflows for both the merged `main` push and the tag push. The tag workflow is the
-one that publishes `vX.Y.Z` and `latest`.
+Watch release workflows for both the merged `main` push and the tag push. The
+main workflow publishes `latest` and `sha-<full-main-sha>`; the tag workflow
+publishes `X.Y.Z`, moving minor `X.Y`, and `sha-<full-main-sha>`.
 
 ```bash
 gh run list --repo enthouan/simplelogin-mcp --limit 10 \
   --json databaseId,name,headBranch,headSha,status,conclusion,event,createdAt,url
+gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
 
-Create the GitHub Release after the tag exists. Use the title `vX.Y.Z release`, not `Prepare...`.
-Use the changelog section as notes.
+Verify image tags before creating the GitHub Release:
+
+```bash
+docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
+docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y
+docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
+```
+
+Create the GitHub Release after the tag workflow and GHCR image checks pass.
+Use the title `vX.Y.Z` exactly, without `release` or any other suffix. Use the
+changelog section as notes.
 
 ```bash
 version=X.Y.Z
-gh release create "v${version}" --repo enthouan/simplelogin-mcp --title "v${version} release" \
+gh release create "v${version}" --repo enthouan/simplelogin-mcp --title "v${version}" \
   --notes "$(git show origin/main:CHANGELOG.md | awk -v "tag=v${version}" '$0 == "## " tag {p=1; next} /^## v/ && p {p=0} p {print}')"
 ```
 
@@ -173,8 +219,6 @@ Verify release, image tags, milestone, and worktree state:
 ```bash
 gh release view vX.Y.Z --repo enthouan/simplelogin-mcp \
   --json tagName,name,isDraft,isPrerelease,publishedAt,url
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:vX.Y.Z
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:latest
 gh api repos/enthouan/simplelogin-mcp/milestones --paginate \
   --jq '.[] | select(.title == "simplelogin-mcp X.Y")'
 git status --short --branch

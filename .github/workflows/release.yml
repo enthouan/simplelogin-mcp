@@ -1,10 +1,10 @@
 name: release
 
-# Build and publish a multi-arch image to GHCR on pushes to main and on v* tags.
+# Build and publish a multi-arch image to GHCR on pushes to main and semver tags.
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v*.*.*']
 
 permissions:
   contents: read
@@ -13,7 +13,7 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,10 +36,26 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
           tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=simplelogin-mcp
+            org.opencontainers.image.description=Self-hostable MCP server for SimpleLogin email-alias workflows.
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            io.github.actions.run.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          annotations: |
+            org.opencontainers.image.description=Self-hostable MCP server for SimpleLogin email-alias workflows.
+            io.github.actions.run.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -49,5 +65,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
