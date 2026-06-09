@@ -2,31 +2,34 @@
 
 A self-hostable [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for the
 [SimpleLogin](https://simplelogin.io) email-alias API. It exposes the core alias workflow —
-list, create (random or custom), update, delete, enable/disable — plus the mailbox, domain, and
-account lookups needed to drive it, as MCP tools that Claude and other MCP clients can call. Runs
+list, create (random or custom), update, delete, enable/disable — plus mailbox management and the
+domain and account lookups needed to drive it, as MCP tools that Claude and other MCP clients can call. Runs
 as a stdio server for local desktop clients or as a stateless Streamable HTTP server you can drop
 into a container and self-host.
 
 ## Tools
 
-| Tool                  | Description                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| `alias_list`          | List aliases (paginated; filter enabled/disabled/pinned; free-text search). |
-| `alias_get`           | Get one alias by id.                                                        |
-| `alias_activity_list` | List an alias's forward/reply/block activity (paginated, 20 per page).      |
-| `alias_create_random` | Create a random alias (`uuid` or `word` mode).                              |
-| `alias_create_custom` | Create a custom alias from a prefix + signed suffix + mailboxes.            |
-| `alias_update`        | Update note, name, owning mailbox(es), PGP, or pinned state.                |
-| `alias_delete`        | Permanently delete an alias (requires `confirm: true`).                     |
-| `alias_set_enabled`   | Explicitly enable or disable an alias (idempotent).                         |
-| `alias_options_get`   | Get creation options (can_create, suffixes, signed suffixes).               |
-| `alias_domains_list`  | List domains usable for alias creation.                                     |
-| `contact_list`        | List an alias's contacts/reverse aliases (paginated, 20 per page).          |
-| `contact_create`      | Create a contact (reverse alias) to send mail from an alias.                |
-| `contact_set_blocked` | Block or unblock forwarding from a contact (idempotent).                    |
-| `contact_delete`      | Permanently delete a contact (requires `confirm: true`).                    |
-| `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).              |
-| `account_get_info`    | Get user info; doubles as an API-key sanity check.                          |
+| Tool                  | Description                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `alias_list`          | List aliases (paginated; filter enabled/disabled/pinned; free-text search).                           |
+| `alias_get`           | Get one alias by id.                                                                                  |
+| `alias_activity_list` | List an alias's forward/reply/block activity (paginated, 20 per page).                                |
+| `alias_create_random` | Create a random alias (`uuid` or `word` mode).                                                        |
+| `alias_create_custom` | Create a custom alias from a prefix + signed suffix + mailboxes.                                      |
+| `alias_update`        | Update note, name, owning mailbox(es), PGP, or pinned state.                                          |
+| `alias_delete`        | Permanently delete an alias (requires `confirm: true`).                                               |
+| `alias_set_enabled`   | Explicitly enable or disable an alias (idempotent).                                                   |
+| `alias_options_get`   | Get creation options (can_create, suffixes, signed suffixes).                                         |
+| `alias_domains_list`  | List domains usable for alias creation.                                                               |
+| `contact_list`        | List an alias's contacts/reverse aliases (paginated, 20 per page).                                    |
+| `contact_create`      | Create a contact (reverse alias) to send mail from an alias.                                          |
+| `contact_set_blocked` | Block or unblock forwarding from a contact (idempotent).                                              |
+| `contact_delete`      | Permanently delete a contact (requires `confirm: true`).                                              |
+| `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).                                        |
+| `mailbox_create`      | Add a mailbox; it must be verified by email before use.                                               |
+| `mailbox_update`      | Set a mailbox as default, change its address, or cancel a pending change.                             |
+| `mailbox_delete`      | Permanently delete a mailbox (requires `confirm: true` and an explicit alias transfer/delete choice). |
+| `account_get_info`    | Get user info; doubles as an API-key sanity check.                                                    |
 
 ## Common workflows
 
@@ -60,6 +63,41 @@ come from the alias; the recipient only ever sees the alias.
 
 > Creating reverse aliases may require a premium SimpleLogin plan; `contact_create` surfaces the
 > API's "please upgrade" error when it does.
+
+### Manage mailboxes
+
+A _mailbox_ is a real email address that receives the mail forwarded by your aliases. Every alias
+is owned by one or more mailboxes, and the account has exactly one _default_ mailbox that new
+aliases attach to unless told otherwise.
+
+**Verification.** A mailbox must prove it exists before SimpleLogin will use it:
+
+1. `mailbox_create` adds a mailbox and sends a verification email to the address. The new mailbox
+   starts with `verified: false` and cannot own aliases or become the default until the link in
+   that email is clicked. Poll `mailbox_list` to see `verified` turn true. Additional mailboxes
+   may require a premium plan.
+2. `mailbox_update` with `email` starts an address change, which is also verification-gated: the
+   new address gets its own verification email and the change stays pending until confirmed. Use
+   `cancel_email_change: true` to abort a pending change (the two fields are mutually exclusive).
+3. `mailbox_update` with `set_default: true` promotes a verified mailbox to account default.
+   There is no `set_default: false`: a mailbox stops being the default only when another one is
+   promoted.
+
+**Deletion and alias transfer.** `mailbox_delete` is permanent and affects the aliases the
+mailbox owns, so it cannot happen accidentally:
+
+1. You must pass `confirm: true`, and you must choose the aliases' fate explicitly: either
+   `transfer_aliases_to` (the id of a different, verified mailbox from `mailbox_list` that takes
+   over the owned aliases) or `delete_aliases: true` (the aliases are deleted with the mailbox).
+   Omitting both, or passing both, is rejected before SimpleLogin is contacted.
+2. The default mailbox cannot be deleted. Promote another mailbox with `mailbox_update`
+   `set_default: true` first, then delete.
+3. The server pre-checks the deletion against `mailbox_list` and refuses with a clear message
+   when the mailbox id is unknown, the transfer target is missing or unverified, or the target is
+   the mailbox being deleted, so nothing is destroyed on a mistyped id.
+
+To merely stop an alias from delivering to a mailbox, do not delete the mailbox: update the alias
+itself with `alias_update` (`mailbox_ids`) or disable it with `alias_set_enabled`.
 
 ## Quick start (Docker Compose)
 

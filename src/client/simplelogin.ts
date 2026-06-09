@@ -14,6 +14,7 @@ import {
   aliasContactsPath,
   contactTogglePath,
   contactPath,
+  mailboxPath,
 } from '../constants.js';
 import { logger } from '../logger.js';
 import {
@@ -42,7 +43,16 @@ import {
   type ContactToggleResponse,
   type ContactDeleteResponse,
 } from '../schemas/contact.js';
-import { MailboxListResponseSchema, type MailboxListResponse } from '../schemas/mailbox.js';
+import {
+  MailboxListResponseSchema,
+  MailboxCreateResponseSchema,
+  MailboxUpdateResponseSchema,
+  MailboxDeleteResponseSchema,
+  type MailboxListResponse,
+  type MailboxCreateResponse,
+  type MailboxUpdateResponse,
+  type MailboxDeleteResponse,
+} from '../schemas/mailbox.js';
 import { DomainListResponseSchema, type DomainListResponse } from '../schemas/domain.js';
 import { UserInfoSchema, type UserInfo } from '../schemas/account.js';
 
@@ -90,7 +100,20 @@ export class ContactMutationError extends Error {
   }
 }
 
-type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+/**
+ * Thrown when a mailbox mutation is rejected locally, before any destructive
+ * network call: a no-op update, conflicting inputs, deleting the default mailbox,
+ * or an invalid alias-transfer target. Carries no HTTP status because the
+ * offending request was never sent.
+ */
+export class MailboxMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MailboxMutationError';
+  }
+}
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
 
@@ -396,6 +419,136 @@ export class SimpleLoginClient {
       method: 'GET',
       endpoint: API_PATHS.mailboxes,
       schema: MailboxListResponseSchema,
+    });
+  }
+
+  /**
+   * Create a new mailbox. SimpleLogin emails a verification link to the address;
+   * the mailbox is returned unverified and cannot own aliases or become the
+   * default until that link is clicked.
+   */
+  createMailbox(email: string): Promise<MailboxCreateResponse> {
+    return this.request({
+      method: 'POST',
+      endpoint: API_PATHS.mailboxCreate,
+      body: { email },
+      schema: MailboxCreateResponseSchema,
+    });
+  }
+
+  /**
+   * Update a mailbox. Guardrails enforced before any network call: the change set
+   * must not be empty, `setDefault` and `cancelEmailChange` only accept `true`
+   * (SimpleLogin ignores `false` for both, so accepting it would silently no-op:
+   * a mailbox stops being the default only when another one is promoted, and a
+   * pending email change can only be cancelled), and `email` cannot be combined
+   * with `cancelEmailChange` since one starts an address change while the other
+   * aborts it.
+   */
+  async updateMailbox(
+    mailboxId: number,
+    patch: { email?: string; setDefault?: boolean; cancelEmailChange?: boolean },
+  ): Promise<MailboxUpdateResponse> {
+    if (patch.setDefault === false) {
+      throw new MailboxMutationError(
+        'set_default only accepts true; to demote this mailbox, set another mailbox as default instead.',
+      );
+    }
+    if (patch.cancelEmailChange === false) {
+      throw new MailboxMutationError(
+        'cancel_email_change only accepts true; a pending email change is either cancelled or left alone.',
+      );
+    }
+    if (patch.email !== undefined && patch.cancelEmailChange !== undefined) {
+      throw new MailboxMutationError(
+        'Provide either email or cancel_email_change, not both: one starts an address change, the other cancels it.',
+      );
+    }
+    const hasChange =
+      patch.email !== undefined ||
+      patch.setDefault !== undefined ||
+      patch.cancelEmailChange !== undefined;
+    if (!hasChange) {
+      throw new MailboxMutationError(
+        'No changes provided; supply at least one field to update (email, set_default, or cancel_email_change).',
+      );
+    }
+
+    // undefined fields are dropped by JSON.stringify, so only provided fields are sent.
+    return this.request({
+      method: 'PUT',
+      endpoint: mailboxPath(mailboxId),
+      body: {
+        email: patch.email,
+        default: patch.setDefault,
+        cancel_email_change: patch.cancelEmailChange,
+      },
+      schema: MailboxUpdateResponseSchema,
+    });
+  }
+
+  /**
+   * Delete a mailbox after local transfer-safety checks. SimpleLogin deletes the
+   * mailbox's aliases unless they are transferred, so the caller must choose
+   * explicitly: `transferAliasesTo` moves the aliases to another mailbox, while
+   * `deleteAliases: true` acknowledges they are deleted with the mailbox. The
+   * mailbox list is read first so deleting the default mailbox, a wrong mailbox
+   * id, or transferring to a missing/unverified target is rejected with a clear
+   * message before anything is destroyed.
+   */
+  async deleteMailbox(
+    mailboxId: number,
+    options: { transferAliasesTo?: number; deleteAliases?: boolean },
+  ): Promise<MailboxDeleteResponse> {
+    const transferring = options.transferAliasesTo !== undefined;
+    if (transferring && options.deleteAliases !== undefined) {
+      throw new MailboxMutationError(
+        'Provide either transfer_aliases_to or delete_aliases, not both: the aliases are either transferred or deleted.',
+      );
+    }
+    if (!transferring && options.deleteAliases !== true) {
+      throw new MailboxMutationError(
+        'Choose what happens to the aliases owned by this mailbox: pass transfer_aliases_to with the id of another mailbox, or delete_aliases=true to delete them with it.',
+      );
+    }
+    if (options.transferAliasesTo === mailboxId) {
+      throw new MailboxMutationError(
+        'transfer_aliases_to must be a different mailbox than the one being deleted.',
+      );
+    }
+
+    const { mailboxes } = await this.listMailboxes();
+    const mailbox = mailboxes.find((candidate) => candidate.id === mailboxId);
+    if (mailbox === undefined) {
+      throw new MailboxMutationError(
+        `Mailbox ${mailboxId} was not found on this account; use mailbox_list to confirm the id.`,
+      );
+    }
+    if (mailbox.default) {
+      throw new MailboxMutationError(
+        `Mailbox ${mailboxId} (${mailbox.email}) is the default mailbox and cannot be deleted; make another mailbox the default first via mailbox_update with set_default=true.`,
+      );
+    }
+    if (transferring) {
+      const target = mailboxes.find((candidate) => candidate.id === options.transferAliasesTo);
+      if (target === undefined) {
+        throw new MailboxMutationError(
+          `Transfer target mailbox ${options.transferAliasesTo} was not found on this account; use mailbox_list to confirm the id.`,
+        );
+      }
+      // `verified` is optional in older instances; only a known-unverified target is rejected.
+      if (target.verified === false) {
+        throw new MailboxMutationError(
+          `Transfer target mailbox ${target.id} (${target.email}) is not verified; verify it before transferring aliases to it.`,
+        );
+      }
+    }
+
+    return this.request({
+      method: 'DELETE',
+      endpoint: mailboxPath(mailboxId),
+      body: transferring ? { transfer_aliases_to: options.transferAliasesTo } : undefined,
+      schema: MailboxDeleteResponseSchema,
     });
   }
 
