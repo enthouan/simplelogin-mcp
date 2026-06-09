@@ -52,11 +52,26 @@ describe('loadConfig', () => {
     });
   });
 
+  it('treats blank optional env-file values as unset', () => {
+    const config = loadConfig(
+      env({ SL_API_KEY: 'k', MCP_AUTH_TOKEN: '', MCP_ALLOWED_ORIGINS: '' }),
+    );
+
+    expect(config.mcpAuthToken).toBeUndefined();
+    expect(config.allowedOrigins).toEqual([]);
+  });
+
   describe('HTTP exposure guard', () => {
     it('refuses a non-loopback bind with no auth token', () => {
       expect(() => loadConfig(env({ SL_API_KEY: 'k', HOST: '0.0.0.0' }))).toThrowError(
         /Refusing to start[\s\S]*HOST=0\.0\.0\.0[\s\S]*MCP_AUTH_TOKEN/,
       );
+    });
+
+    it('treats a blank auth token as missing', () => {
+      expect(() =>
+        loadConfig(env({ SL_API_KEY: 'k', HOST: '0.0.0.0', MCP_AUTH_TOKEN: '' })),
+      ).toThrowError(/Refusing to start[\s\S]*MCP_AUTH_TOKEN/);
     });
 
     it('allows a non-loopback bind when a token is set', () => {

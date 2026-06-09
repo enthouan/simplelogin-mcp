@@ -12,6 +12,11 @@ const boolEnv = z.preprocess(
   z.enum(['true', 'false', '1', '0']).default('false'),
 );
 
+const optionalEnvString = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v),
+  z.string().min(1).optional(),
+);
+
 const ConfigSchema = z.object({
   TRANSPORT: z.enum(['stdio', 'http']).default('http'),
   // Default to loopback so a fresh HTTP deployment is reachable only from the local
@@ -21,8 +26,8 @@ const ConfigSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   SL_API_URL: z.string().url().default('https://app.simplelogin.io'),
   SL_API_KEY: z.string().min(1, 'SL_API_KEY is required'),
-  MCP_AUTH_TOKEN: z.string().min(1).optional(),
-  MCP_ALLOWED_ORIGINS: z.string().optional(),
+  MCP_AUTH_TOKEN: optionalEnvString,
+  MCP_ALLOWED_ORIGINS: optionalEnvString,
   ALLOW_UNAUTHENTICATED_EXPOSURE: boolEnv,
   SL_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1).default(15000),
 });
@@ -81,8 +86,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         `    an SSH tunnel.`,
         `  - Authenticate it: set MCP_AUTH_TOKEN to a long random secret, ideally behind TLS.`,
         `  - Override: set ALLOW_UNAUTHENTICATED_EXPOSURE=true ONLY if exposure is already`,
-        `    contained elsewhere (a loopback-only Docker port publish, an authenticating`,
-        `    reverse proxy, a firewall).`,
+        `    contained elsewhere (an authenticating reverse proxy, a firewall, or another`,
+        `    deployment layer).`,
         ``,
         `See SECURITY.md for the full network exposure model.`,
       ].join('\n'),

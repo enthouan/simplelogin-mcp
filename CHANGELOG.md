@@ -11,7 +11,8 @@
   `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when exposure is contained elsewhere.
 - Validate the `Origin` header on `POST /mcp` (DNS-rebinding / CSRF defense); loopback origins are
   allowed by default and extra origins can be added via `MCP_ALLOWED_ORIGINS`.
-- Publish the Docker Compose port on the host's loopback only (`127.0.0.1:3000:3000`).
+- Publish the Docker Compose port on the host's loopback only (`127.0.0.1:3000:3000`) while keeping
+  the non-loopback auth guard active, so Compose deployments require `MCP_AUTH_TOKEN`.
 - Add `SECURITY.md` documenting the credential risk model, network exposure model, and vulnerability
   reporting.
 
@@ -28,6 +29,8 @@
 - Reject no-op `alias_update` calls (no fields to change) before contacting SimpleLogin.
 - Reject `alias_update` calls that pass both `mailbox_id` and `mailbox_ids`, which are mutually
   exclusive.
+- Treat blank optional env-file values as unset, so copied `.env.example` files can leave optional
+  settings empty.
 
 ## v0.1.0
 

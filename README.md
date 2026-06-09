@@ -30,9 +30,11 @@ into a container and self-host.
 git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
 
-# 2. Create your .env from the template and add your SimpleLogin API key
+# 2. Create your .env from the template and add your secrets
 cp .env.example .env
-# then edit .env and set SL_API_KEY=...
+# then edit .env and set:
+#   SL_API_KEY=...
+#   MCP_AUTH_TOKEN=<output of: openssl rand -hex 32>
 
 # 3. Build and run
 docker compose up -d
@@ -72,6 +74,8 @@ validates them at startup and exits with a readable message if anything required
 > **Safe by default:** the HTTP server binds `127.0.0.1` and is reachable only from the local
 > machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup, so exposing
 > the endpoint is always an explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
+> Docker Compose sets `HOST=0.0.0.0` inside the container for port forwarding, so its quick start
+> requires `MCP_AUTH_TOKEN` even though the host port is published on loopback.
 
 ## Getting a SimpleLogin API key
 
@@ -83,17 +87,17 @@ validates them at startup and exits with a readable message if anything required
 
 ### Claude Code (HTTP)
 
-With the server running (see Quick start), register it:
-
-```bash
-claude mcp add --transport http simplelogin http://localhost:3000/mcp
-```
-
-If you set `MCP_AUTH_TOKEN`, include it:
+With the server running (see Quick start), register it with the token from `.env`:
 
 ```bash
 claude mcp add --transport http simplelogin http://localhost:3000/mcp \
   --header "Authorization: Bearer YOUR_MCP_AUTH_TOKEN"
+```
+
+For loopback-only, non-container use with no `MCP_AUTH_TOKEN`, omit the header:
+
+```bash
+claude mcp add --transport http simplelogin http://localhost:3000/mcp
 ```
 
 ### Claude Desktop (stdio)
