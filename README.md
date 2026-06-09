@@ -117,7 +117,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3000/health
-# -> {"status":"ok","version":"0.3.0"}
+# -> {"status":"ok","version":"0.4.0"}
 ```
 
 The server now listens on `http://localhost:3000` with the MCP endpoint at `POST /mcp`.
