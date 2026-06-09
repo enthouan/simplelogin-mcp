@@ -10,6 +10,7 @@ import {
   SimpleLoginAPIError,
   AliasMutationError,
   ContactMutationError,
+  MailboxMutationError,
   type FetchLike,
 } from '../src/client/simplelogin.js';
 
@@ -385,6 +386,229 @@ describe('contact set blocked', () => {
     expect(error).toBeInstanceOf(ContactMutationError);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url.pathname).toBe('/api/aliases/42/contacts');
+  });
+});
+
+describe('mailbox create', () => {
+  const CREATED = { id: 4, email: 'new@example.com', verified: false, default: false };
+
+  it('POSTs the email in the body and parses the created mailbox', async () => {
+    const { client, calls } = stubClient(
+      jsonResponse({ ...CREATED, creation_timestamp: 1, nb_alias: 0 }, 201),
+    );
+    await expect(client.createMailbox('new@example.com')).resolves.toEqual({
+      ...CREATED,
+      creation_timestamp: 1,
+      nb_alias: 0,
+    });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('POST');
+    expect(call.url.pathname).toBe('/api/mailboxes');
+    expect(call.body).toEqual({ email: 'new@example.com' });
+  });
+
+  it('parses a response without the optional creation_timestamp/nb_alias fields', async () => {
+    const { client } = stubClient(jsonResponse(CREATED, 201));
+    await expect(client.createMailbox('new@example.com')).resolves.toEqual(CREATED);
+  });
+
+  it('propagates a ZodError when the created mailbox is malformed', async () => {
+    const { client } = stubClient(jsonResponse({ email: 'new@example.com' }, 201));
+    await expect(client.createMailbox('new@example.com')).rejects.toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe('mailbox update', () => {
+  it('PUTs only the provided fields to the mailbox path', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    await expect(client.updateMailbox(7, { email: 'renamed@example.com' })).resolves.toEqual({
+      updated: true,
+    });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('PUT');
+    expect(call.url.pathname).toBe('/api/mailboxes/7');
+    expect(call.body).toEqual({ email: 'renamed@example.com' });
+    expect(Object.keys(call.body as Record<string, unknown>)).toEqual(['email']);
+  });
+
+  it('sends default=true when promoting a mailbox to default', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    await client.updateMailbox(7, { setDefault: true });
+    expect(calls[0]!.body).toEqual({ default: true });
+  });
+
+  it('sends cancel_email_change=true when cancelling a pending change', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    await client.updateMailbox(7, { cancelEmailChange: true });
+    expect(calls[0]!.body).toEqual({ cancel_email_change: true });
+  });
+
+  it('rejects a no-op update before any network call', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    const error = await client.updateMailbox(7, {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects setDefault=false, which SimpleLogin would silently ignore', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    const error = await client.updateMailbox(7, { setDefault: false }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects cancelEmailChange=false, which SimpleLogin would silently ignore', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    const error = await client
+      .updateMailbox(7, { cancelEmailChange: false })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects combining an email change with cancel_email_change', async () => {
+    const { client, calls } = stubClient(jsonResponse({ updated: true }));
+    const error = await client
+      .updateMailbox(7, { email: 'renamed@example.com', cancelEmailChange: true })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('mailbox delete safeguards', () => {
+  /** Account fixture: a default mailbox, a verified secondary, and an unverified one. */
+  const MAILBOXES = {
+    mailboxes: [
+      {
+        id: 1,
+        email: 'me@b.io',
+        default: true,
+        creation_timestamp: 0,
+        nb_alias: 5,
+        verified: true,
+      },
+      {
+        id: 2,
+        email: 'work@b.io',
+        default: false,
+        creation_timestamp: 0,
+        nb_alias: 2,
+        verified: true,
+      },
+      {
+        id: 3,
+        email: 'new@b.io',
+        default: false,
+        creation_timestamp: 0,
+        nb_alias: 0,
+        verified: false,
+      },
+    ],
+  };
+
+  /** Stub that serves the mailbox list for GETs and a delete success otherwise. */
+  function deleteStub() {
+    return stubClient((call) =>
+      call.method === 'GET' ? jsonResponse(MAILBOXES) : jsonResponse({ deleted: true }),
+    );
+  }
+
+  it('transfers aliases: reads the mailbox list, then DELETEs with transfer_aliases_to', async () => {
+    const { client, calls } = deleteStub();
+    await expect(client.deleteMailbox(2, { transferAliasesTo: 1 })).resolves.toEqual({
+      deleted: true,
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.method).toBe('GET');
+    expect(calls[0]!.url.pathname).toBe('/api/v2/mailboxes');
+    expect(calls[1]!.method).toBe('DELETE');
+    expect(calls[1]!.url.pathname).toBe('/api/mailboxes/2');
+    expect(calls[1]!.body).toEqual({ transfer_aliases_to: 1 });
+  });
+
+  it('deletes aliases only with an explicit delete_aliases acknowledgement, sending no body', async () => {
+    const { client, calls } = deleteStub();
+    await expect(client.deleteMailbox(2, { deleteAliases: true })).resolves.toEqual({
+      deleted: true,
+    });
+
+    expect(calls[1]!.method).toBe('DELETE');
+    expect(calls[1]!.body).toBeUndefined();
+    expect(calls[1]!.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('rejects a delete that chooses no alias fate, before any network call', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(2, {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects a delete that both transfers and deletes the aliases', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client
+      .deleteMailbox(2, { transferAliasesTo: 1, deleteAliases: true })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects transferring aliases to the mailbox being deleted', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(2, { transferAliasesTo: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('refuses to delete the default mailbox, issuing no DELETE', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(1, { deleteAliases: true }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect((error as Error).message).toContain('default');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe('GET');
+  });
+
+  it('rejects a mailbox id that is not on the account, issuing no DELETE', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(99, { deleteAliases: true }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('rejects a transfer target that is not on the account, issuing no DELETE', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(2, { transferAliasesTo: 99 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('rejects an unverified transfer target, issuing no DELETE', async () => {
+    const { client, calls } = deleteStub();
+    const error = await client.deleteMailbox(2, { transferAliasesTo: 3 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MailboxMutationError);
+    expect((error as Error).message).toContain('not verified');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('allows a transfer target whose verified flag is absent (older instances)', async () => {
+    const mailboxes = {
+      mailboxes: [
+        { id: 2, email: 'work@b.io', default: false, creation_timestamp: 0 },
+        { id: 5, email: 'old@b.io', default: false, creation_timestamp: 0 },
+      ],
+    };
+    const { client, calls } = stubClient((call) =>
+      call.method === 'GET' ? jsonResponse(mailboxes) : jsonResponse({ deleted: true }),
+    );
+    await expect(client.deleteMailbox(2, { transferAliasesTo: 5 })).resolves.toEqual({
+      deleted: true,
+    });
+    expect(calls).toHaveLength(2);
   });
 });
 

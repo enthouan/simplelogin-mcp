@@ -20,7 +20,12 @@ export const API_PATHS = {
   settingDomains: '/api/v2/setting/domains',
   /** GET — user mailboxes (verified and unverified). */
   mailboxes: '/api/v2/mailboxes',
+  /** POST — create a new mailbox (sends a verification email to the address). */
+  mailboxCreate: '/api/mailboxes',
 } as const;
+
+/** Per-mailbox resource path (PUT / DELETE). */
+export const mailboxPath = (mailboxId: number): string => `/api/mailboxes/${mailboxId}`;
 
 /** Per-alias resource path (GET / PATCH / DELETE). */
 export const aliasPath = (aliasId: number): string => `/api/aliases/${aliasId}`;

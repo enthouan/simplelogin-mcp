@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add mailbox management tools: `mailbox_create` to add a mailbox (verification email sent; the
+  mailbox is unusable until verified), `mailbox_update` to promote a verified mailbox to account
+  default, change its address (pending until the new address is verified), or cancel a pending
+  address change, and `mailbox_delete` to remove a mailbox.
+- Guard mailbox mutations with local pre-flight checks that reject bad requests before SimpleLogin
+  is contacted: `mailbox_delete` requires `confirm: true` plus an explicit alias fate (exactly one
+  of `transfer_aliases_to` or `delete_aliases: true`), refuses to delete the default mailbox, and
+  validates the mailbox and transfer target against the live mailbox list (target must exist, be
+  verified, and differ from the mailbox being deleted); `mailbox_update` rejects empty change sets,
+  `set_default`/`cancel_email_change` values other than `true` (SimpleLogin silently ignores
+  `false`), and combining an address change with its cancellation.
+- Document mailbox verification, default-mailbox, and alias ownership/transfer behavior in the
+  README.
+
 ## v0.3.0
 
 ### Added
