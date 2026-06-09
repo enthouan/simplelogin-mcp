@@ -113,6 +113,43 @@ describe('alias list', () => {
   });
 });
 
+describe('alias activity list', () => {
+  const ACTIVITY = {
+    action: 'reply',
+    from: 'alias@sl.io',
+    to: 'dest@example.com',
+    timestamp: 1580903760,
+    reverse_alias: '"dest at example.com" <reply@sl.io>',
+    reverse_alias_address: 'reply@sl.io',
+  };
+
+  it('uses GET with the activities path and a page_id query, no body', async () => {
+    const { client, calls } = stubClient(jsonResponse({ activities: [ACTIVITY] }));
+    await client.listAliasActivities({ aliasId: 42, pageId: 3 });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/aliases/42/activities');
+    expect(call.url.searchParams.get('page_id')).toBe('3');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('parses an activity payload, leaving reverse-alias fields optional', async () => {
+    const minimal = { action: 'block', from: 'x@sl.io', to: 'y@example.com', timestamp: 1 };
+    const { client } = stubClient(jsonResponse({ activities: [ACTIVITY, minimal] }));
+    await expect(client.listAliasActivities({ aliasId: 1, pageId: 0 })).resolves.toEqual({
+      activities: [ACTIVITY, minimal],
+    });
+  });
+
+  it('propagates a ZodError when an activity entry is malformed', async () => {
+    const { client } = stubClient(jsonResponse({ activities: [{ action: 'reply' }] }));
+    await expect(client.listAliasActivities({ aliasId: 1, pageId: 0 })).rejects.toBeInstanceOf(
+      z.ZodError,
+    );
+  });
+});
+
 describe('alias creation request shapes', () => {
   it('random alias sends note in the body and mode/hostname in the query', async () => {
     const { client, calls } = stubClient(jsonResponse(ALIAS));

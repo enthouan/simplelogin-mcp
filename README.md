@@ -13,6 +13,7 @@ into a container and self-host.
 | --------------------- | --------------------------------------------------------------------------- |
 | `alias_list`          | List aliases (paginated; filter enabled/disabled/pinned; free-text search). |
 | `alias_get`           | Get one alias by id.                                                        |
+| `alias_activity_list` | List an alias's forward/reply/block activity (paginated, 20 per page).      |
 | `alias_create_random` | Create a random alias (`uuid` or `word` mode).                              |
 | `alias_create_custom` | Create a custom alias from a prefix + signed suffix + mailboxes.            |
 | `alias_update`        | Update note, name, owning mailbox(es), PGP, or pinned state.                |
@@ -22,6 +23,19 @@ into a container and self-host.
 | `alias_domains_list`  | List domains usable for alias creation.                                     |
 | `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).              |
 | `account_get_info`    | Get user info; doubles as an API-key sanity check.                          |
+
+## Common workflows
+
+### Audit recent alias activity
+
+1. Use `alias_list` or `alias_get` to find the numeric `alias_id` for the address you want to
+   inspect.
+2. Call `alias_activity_list` with that `alias_id` and `page_id: 0` to fetch the newest
+   forward/reply/block/bounced events. Each page is capped at 20 entries.
+3. Increase `page_id` to walk older activity. Stop when a page returns fewer than 20 entries or the
+   event you are investigating is found.
+4. For reply investigations, use `reverse_alias` for the display form and `reverse_alias_address`
+   for the address clients should reply to.
 
 ## Quick start (Docker Compose)
 

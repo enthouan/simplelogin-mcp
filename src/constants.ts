@@ -27,3 +27,7 @@ export const aliasPath = (aliasId: number): string => `/api/aliases/${aliasId}`;
 
 /** Enable/disable toggle for a single alias (POST). */
 export const aliasTogglePath = (aliasId: number): string => `/api/aliases/${aliasId}/toggle`;
+
+/** Paginated forward/reply/block activity log for a single alias (GET). */
+export const aliasActivitiesPath = (aliasId: number): string =>
+  `/api/aliases/${aliasId}/activities`;

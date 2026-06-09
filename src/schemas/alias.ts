@@ -84,3 +84,26 @@ export type AliasDeleteResponse = z.infer<typeof AliasDeleteResponseSchema>;
  * the client can normalize it to a simple success result.
  */
 export const AliasUpdateResponseSchema = z.unknown();
+
+/**
+ * One entry in an alias's activity log (GET /api/aliases/:id/activities). Distinct
+ * from {@link AliasActivitySchema}, the trimmed `latest_activity` embedded in alias
+ * objects: the log carries the message envelope (from/to, reverse alias). `action`
+ * is left a plain string rather than an enum so newer/self-hosted instances that add
+ * action types still validate; known values are forward, reply, block, and bounced.
+ */
+const AliasActivityEntrySchema = z.object({
+  action: z.string(),
+  from: z.string(),
+  to: z.string(),
+  timestamp: z.number(),
+  reverse_alias: z.string().optional(),
+  reverse_alias_address: z.string().optional(),
+});
+export type AliasActivityEntry = z.infer<typeof AliasActivityEntrySchema>;
+
+/** GET /api/aliases/:id/activities response (max 20 entries per page). */
+export const AliasActivitiesResponseSchema = z.object({
+  activities: z.array(AliasActivityEntrySchema),
+});
+export type AliasActivitiesResponse = z.infer<typeof AliasActivitiesResponseSchema>;
