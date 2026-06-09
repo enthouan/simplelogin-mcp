@@ -12,7 +12,7 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
 
 - Never push directly to `main`; the branch is protected. Use a PR and wait for the required
   `check` status.
-- Use branch names like `antoine/release-0.3.0`.
+- Use branch names like `release-0.3.0`.
 - Use the squash commit subject `vX.Y.Z release`. Do not use `Prepare vX.Y.Z release`; that reads
   badly in the permanent git history.
 - Tag only after the release PR is merged to `main`, and tag the fetched `origin/main` merge commit.
@@ -99,7 +99,7 @@ Create the release branch from fetched `origin/main`:
 
 ```bash
 git switch --detach origin/main
-git switch -c antoine/release-X.Y.Z
+git switch -c release-X.Y.Z
 git add CHANGELOG.md README.md package.json src/version.ts
 git commit -m "vX.Y.Z release"
 git push -u origin HEAD
