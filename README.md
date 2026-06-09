@@ -24,6 +24,19 @@ into a container and self-host.
 | `mailbox_list`        | List mailboxes (use their ids when creating/updating aliases).              |
 | `account_get_info`    | Get user info; doubles as an API-key sanity check.                          |
 
+## Common workflows
+
+### Audit recent alias activity
+
+1. Use `alias_list` or `alias_get` to find the numeric `alias_id` for the address you want to
+   inspect.
+2. Call `alias_activity_list` with that `alias_id` and `page_id: 0` to fetch the newest
+   forward/reply/block/bounced events. Each page is capped at 20 entries.
+3. Increase `page_id` to walk older activity. Stop when a page returns fewer than 20 entries or the
+   event you are investigating is found.
+4. For reply investigations, use `reverse_alias` for the display form and `reverse_alias_address`
+   for the address clients should reply to.
+
 ## Quick start (Docker Compose)
 
 ```bash
