@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add `alias_activity_list`, a read-only tool that returns an alias's forward/reply/block activity
+  history. Results are paginated at 20 entries per page (`page_id`, zero-based) so responses stay
+  bounded, making it suitable for auditing how a specific alias has been used.
+
 ## v0.2.0
 
 ### Security

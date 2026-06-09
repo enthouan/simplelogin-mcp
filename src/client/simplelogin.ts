@@ -6,7 +6,7 @@
  * small, obvious change: one constant in constants.ts, one schema, one method here.
  */
 import { z } from 'zod';
-import { API_PATHS, aliasPath, aliasTogglePath } from '../constants.js';
+import { API_PATHS, aliasPath, aliasTogglePath, aliasActivitiesPath } from '../constants.js';
 import { logger } from '../logger.js';
 import {
   AliasSchema,
@@ -15,11 +15,13 @@ import {
   AliasToggleResponseSchema,
   AliasDeleteResponseSchema,
   AliasUpdateResponseSchema,
+  AliasActivitiesResponseSchema,
   type Alias,
   type AliasListResponse,
   type AliasOptions,
   type AliasToggleResponse,
   type AliasDeleteResponse,
+  type AliasActivitiesResponse,
 } from '../schemas/alias.js';
 import { MailboxListResponseSchema, type MailboxListResponse } from '../schemas/mailbox.js';
 import { DomainListResponseSchema, type DomainListResponse } from '../schemas/domain.js';
@@ -245,6 +247,22 @@ export class SimpleLoginClient {
       endpoint: API_PATHS.aliasOptions,
       query: { hostname },
       schema: AliasOptionsSchema,
+    });
+  }
+
+  /**
+   * Read one page (max 20 entries) of an alias's forward/reply/block activity log.
+   * Pagination is the bound that keeps the result from growing unbounded.
+   */
+  listAliasActivities(params: {
+    aliasId: number;
+    pageId: number;
+  }): Promise<AliasActivitiesResponse> {
+    return this.request({
+      method: 'GET',
+      endpoint: aliasActivitiesPath(params.aliasId),
+      query: { page_id: params.pageId },
+      schema: AliasActivitiesResponseSchema,
     });
   }
 

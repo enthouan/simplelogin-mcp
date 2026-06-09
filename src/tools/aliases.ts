@@ -56,6 +56,33 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
   );
 
   server.registerTool(
+    'alias_activity_list',
+    {
+      title: 'List alias activity',
+      description:
+        'List the forward/reply/block activity history for a single SimpleLogin alias, 20 ' +
+        'entries per page (most recent first). Each entry has an action (forward, reply, block, ' +
+        'or bounced), the from/to addresses, a Unix timestamp, and the reverse-alias address for ' +
+        'replies. Use page_id for pagination (starts at 0); the per-page cap keeps responses ' +
+        'bounded, so page through rather than expecting the full history in one call.',
+      inputSchema: {
+        alias_id: z.number().int().describe('Numeric id of the alias whose activity to list.'),
+        page_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Zero-based page number; 20 entries per page. Defaults to 0.'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args) =>
+      runTool(() =>
+        client.listAliasActivities({ aliasId: args.alias_id, pageId: args.page_id ?? 0 }),
+      ),
+  );
+
+  server.registerTool(
     'alias_create_random',
     {
       title: 'Create random alias',

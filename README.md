@@ -13,6 +13,7 @@ into a container and self-host.
 | --------------------- | --------------------------------------------------------------------------- |
 | `alias_list`          | List aliases (paginated; filter enabled/disabled/pinned; free-text search). |
 | `alias_get`           | Get one alias by id.                                                        |
+| `alias_activity_list` | List an alias's forward/reply/block activity (paginated, 20 per page).      |
 | `alias_create_random` | Create a random alias (`uuid` or `word` mode).                              |
 | `alias_create_custom` | Create a custom alias from a prefix + signed suffix + mailboxes.            |
 | `alias_update`        | Update note, name, owning mailbox(es), PGP, or pinned state.                |
