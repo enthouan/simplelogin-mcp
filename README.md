@@ -3,7 +3,7 @@
 A self-hostable [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for the
 [SimpleLogin](https://simplelogin.io) email-alias API. It exposes the core alias workflow —
 list, create (random or custom), update, delete, enable/disable — plus mailbox and custom-domain
-management and the account lookups needed to drive it, as MCP tools that Claude and other MCP clients can call. Runs
+management and account utilities (info, stats, notifications, settings), as MCP tools that Claude and other MCP clients can call. Runs
 as a stdio server for local desktop clients or as a stateless Streamable HTTP server you can drop
 into a container and self-host.
 
@@ -33,6 +33,11 @@ into a container and self-host.
 | `custom_domain_update`     | Update a custom domain's catch-all, random-prefix, display-name, or mailbox settings.                 |
 | `custom_domain_trash_list` | List a custom domain's deleted aliases (trash).                                                       |
 | `account_get_info`         | Get user info; doubles as an API-key sanity check.                                                    |
+| `account_get_stats`        | Get lifetime counters: aliases, emails forwarded, replied to, and blocked.                            |
+| `notification_list`        | List account notifications (paginated, 20 per page, unread first).                                    |
+| `notification_mark_read`   | Mark a notification as read (idempotent).                                                             |
+| `settings_get`             | Get the account-wide alias settings.                                                                  |
+| `settings_update`          | Update the alias settings: generator, notifications, default domain, sender format, suffix.           |
 
 ## Common workflows
 
@@ -125,6 +130,36 @@ own domain instead of a SimpleLogin one.
 **Non-goals.** Adding or deleting a custom domain, and DNS/MX verification, are account-level
 operations the SimpleLogin API does not expose; do them in the SimpleLogin web UI (Domains tab).
 Subdomains of SimpleLogin-provided domains are also not returned by `custom_domain_list`.
+
+### Check on the account
+
+1. `account_get_stats` returns the account's lifetime counters: total aliases and emails
+   forwarded, replied to, and blocked across all aliases. Use `alias_activity_list` to drill
+   into the per-alias events behind a surprising number.
+2. `notification_list` pages through SimpleLogin's account notifications (announcements and
+   warnings such as a bouncing mailbox), 20 per page, unread first. Each entry's `message` is
+   HTML and `created_at` is human-readable text ("2 days ago"). After handling one, call
+   `notification_mark_read` with its id; marking an already-read notification is a harmless
+   no-op. The API offers no unread or delete.
+3. `settings_get` and `settings_update` read and change the account-wide alias settings. Only
+   the fields you pass change, a call that changes nothing is rejected before SimpleLogin is
+   contacted, and the resulting settings are returned:
+   - `alias_generator` (`word` or `uuid`) sets the address style of random aliases, and
+     `random_alias_suffix` (`word` or `random_string`) the suffix style for random and
+     on-the-fly aliases.
+   - `random_alias_default_domain` sets the domain random aliases are created on; it must be
+     one of the domains from `alias_domains_list` (premium-only domains require a premium
+     account, and a custom domain must be yours and verified; SimpleLogin rejects anything
+     else with a clear error).
+   - `sender_format` controls how the original sender appears in forwarded mail: `AT`
+     ("John Wick - john at wick.com"), `A` ("John Wick - john(a)wick.com"), `NAME_ONLY`,
+     `AT_ONLY`, or `NO_NAME`.
+   - `notification` (boolean) turns SimpleLogin's email notifications on or off.
+
+**Non-goals.** `settings_update` is deliberately limited to those five documented
+alias-behavior fields. Account email/password changes, payment and subscription management,
+account deletion, and sudo-mode endpoints are out of scope by design; do them in the
+SimpleLogin web UI.
 
 ## Quick start (Docker Compose)
 

@@ -12,6 +12,7 @@ import {
   ContactMutationError,
   MailboxMutationError,
   CustomDomainMutationError,
+  SettingsMutationError,
   type FetchLike,
 } from '../src/client/simplelogin.js';
 
@@ -760,6 +761,126 @@ describe('error mapping', () => {
     const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
     expect(error.status).toBe(0);
     expect(error.message).toBe('Network error: connection refused');
+  });
+});
+
+describe('account stats', () => {
+  it('uses GET on the stats path and parses the counters', async () => {
+    const stats = { nb_alias: 12, nb_block: 3, nb_forward: 240, nb_reply: 9 };
+    const { client, calls } = stubClient(jsonResponse(stats));
+    await expect(client.getStats()).resolves.toEqual(stats);
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/stats');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('propagates a ZodError when a counter is missing', async () => {
+    const { client } = stubClient(jsonResponse({ nb_alias: 12 }));
+    await expect(client.getStats()).rejects.toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe('notifications', () => {
+  /** A minimal valid notification payload satisfying NotificationSchema. */
+  const NOTIFICATION = {
+    id: 5,
+    title: 'Mailbox is bouncing',
+    message: '<p>Your mailbox bounced an email</p>',
+    read: false,
+    created_at: '2 days ago',
+  };
+
+  it('list uses GET with a `page` query (not page_id), no body', async () => {
+    const { client, calls } = stubClient(
+      jsonResponse({ more: true, notifications: [NOTIFICATION] }),
+    );
+    await expect(client.listNotifications({ pageId: 3 })).resolves.toEqual({
+      more: true,
+      notifications: [NOTIFICATION],
+    });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/notifications');
+    expect(call.url.searchParams.get('page')).toBe('3');
+    expect(call.url.searchParams.has('page_id')).toBe(false);
+    expect(call.body).toBeUndefined();
+  });
+
+  it('mark-read POSTs to the /read suffix path with no body', async () => {
+    const { client, calls } = stubClient(jsonResponse({ done: true }));
+    await expect(client.markNotificationRead(5)).resolves.toEqual({ done: true });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('POST');
+    expect(call.url.pathname).toBe('/api/notifications/5/read');
+    expect(call.body).toBeUndefined();
+  });
+});
+
+describe('settings', () => {
+  /** A valid settings payload satisfying SettingSchema. */
+  const SETTING = {
+    alias_generator: 'word',
+    notification: true,
+    random_alias_default_domain: 'sl.example.com',
+    sender_format: 'AT',
+    random_alias_suffix: 'random_string',
+  };
+
+  it('get uses GET on the setting path and parses the settings', async () => {
+    const { client, calls } = stubClient(jsonResponse(SETTING));
+    await expect(client.getSettings()).resolves.toEqual(SETTING);
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/setting');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('get propagates a ZodError on an unknown enum value', async () => {
+    const { client } = stubClient(jsonResponse({ ...SETTING, sender_format: 'FULL' }));
+    await expect(client.getSettings()).rejects.toBeInstanceOf(z.ZodError);
+  });
+
+  it('update PATCHes only the provided fields and parses the resulting settings', async () => {
+    const updated = { ...SETTING, alias_generator: 'uuid', notification: false };
+    const { client, calls } = stubClient(jsonResponse(updated));
+    await expect(
+      client.updateSettings({ aliasGenerator: 'uuid', notification: false }),
+    ).resolves.toEqual(updated);
+
+    const call = calls[0]!;
+    expect(call.method).toBe('PATCH');
+    expect(call.url.pathname).toBe('/api/setting');
+    expect(call.body).toEqual({ alias_generator: 'uuid', notification: false });
+    expect(Object.keys(call.body as Record<string, unknown>)).toEqual([
+      'alias_generator',
+      'notification',
+    ]);
+  });
+
+  it('update maps the remaining fields to their snake_case keys', async () => {
+    const { client, calls } = stubClient(jsonResponse(SETTING));
+    await client.updateSettings({
+      randomAliasDefaultDomain: 'sl.example.com',
+      senderFormat: 'NAME_ONLY',
+      randomAliasSuffix: 'word',
+    });
+    expect(calls[0]!.body).toEqual({
+      random_alias_default_domain: 'sl.example.com',
+      sender_format: 'NAME_ONLY',
+      random_alias_suffix: 'word',
+    });
+  });
+
+  it('rejects a no-op update before any network call', async () => {
+    const { client, calls } = stubClient(jsonResponse(SETTING));
+    const error = await client.updateSettings({}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SettingsMutationError);
+    expect(calls).toHaveLength(0);
   });
 });
 
