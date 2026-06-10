@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add custom-domain tools: `custom_domain_list` to inspect each domain's verification status,
+  settings, and mailboxes, `custom_domain_update` to change the supported settings (catch-all,
+  random prefix generation, display name, and the domain's mailbox set), and
+  `custom_domain_trash_list` to audit a domain's deleted aliases. Domain create/delete and DNS
+  verification are not exposed by the SimpleLogin API and stay in the web UI; they are documented
+  as non-goals.
+- Guard `custom_domain_update` with local pre-flight checks that reject bad requests with a clear
+  message before SimpleLogin is contacted (the API answers them with a generic 400): empty change
+  sets, an empty `mailbox_ids` set (a domain must keep at least one mailbox), and more than 20
+  mailboxes (the SimpleLogin per-domain cap).
+
 ## v0.4.0
 
 ### Added
