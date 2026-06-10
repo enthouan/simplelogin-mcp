@@ -29,7 +29,7 @@ export type AccountStats = z.infer<typeof AccountStatsSchema>;
 /** A single account notification. `message` is HTML; `created_at` is humanized text. */
 export const NotificationSchema = z.object({
   id: z.number().int(),
-  title: z.string(),
+  title: z.string().nullable(),
   message: z.string(),
   read: z.boolean(),
   created_at: z.string(),

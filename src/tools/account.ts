@@ -45,7 +45,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
       description:
         'List account notifications from SimpleLogin (announcements, warnings such as a mailbox ' +
         'bouncing, etc.), 20 per page, unread first then newest first. Each entry has an id, ' +
-        'title, HTML message, read flag, and a human-readable created_at. Use page_id for ' +
+        'nullable title, HTML message, read flag, and a human-readable created_at. Use page_id for ' +
         'pagination (starts at 0); more=true means another page exists. Mark entries handled ' +
         'with notification_mark_read.',
       inputSchema: {

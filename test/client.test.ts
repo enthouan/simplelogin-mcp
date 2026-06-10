@@ -809,6 +809,17 @@ describe('notifications', () => {
     expect(call.body).toBeUndefined();
   });
 
+  it('list accepts notifications without a title', async () => {
+    const titlelessNotification = { ...NOTIFICATION, title: null };
+    const { client } = stubClient(
+      jsonResponse({ more: false, notifications: [titlelessNotification] }),
+    );
+    await expect(client.listNotifications({ pageId: 0 })).resolves.toEqual({
+      more: false,
+      notifications: [titlelessNotification],
+    });
+  });
+
   it('mark-read POSTs to the /read suffix path with no body', async () => {
     const { client, calls } = stubClient(jsonResponse({ done: true }));
     await expect(client.markNotificationRead(5)).resolves.toEqual({ done: true });
