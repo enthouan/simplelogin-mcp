@@ -24,7 +24,21 @@ export const API_PATHS = {
   mailboxCreate: '/api/mailboxes',
   /** GET — the user's custom domains with their settings and mailboxes. */
   customDomains: '/api/custom_domains',
+  /** GET: account-wide alias/forward/reply/block counters. */
+  stats: '/api/stats',
+  /** GET: paginated account notifications. Pages via `page` (not `page_id`). */
+  notifications: '/api/notifications',
+  /** GET to read / PATCH to update the account-wide alias settings. */
+  setting: '/api/setting',
 } as const;
+
+/**
+ * Mark a single notification as read (POST). The in-app api.md documents this
+ * as POST /api/notifications/:id, but the Flask view registers the `/read`
+ * suffix; the source is the truth.
+ */
+export const notificationReadPath = (notificationId: number): string =>
+  `/api/notifications/${notificationId}/read`;
 
 /** Per-custom-domain resource path (PATCH). */
 export const customDomainPath = (customDomainId: number): string =>

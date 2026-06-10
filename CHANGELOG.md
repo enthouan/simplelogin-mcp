@@ -14,6 +14,14 @@
   message before SimpleLogin is contacted (the API answers them with a generic 400): empty change
   sets, an empty `mailbox_ids` set (a domain must keep at least one mailbox), and more than 20
   mailboxes (the SimpleLogin per-domain cap).
+- Add account utility tools: `account_get_stats` for the lifetime alias/forward/reply/block
+  counters, `notification_list` and `notification_mark_read` for account notifications, and
+  `settings_get`/`settings_update` for the account-wide alias settings. `settings_update` is
+  conservative by design: it covers only the five documented alias-behavior fields
+  (`alias_generator`, `notification`, `random_alias_default_domain`, `sender_format`,
+  `random_alias_suffix`), validates the enum fields locally, and rejects no-op calls before
+  SimpleLogin is contacted (the API silently accepts an empty PATCH). Auth, payment,
+  account-deletion, and sudo-style endpoints stay out of scope.
 
 ## v0.4.0
 

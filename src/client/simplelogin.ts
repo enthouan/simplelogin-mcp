@@ -17,6 +17,7 @@ import {
   mailboxPath,
   customDomainPath,
   customDomainTrashPath,
+  notificationReadPath,
 } from '../constants.js';
 import { logger } from '../logger.js';
 import {
@@ -65,7 +66,21 @@ import {
   type CustomDomainUpdateResponse,
   type CustomDomainTrashResponse,
 } from '../schemas/domain.js';
-import { UserInfoSchema, type UserInfo } from '../schemas/account.js';
+import {
+  UserInfoSchema,
+  AccountStatsSchema,
+  ALIAS_GENERATORS,
+  SENDER_FORMATS,
+  RANDOM_ALIAS_SUFFIXES,
+  NotificationListResponseSchema,
+  NotificationReadResponseSchema,
+  SettingSchema,
+  type UserInfo,
+  type AccountStats,
+  type NotificationListResponse,
+  type NotificationReadResponse,
+  type Setting,
+} from '../schemas/account.js';
 
 /** Thrown for any non-2xx SimpleLogin response, request timeout, or network error. */
 export class SimpleLoginAPIError extends Error {
@@ -133,6 +148,18 @@ export class CustomDomainMutationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'CustomDomainMutationError';
+  }
+}
+
+/**
+ * Thrown when a settings update is rejected locally, before any network call.
+ * SimpleLogin silently accepts an empty PATCH and returns the unchanged
+ * settings, so the no-op is caught here with a clear message instead.
+ */
+export class SettingsMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SettingsMutationError';
   }
 }
 
@@ -650,6 +677,79 @@ export class SimpleLoginClient {
 
   getUserInfo(): Promise<UserInfo> {
     return this.request({ method: 'GET', endpoint: API_PATHS.userInfo, schema: UserInfoSchema });
+  }
+
+  getStats(): Promise<AccountStats> {
+    return this.request({ method: 'GET', endpoint: API_PATHS.stats, schema: AccountStatsSchema });
+  }
+
+  /**
+   * Read one page (max 20 entries) of account notifications, unread first then
+   * newest first. The endpoint pages via `page`, unlike the `page_id` used by
+   * the alias/contact/activity lists.
+   */
+  listNotifications(params: { pageId: number }): Promise<NotificationListResponse> {
+    return this.request({
+      method: 'GET',
+      endpoint: API_PATHS.notifications,
+      query: { page: params.pageId },
+      schema: NotificationListResponseSchema,
+    });
+  }
+
+  markNotificationRead(notificationId: number): Promise<NotificationReadResponse> {
+    return this.request({
+      method: 'POST',
+      endpoint: notificationReadPath(notificationId),
+      schema: NotificationReadResponseSchema,
+    });
+  }
+
+  getSettings(): Promise<Setting> {
+    return this.request({ method: 'GET', endpoint: API_PATHS.setting, schema: SettingSchema });
+  }
+
+  /**
+   * Update the account-wide alias settings and return the resulting settings.
+   * Deliberately conservative: only the five documented, well-understood fields
+   * are supported, and an empty change set is rejected before any network call
+   * (SimpleLogin would silently accept it). `randomAliasDefaultDomain` is
+   * validated server-side: it must be a domain from the alias-domains list, and
+   * premium-only or unverified/foreign custom domains are rejected with a clear
+   * API error.
+   */
+  async updateSettings(patch: {
+    aliasGenerator?: (typeof ALIAS_GENERATORS)[number];
+    notification?: boolean;
+    randomAliasDefaultDomain?: string;
+    senderFormat?: (typeof SENDER_FORMATS)[number];
+    randomAliasSuffix?: (typeof RANDOM_ALIAS_SUFFIXES)[number];
+  }): Promise<Setting> {
+    const hasChange =
+      patch.aliasGenerator !== undefined ||
+      patch.notification !== undefined ||
+      patch.randomAliasDefaultDomain !== undefined ||
+      patch.senderFormat !== undefined ||
+      patch.randomAliasSuffix !== undefined;
+    if (!hasChange) {
+      throw new SettingsMutationError(
+        'No changes provided; supply at least one field to update (alias_generator, notification, random_alias_default_domain, sender_format, or random_alias_suffix).',
+      );
+    }
+
+    // undefined fields are dropped by JSON.stringify, so only provided fields are sent.
+    return this.request({
+      method: 'PATCH',
+      endpoint: API_PATHS.setting,
+      body: {
+        alias_generator: patch.aliasGenerator,
+        notification: patch.notification,
+        random_alias_default_domain: patch.randomAliasDefaultDomain,
+        sender_format: patch.senderFormat,
+        random_alias_suffix: patch.randomAliasSuffix,
+      },
+      schema: SettingSchema,
+    });
   }
 
   // --- Shared request helper -------------------------------------------------
