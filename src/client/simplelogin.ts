@@ -15,6 +15,8 @@ import {
   contactTogglePath,
   contactPath,
   mailboxPath,
+  customDomainPath,
+  customDomainTrashPath,
 } from '../constants.js';
 import { logger } from '../logger.js';
 import {
@@ -53,7 +55,16 @@ import {
   type MailboxUpdateResponse,
   type MailboxDeleteResponse,
 } from '../schemas/mailbox.js';
-import { DomainListResponseSchema, type DomainListResponse } from '../schemas/domain.js';
+import {
+  DomainListResponseSchema,
+  CustomDomainListResponseSchema,
+  CustomDomainUpdateResponseSchema,
+  CustomDomainTrashResponseSchema,
+  type DomainListResponse,
+  type CustomDomainListResponse,
+  type CustomDomainUpdateResponse,
+  type CustomDomainTrashResponse,
+} from '../schemas/domain.js';
 import { UserInfoSchema, type UserInfo } from '../schemas/account.js';
 
 /** Thrown for any non-2xx SimpleLogin response, request timeout, or network error. */
@@ -110,6 +121,18 @@ export class MailboxMutationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'MailboxMutationError';
+  }
+}
+
+/**
+ * Thrown when a custom-domain mutation is rejected locally, before any network
+ * call: a no-op update or an invalid mailbox set. SimpleLogin answers both with
+ * an unhelpful generic 400, so catching them here yields a clear message instead.
+ */
+export class CustomDomainMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CustomDomainMutationError';
   }
 }
 
@@ -411,6 +434,77 @@ export class SimpleLoginClient {
       method: 'GET',
       endpoint: API_PATHS.settingDomains,
       schema: DomainListResponseSchema,
+    });
+  }
+
+  listCustomDomains(): Promise<CustomDomainListResponse> {
+    return this.request({
+      method: 'GET',
+      endpoint: API_PATHS.customDomains,
+      schema: CustomDomainListResponseSchema,
+    });
+  }
+
+  /**
+   * Update a custom domain's settings. Guardrails enforced before any network
+   * call (SimpleLogin answers both cases with a generic 400): the change set must
+   * not be empty, and `mailboxIds`, when provided, must name between 1 and 20
+   * mailboxes — a domain always keeps at least one mailbox, and SimpleLogin caps
+   * a domain at 20. `name: null` clears the domain's display name.
+   */
+  async updateCustomDomain(
+    customDomainId: number,
+    patch: {
+      catchAll?: boolean;
+      randomPrefixGeneration?: boolean;
+      name?: string | null;
+      mailboxIds?: number[];
+    },
+  ): Promise<CustomDomainUpdateResponse> {
+    if (patch.mailboxIds?.length === 0) {
+      throw new CustomDomainMutationError(
+        'mailbox_ids cannot be empty; a custom domain must keep at least one mailbox.',
+      );
+    }
+    if (patch.mailboxIds !== undefined && patch.mailboxIds.length > 20) {
+      throw new CustomDomainMutationError(
+        'mailbox_ids lists more than 20 mailboxes; SimpleLogin allows at most 20 per domain.',
+      );
+    }
+    const hasChange =
+      patch.catchAll !== undefined ||
+      patch.randomPrefixGeneration !== undefined ||
+      patch.name !== undefined ||
+      patch.mailboxIds !== undefined;
+    if (!hasChange) {
+      throw new CustomDomainMutationError(
+        'No changes provided; supply at least one field to update (catch_all, random_prefix_generation, name, or mailbox_ids).',
+      );
+    }
+
+    // undefined fields are dropped by JSON.stringify (a null name survives, clearing it).
+    return this.request({
+      method: 'PATCH',
+      endpoint: customDomainPath(customDomainId),
+      body: {
+        catch_all: patch.catchAll,
+        random_prefix_generation: patch.randomPrefixGeneration,
+        name: patch.name,
+        mailbox_ids: patch.mailboxIds,
+      },
+      schema: CustomDomainUpdateResponseSchema,
+    });
+  }
+
+  /**
+   * Read a custom domain's trash: aliases on the domain that were deleted, each
+   * with its deletion timestamp. Unpaginated by the API.
+   */
+  getCustomDomainTrash(customDomainId: number): Promise<CustomDomainTrashResponse> {
+    return this.request({
+      method: 'GET',
+      endpoint: customDomainTrashPath(customDomainId),
+      schema: CustomDomainTrashResponseSchema,
     });
   }
 

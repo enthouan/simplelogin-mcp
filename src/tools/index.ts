@@ -8,6 +8,7 @@ import type { SimpleLoginClient } from '../client/simplelogin.js';
 import { registerAliasTools } from './aliases.js';
 import { registerContactTools } from './contacts.js';
 import { registerMailboxTools } from './mailboxes.js';
+import { registerCustomDomainTools } from './domains.js';
 import { registerAccountTools } from './account.js';
 
 /** Wire all SimpleLogin tools onto the given server. */
@@ -15,5 +16,6 @@ export function registerAllTools(server: McpServer, client: SimpleLoginClient): 
   registerAliasTools(server, client);
   registerContactTools(server, client);
   registerMailboxTools(server, client);
+  registerCustomDomainTools(server, client);
   registerAccountTools(server, client);
 }

@@ -22,7 +22,17 @@ export const API_PATHS = {
   mailboxes: '/api/v2/mailboxes',
   /** POST — create a new mailbox (sends a verification email to the address). */
   mailboxCreate: '/api/mailboxes',
+  /** GET — the user's custom domains with their settings and mailboxes. */
+  customDomains: '/api/custom_domains',
 } as const;
+
+/** Per-custom-domain resource path (PATCH). */
+export const customDomainPath = (customDomainId: number): string =>
+  `/api/custom_domains/${customDomainId}`;
+
+/** Deleted aliases (trash) of a single custom domain (GET). */
+export const customDomainTrashPath = (customDomainId: number): string =>
+  `/api/custom_domains/${customDomainId}/trash`;
 
 /** Per-mailbox resource path (PUT / DELETE). */
 export const mailboxPath = (mailboxId: number): string => `/api/mailboxes/${mailboxId}`;

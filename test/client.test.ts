@@ -11,6 +11,7 @@ import {
   AliasMutationError,
   ContactMutationError,
   MailboxMutationError,
+  CustomDomainMutationError,
   type FetchLike,
 } from '../src/client/simplelogin.js';
 
@@ -609,6 +610,100 @@ describe('mailbox delete safeguards', () => {
       deleted: true,
     });
     expect(calls).toHaveLength(2);
+  });
+});
+
+describe('custom domains', () => {
+  /** A valid custom-domain payload satisfying CustomDomainSchema. */
+  const CUSTOM_DOMAIN = {
+    id: 3,
+    domain_name: 'mail.example.org',
+    is_verified: true,
+    nb_alias: 4,
+    creation_date: '2021-03-10 21:36:08+00:00',
+    creation_timestamp: 1615412168,
+    catch_all: false,
+    name: null,
+    random_prefix_generation: false,
+    mailboxes: [{ id: 1, email: 'me@b.io' }],
+  };
+
+  it('list uses GET on the custom domains path with no body', async () => {
+    const { client, calls } = stubClient(jsonResponse({ custom_domains: [CUSTOM_DOMAIN] }));
+    await expect(client.listCustomDomains()).resolves.toEqual({
+      custom_domains: [CUSTOM_DOMAIN],
+    });
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/custom_domains');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('list propagates a ZodError when a domain entry is malformed', async () => {
+    const { client } = stubClient(jsonResponse({ custom_domains: [{ id: 3 }] }));
+    await expect(client.listCustomDomains()).rejects.toBeInstanceOf(z.ZodError);
+  });
+
+  it('trash uses GET on the trash path and parses the deleted aliases', async () => {
+    const trash = { aliases: [{ alias: 'old@mail.example.org', deletion_timestamp: 1605464595 }] };
+    const { client, calls } = stubClient(jsonResponse(trash));
+    await expect(client.getCustomDomainTrash(3)).resolves.toEqual(trash);
+
+    const call = calls[0]!;
+    expect(call.method).toBe('GET');
+    expect(call.url.pathname).toBe('/api/custom_domains/3/trash');
+    expect(call.body).toBeUndefined();
+  });
+
+  it('update PATCHes only the provided fields to the domain path', async () => {
+    const updated = { custom_domain: { ...CUSTOM_DOMAIN, catch_all: true } };
+    const { client, calls } = stubClient(jsonResponse(updated));
+    await expect(client.updateCustomDomain(3, { catchAll: true })).resolves.toEqual(updated);
+
+    const call = calls[0]!;
+    expect(call.method).toBe('PATCH');
+    expect(call.url.pathname).toBe('/api/custom_domains/3');
+    expect(call.body).toEqual({ catch_all: true });
+    expect(Object.keys(call.body as Record<string, unknown>)).toEqual(['catch_all']);
+  });
+
+  it('update sends a null name to clear the display name', async () => {
+    const { client, calls } = stubClient(jsonResponse({ custom_domain: CUSTOM_DOMAIN }));
+    await client.updateCustomDomain(3, { name: null });
+    expect(calls[0]!.body).toEqual({ name: null });
+  });
+
+  it('update sends a replacement mailbox set', async () => {
+    const { client, calls } = stubClient(jsonResponse({ custom_domain: CUSTOM_DOMAIN }));
+    await client.updateCustomDomain(3, { randomPrefixGeneration: true, mailboxIds: [1, 2] });
+    expect(calls[0]!.body).toEqual({ random_prefix_generation: true, mailbox_ids: [1, 2] });
+  });
+
+  it('rejects a no-op update before any network call', async () => {
+    const { client, calls } = stubClient(jsonResponse({ custom_domain: CUSTOM_DOMAIN }));
+    const error = await client.updateCustomDomain(3, {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CustomDomainMutationError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects an empty mailbox set before any network call', async () => {
+    const { client, calls } = stubClient(jsonResponse({ custom_domain: CUSTOM_DOMAIN }));
+    const error = await client.updateCustomDomain(3, { mailboxIds: [] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CustomDomainMutationError);
+    expect((error as Error).message).toContain('at least one mailbox');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects a mailbox set above the 20-per-domain cap before any network call', async () => {
+    const tooMany = Array.from({ length: 21 }, (_, i) => i + 1);
+    const { client, calls } = stubClient(jsonResponse({ custom_domain: CUSTOM_DOMAIN }));
+    const error = await client
+      .updateCustomDomain(3, { mailboxIds: tooMany })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CustomDomainMutationError);
+    expect((error as Error).message).toContain('20');
+    expect(calls).toHaveLength(0);
   });
 });
 
