@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.0
+
 ### Added
 
 - Add custom-domain tools: `custom_domain_list` to inspect each domain's verification status,
