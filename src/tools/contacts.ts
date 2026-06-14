@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
+import { toolAnnotations } from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerContactTools(server: McpServer, client: SimpleLoginClient): void {
@@ -30,7 +31,7 @@ export function registerContactTools(server: McpServer, client: SimpleLoginClien
           .optional()
           .describe('Zero-based page number; 20 contacts per page. Defaults to 0.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('contact_list'),
     },
     (args) =>
       runTool(() =>
@@ -58,6 +59,7 @@ export function registerContactTools(server: McpServer, client: SimpleLoginClien
             'Recipient address, optionally with a display name: "Name <addr@example.com>".',
           ),
       },
+      annotations: toolAnnotations('contact_create'),
     },
     (args) =>
       runTool(() => client.createContact({ aliasId: args.alias_id, contact: args.contact })),
@@ -79,7 +81,7 @@ export function registerContactTools(server: McpServer, client: SimpleLoginClien
           .boolean()
           .describe('Desired state: true to block forwarding from the contact, false to allow it.'),
       },
-      annotations: { idempotentHint: true },
+      annotations: toolAnnotations('contact_set_blocked'),
     },
     (args) => runTool(() => client.setContactBlocked(args.alias_id, args.contact_id, args.blocked)),
   );
@@ -99,7 +101,7 @@ export function registerContactTools(server: McpServer, client: SimpleLoginClien
           .literal(true)
           .describe('Must be set to true to confirm this permanent, irreversible deletion.'),
       },
-      annotations: { destructiveHint: true },
+      annotations: toolAnnotations('contact_delete'),
     },
     (args) => runTool(() => client.deleteContact(args.contact_id)),
   );

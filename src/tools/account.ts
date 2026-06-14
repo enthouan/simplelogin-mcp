@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
 import { ALIAS_GENERATORS, SENDER_FORMATS, RANDOM_ALIAS_SUFFIXES } from '../schemas/account.js';
+import { toolAnnotations } from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerAccountTools(server: McpServer, client: SimpleLoginClient): void {
@@ -20,7 +21,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
       description:
         "Return the authenticated SimpleLogin user's info: name, email, premium/trial status, " +
         'and free-plan alias limit. Useful as a quick check that the configured API key is valid.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('account_get_info'),
     },
     () => runTool(() => client.getUserInfo()),
   );
@@ -33,7 +34,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
         "Return the account's lifetime counters: number of aliases (nb_alias) and number of " +
         'emails forwarded (nb_forward), replied to (nb_reply), and blocked (nb_block) across ' +
         'all aliases. Use alias_activity_list for the per-alias breakdown behind these totals.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('account_get_stats'),
     },
     () => runTool(() => client.getStats()),
   );
@@ -56,7 +57,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
           .optional()
           .describe('Zero-based page number; 20 notifications per page. Defaults to 0.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('notification_list'),
     },
     (args) => runTool(() => client.listNotifications({ pageId: args.page_id ?? 0 })),
   );
@@ -75,7 +76,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
           .int()
           .describe('Numeric id of the notification to mark as read.'),
       },
-      annotations: { idempotentHint: true },
+      annotations: toolAnnotations('notification_mark_read'),
     },
     (args) => runTool(() => client.markNotificationRead(args.notification_id)),
   );
@@ -90,7 +91,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
         'for random aliases), sender_format (how the original sender appears in forwarded ' +
         'mail), and random_alias_suffix (suffix style for random and on-the-fly aliases). ' +
         'Change them with settings_update.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('settings_get'),
     },
     () => runTool(() => client.getSettings()),
   );
@@ -136,6 +137,7 @@ export function registerAccountTools(server: McpServer, client: SimpleLoginClien
               '"random_string".',
           ),
       },
+      annotations: toolAnnotations('settings_update'),
     },
     (args) =>
       runTool(() =>

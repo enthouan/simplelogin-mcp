@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- Standardize the public MCP tool surface for the 0.6 milestone: tool names are documented as
+  stable 1.0 candidates, every registered tool now carries complete MCP behavior annotations, and
+  the generated tool catalog documents each tool's bounds and output shape.
+- Bound `custom_domain_trash_list` responses with an optional `limit` input (default 100, max 500)
+  and return `{ aliases, returned, total, truncated }` so the unpaginated SimpleLogin endpoint
+  cannot produce unbounded MCP responses.
+
 ## v0.5.0
 
 ### Added

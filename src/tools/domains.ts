@@ -9,6 +9,11 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
+import {
+  CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT,
+  CUSTOM_DOMAIN_TRASH_MAX_LIMIT,
+  toolAnnotations,
+} from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerCustomDomainTools(server: McpServer, client: SimpleLoginClient): void {
@@ -21,7 +26,7 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         'status, alias count, catch-all and random-prefix-generation flags, display name, ' +
         'and the mailboxes that receive its mail. Use the returned ids with ' +
         'custom_domain_update and custom_domain_trash_list.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('custom_domain_list'),
     },
     () => runTool(() => client.listCustomDomains()),
   );
@@ -60,6 +65,7 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
           .optional()
           .describe("Replace the full set of mailboxes that receive the domain's mail, by id."),
       },
+      annotations: toolAnnotations('custom_domain_update'),
     },
     (args) =>
       runTool(() =>
@@ -80,15 +86,36 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         "List a custom domain's deleted aliases (its trash), each with the alias address and " +
         'a Unix deletion timestamp. Deleted addresses on a custom domain are remembered so ' +
         'they are not silently recreated by catch-all; use this to audit what was removed or ' +
-        'to check whether an address is in the trash before reusing it.',
+        'to check whether an address is in the trash before reusing it. SimpleLogin exposes ' +
+        'this endpoint without pagination, so the MCP result is capped by limit (defaults to ' +
+        `${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}, max ${CUSTOM_DOMAIN_TRASH_MAX_LIMIT}).`,
       inputSchema: {
         custom_domain_id: z
           .number()
           .int()
           .describe('Numeric id of the custom domain whose trash to list.'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(CUSTOM_DOMAIN_TRASH_MAX_LIMIT)
+          .optional()
+          .describe(
+            `Maximum deleted aliases to return; defaults to ${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}.`,
+          ),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('custom_domain_trash_list'),
     },
-    (args) => runTool(() => client.getCustomDomainTrash(args.custom_domain_id)),
+    (args) =>
+      runTool(async () => {
+        const limit = args.limit ?? CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT;
+        const trash = await client.getCustomDomainTrash(args.custom_domain_id);
+        return {
+          aliases: trash.aliases.slice(0, limit),
+          returned: Math.min(trash.aliases.length, limit),
+          total: trash.aliases.length,
+          truncated: trash.aliases.length > limit,
+        };
+      }),
   );
 }

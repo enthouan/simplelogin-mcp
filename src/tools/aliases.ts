@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
+import { toolAnnotations } from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerAliasTools(server: McpServer, client: SimpleLoginClient): void {
@@ -32,7 +33,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .describe('Return only aliases in this state. Mutually exclusive.'),
         query: z.string().optional().describe('Free-text search over alias email, note, and name.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('alias_list'),
     },
     (args) =>
       runTool(() =>
@@ -50,7 +51,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
       inputSchema: {
         alias_id: z.number().int().describe('Numeric id of the alias to fetch.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('alias_get'),
     },
     (args) => runTool(() => client.getAlias(args.alias_id)),
   );
@@ -74,7 +75,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .optional()
           .describe('Zero-based page number; 20 entries per page. Defaults to 0.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('alias_activity_list'),
     },
     (args) =>
       runTool(() =>
@@ -101,6 +102,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .optional()
           .describe('Website hostname this alias is created for (context only).'),
       },
+      annotations: toolAnnotations('alias_create_random'),
     },
     (args) =>
       runTool(() =>
@@ -137,6 +139,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .optional()
           .describe('Website hostname this alias is created for (context only).'),
       },
+      annotations: toolAnnotations('alias_create_custom'),
     },
     (args) =>
       runTool(() =>
@@ -176,6 +179,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .describe('Disable PGP on this alias even if a mailbox supports it.'),
         pinned: z.boolean().optional().describe('Pin or unpin the alias.'),
       },
+      annotations: toolAnnotations('alias_update'),
     },
     (args) =>
       runTool(() =>
@@ -204,7 +208,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .literal(true)
           .describe('Must be set to true to confirm this permanent, irreversible deletion.'),
       },
-      annotations: { destructiveHint: true },
+      annotations: toolAnnotations('alias_delete'),
     },
     (args) => runTool(() => client.deleteAlias(args.alias_id)),
   );
@@ -224,7 +228,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .boolean()
           .describe('Desired state: true to enable the alias, false to disable it.'),
       },
-      annotations: { destructiveHint: true, idempotentHint: true },
+      annotations: toolAnnotations('alias_set_enabled'),
     },
     (args) => runTool(() => client.setAliasEnabled(args.alias_id, args.enabled)),
   );
@@ -244,7 +248,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
           .optional()
           .describe('Website hostname to tailor the prefix suggestion.'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('alias_options_get'),
     },
     (args) => runTool(() => client.getAliasOptions(args.hostname)),
   );
@@ -256,7 +260,7 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
       description:
         'List the email domains available for creating aliases on this account, each flagged ' +
         'is_custom (a user-owned domain) or not (a SimpleLogin public domain).',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('alias_domains_list'),
     },
     () => runTool(() => client.listDomains()),
   );
