@@ -97,9 +97,9 @@ Non-browser MCP clients send no `Origin` and are unaffected.
 ## Logging and error output
 
 - All diagnostics go to **stderr** (stdout is reserved for the MCP stdio stream).
-- Secrets are never logged. API failures log only the endpoint and HTTP status; neither
-  `SL_API_KEY` nor `MCP_AUTH_TOKEN` appears in logs or in tool error messages returned to
-  clients.
+- Secrets are never logged. API failures log only sanitized structured metadata such as endpoint,
+  method, HTTP status/status text, response-body type, and `Retry-After`; neither `SL_API_KEY` nor
+  `MCP_AUTH_TOKEN` appears in logs or in tool error messages returned to clients.
 - Error results surface the SimpleLogin status/endpoint/message and validation detail,
   not request headers or credentials.
 

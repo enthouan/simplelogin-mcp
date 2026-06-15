@@ -6,6 +6,16 @@
 import { z } from 'zod';
 import { isLoopbackHost } from './security.js';
 
+const CONFIG_HINTS: Record<string, string> = {
+  TRANSPORT: 'set TRANSPORT to "stdio" for local MCP clients or "http" for the HTTP server.',
+  HOST: 'set HOST to a hostname or IP address; omit it to use the loopback default 127.0.0.1.',
+  PORT: 'set PORT to an integer from 1 to 65535.',
+  SL_API_URL: 'set SL_API_URL to an absolute http(s) URL such as https://app.simplelogin.io.',
+  SL_API_KEY: 'set SL_API_KEY to a non-empty SimpleLogin API key.',
+  ALLOW_UNAUTHENTICATED_EXPOSURE: 'set ALLOW_UNAUTHENTICATED_EXPOSURE to true, false, 1, or 0.',
+  SL_REQUEST_TIMEOUT_MS: 'set SL_REQUEST_TIMEOUT_MS to a positive integer number of milliseconds.',
+};
+
 /** Parse an env flag forgivingly: `true`/`1` → true, `false`/`0` → false (default). */
 const boolEnv = z.preprocess(
   (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v),
@@ -24,7 +34,11 @@ const ConfigSchema = z.object({
   // deliberate change. See the exposure guard below.
   HOST: z.string().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  SL_API_URL: z.string().url().default('https://app.simplelogin.io'),
+  SL_API_URL: z
+    .string()
+    .url()
+    .refine((value) => isHttpUrl(value))
+    .default('https://app.simplelogin.io'),
   SL_API_KEY: z.string().min(1, 'SL_API_KEY is required'),
   MCP_AUTH_TOKEN: optionalEnvString,
   MCP_ALLOWED_ORIGINS: optionalEnvString,
@@ -55,7 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = ConfigSchema.safeParse(env);
   if (!parsed.success) {
     const details = parsed.error.issues
-      .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .map((issue) => `  - ${formatConfigIssue(issue)}`)
       .join('\n');
     throw new Error(`Invalid configuration:\n${details}`);
   }
@@ -114,4 +128,18 @@ function parseOrigins(raw: string | undefined): string[] {
     .split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
+function formatConfigIssue(issue: z.ZodIssue): string {
+  const field = issue.path.join('.') || '(root)';
+  const hint = CONFIG_HINTS[field];
+  return hint ? `${field}: ${hint}` : `${field}: ${issue.message}`;
 }

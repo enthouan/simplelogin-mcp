@@ -106,7 +106,9 @@ describe('loadConfig', () => {
   });
 
   it('throws a readable error naming SL_API_KEY when it is missing', () => {
-    expect(() => loadConfig(env({}))).toThrowError(/Invalid configuration:[\s\S]*SL_API_KEY/);
+    expect(() => loadConfig(env({}))).toThrowError(
+      /Invalid configuration:[\s\S]*SL_API_KEY[\s\S]*non-empty SimpleLogin API key/,
+    );
   });
 
   it('rejects an out-of-range port', () => {
@@ -115,7 +117,7 @@ describe('loadConfig', () => {
 
   it('rejects an unknown transport', () => {
     expect(() => loadConfig(env({ SL_API_KEY: 'k', TRANSPORT: 'carrier-pigeon' }))).toThrowError(
-      /TRANSPORT/,
+      /TRANSPORT[\s\S]*stdio[\s\S]*http/,
     );
   });
 
@@ -123,6 +125,24 @@ describe('loadConfig', () => {
     expect(() => loadConfig(env({ SL_API_KEY: 'k', SL_API_URL: 'not-a-url' }))).toThrowError(
       /SL_API_URL/,
     );
+  });
+
+  it('rejects a non-http API base', () => {
+    expect(() =>
+      loadConfig(env({ SL_API_KEY: 'k', SL_API_URL: 'ftp://sl.example.com' })),
+    ).toThrowError(/SL_API_URL[\s\S]*http\(s\)/);
+  });
+
+  it('does not echo invalid environment values in configuration errors', () => {
+    let message = '';
+    try {
+      loadConfig(env({ SL_API_KEY: 'k', TRANSPORT: 'secret-token-value' }));
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain('TRANSPORT');
+    expect(message).not.toContain('secret-token-value');
   });
 
   it('lists every offending field in a single error', () => {

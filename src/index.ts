@@ -37,10 +37,10 @@ async function main(): Promise<void> {
 async function startStdio(client: SimpleLoginClient): Promise<void> {
   const server = buildServer(client);
   await server.connect(new StdioServerTransport());
-  logger.info(`v${VERSION} ready on stdio transport`);
+  logger.info('server ready', { version: VERSION, transport: 'stdio' });
 
   const shutdown = (signal: string): void => {
-    logger.info(`received ${signal}, shutting down`);
+    logger.info('received shutdown signal', { signal, transport: 'stdio' });
     void server.close().finally(() => process.exit(0));
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -86,9 +86,15 @@ function startHttp(config: AppConfig, client: SimpleLoginClient): void {
   const httpServer = serve(
     { fetch: app.fetch, port: config.port, hostname: config.host },
     (info) => {
-      logger.info(
-        `v${VERSION} listening on http://${config.host}:${info.port} (POST /mcp, GET /health)`,
-      );
+      logger.info('server listening', {
+        version: VERSION,
+        transport: 'http',
+        url: `http://${config.host}:${info.port}`,
+        mcpPath: '/mcp',
+        healthPath: '/health',
+        auth: config.mcpAuthToken ? 'enabled' : 'disabled',
+        allowedOrigins: config.allowedOrigins.length,
+      });
       if (!config.mcpAuthToken) {
         if (isLoopbackHost(config.host)) {
           logger.info(
@@ -105,7 +111,7 @@ function startHttp(config: AppConfig, client: SimpleLoginClient): void {
   );
 
   const shutdown = (signal: string): void => {
-    logger.info(`received ${signal}, shutting down`);
+    logger.info('received shutdown signal', { signal, transport: 'http' });
     httpServer.close(() => process.exit(0));
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));

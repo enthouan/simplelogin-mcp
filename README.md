@@ -329,8 +329,11 @@ Adding a new SimpleLogin endpoint is intentionally a small, three-step change:
 3. Add a thin client method in [`src/client/simplelogin.ts`](src/client/simplelogin.ts) and a tool
    registration in [`src/tools/`](src/tools).
 
-The client's shared `request()` helper handles the `Authentication` header, timeout, error parsing
-(throwing a typed `SimpleLoginAPIError`), and Zod validation, so each method stays a one-liner.
+The client's shared `request()` helper handles the `Authentication` header, timeout, deterministic
+error parsing (throwing a typed `SimpleLoginAPIError` for JSON, text, empty, malformed, timeout,
+abort, network, and rate-limit failures), and Zod validation, so each method stays a one-liner.
+429 responses are reported with status, endpoint, and `Retry-After` when SimpleLogin provides it;
+the server does not retry automatically, so mutating tools are never repeated implicitly.
 
 The API surface follows the in-app SimpleLogin reference
 ([`docs/api.md`](https://github.com/simple-login/app/blob/master/docs/api.md)), which is the source

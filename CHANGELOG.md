@@ -13,6 +13,13 @@
   0, default limit 100, max 500) and return `{ aliases, page_id, limit, returned, total, more }` so
   the unpaginated SimpleLogin endpoint cannot produce unbounded MCP responses while still allowing
   older trash entries to be reached.
+- Improve runtime failure diagnostics: SimpleLogin API JSON, text, empty, malformed, timeout,
+  abort, network, and rate-limit failures now map deterministically to typed MCP errors with status
+  and endpoint context. Logs stay on stderr with redacted structured metadata and never include API
+  keys, MCP auth tokens, authorization headers, or request bodies.
+- Keep 429 handling explicit and non-retrying in 0.6: rate-limit responses surface the status,
+  endpoint, server message, and `Retry-After` hint when present, leaving retry policy to the caller
+  so mutating tools are not repeated implicitly.
 
 ## v0.5.0
 
