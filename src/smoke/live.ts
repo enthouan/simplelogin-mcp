@@ -127,6 +127,7 @@ export interface RunSmokeTestOptions {
   attemptContact?: boolean;
   maxLookupPages?: number;
   secrets?: readonly string[];
+  abortSignal?: AbortSignal;
 }
 
 interface CliConfig {
@@ -253,6 +254,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
       'alias_create_random',
       secrets,
       async () => {
+        throwIfAborted(options.abortSignal);
         const createdAlias = await client!.callTool('alias_create_random', {
           mode: 'uuid',
           note: naming.aliasNote,
@@ -291,6 +293,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
       toolNames,
       maxLookupPages,
       secrets,
+      abortSignal: options.abortSignal,
     });
   } catch (error) {
     summary.failure = normalizeFailure(error, summary, secrets);
@@ -298,6 +301,13 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     if (client) {
       if (!artifacts.alias && shouldAttemptAliasRecovery(summary.failure)) {
         await recoverAliasCreatedByFailedStep(client, artifacts, summary, {
+          naming,
+          maxLookupPages,
+          secrets,
+        });
+      }
+      if (artifacts.alias && !artifacts.contact && shouldAttemptContactRecovery(summary.failure)) {
+        await recoverContactCreatedByFailedStep(client, artifacts, summary, {
           naming,
           maxLookupPages,
           secrets,
@@ -485,6 +495,49 @@ async function recoverAliasCreatedByFailedStep(
   }
 }
 
+async function recoverContactCreatedByFailedStep(
+  client: SmokeMcpClient,
+  artifacts: SmokeArtifacts,
+  summary: SmokeRunSummary,
+  options: { naming: SmokeRunNaming; maxLookupPages: number; secrets: readonly string[] },
+): Promise<void> {
+  const alias = artifacts.alias;
+  if (!alias) return;
+
+  const record = startStep(
+    summary,
+    'recover temporary contact after failed create',
+    'contact_list',
+  );
+  try {
+    const contact = await findContactByRunId(
+      client,
+      alias.id,
+      options.naming.runId,
+      options.maxLookupPages,
+    );
+    if (!contact) {
+      record.status = 'skipped';
+      record.note = 'no temporary contact found for this smoke run id';
+      return;
+    }
+
+    const id = requireInteger(contact, 'id', 'contact_list');
+    artifacts.contact = {
+      id,
+      aliasId: alias.id,
+      contact: stringifyContact(contact),
+      runId: options.naming.runId,
+      createdByRun: true,
+    };
+    record.status = 'ok';
+    record.note = `recovered contact ${id} for cleanup`;
+  } catch (error) {
+    record.status = 'failed';
+    record.note = redactSmokeText(errorMessage(error), options.secrets);
+  }
+}
+
 async function maybeExerciseContact(options: {
   client: SmokeMcpClient;
   summary: SmokeRunSummary;
@@ -493,6 +546,7 @@ async function maybeExerciseContact(options: {
   toolNames: string[];
   maxLookupPages: number;
   secrets: readonly string[];
+  abortSignal?: AbortSignal;
 }): Promise<void> {
   if (!options.summary.contact.attempted) {
     options.summary.contact.skipped = true;
@@ -515,6 +569,7 @@ async function maybeExerciseContact(options: {
   const alias = options.artifacts.alias;
   if (!alias) throw new Error('internal smoke error: missing temporary alias before contact step');
 
+  throwIfAborted(options.abortSignal);
   const createStep = startStep(options.summary, 'create temporary contact', 'contact_create');
   let contact: Record<string, unknown>;
   let contactId: number | undefined;
@@ -563,14 +618,6 @@ async function maybeExerciseContact(options: {
     );
   }
 
-  options.artifacts.contact = {
-    id: contactId,
-    aliasId: alias.id,
-    contact: options.naming.contact,
-    runId: options.naming.runId,
-    createdByRun: true,
-  };
-
   await runStep(
     options.summary,
     'read temporary contact',
@@ -586,6 +633,16 @@ async function maybeExerciseContact(options: {
       if (!found) {
         throw new Error(`contact ${contactId} was not found on alias ${alias.id} after creation`);
       }
+      if (!contactBelongsToRun(found, options.naming.runId)) {
+        throw new Error('contact_list returned a contact that does not match this smoke run');
+      }
+      options.artifacts.contact = {
+        id: contactId,
+        aliasId: alias.id,
+        contact: stringifyContact(found),
+        runId: options.naming.runId,
+        createdByRun: true,
+      };
       return found;
     },
   );
@@ -733,6 +790,32 @@ async function findContactById(
   return undefined;
 }
 
+async function findContactByRunId(
+  client: SmokeMcpClient,
+  aliasId: number,
+  runId: string,
+  maxPages: number,
+): Promise<Record<string, unknown> | undefined> {
+  for (let pageId = 0; pageId < maxPages; pageId++) {
+    const result = await client.callTool('contact_list', { alias_id: aliasId, page_id: pageId });
+    const contacts = Array.isArray(result['contacts']) ? result['contacts'] : [];
+    for (const candidate of contacts) {
+      if (isRecord(candidate) && contactBelongsToRun(candidate, runId)) return candidate;
+    }
+    if (contacts.length < LIST_PAGE_SIZE) return undefined;
+  }
+  return undefined;
+}
+
+function contactBelongsToRun(contact: Record<string, unknown>, runId: string): boolean {
+  return stringifyContact(contact).includes(runId);
+}
+
+function stringifyContact(contact: Record<string, unknown>): string {
+  const value = contact['contact'];
+  return typeof value === 'string' ? value : '';
+}
+
 async function runStep<T>(
   summary: SmokeRunSummary,
   step: string,
@@ -873,6 +956,10 @@ function shouldAttemptAliasRecovery(failure: SmokeFailure | undefined): boolean 
   );
 }
 
+function shouldAttemptContactRecovery(failure: SmokeFailure | undefined): boolean {
+  return failure?.step === 'create temporary contact' || failure?.step === 'read temporary contact';
+}
+
 function ownsArtifact(artifact: SmokeArtifact, runId: string): boolean {
   return artifact.createdByRun && artifact.runId === runId;
 }
@@ -888,6 +975,12 @@ function isNotFoundError(message: string): boolean {
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new Error('Smoke run interrupted; skipping new mutating calls and starting cleanup.');
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -975,8 +1068,10 @@ async function runCli(): Promise<void> {
   let removeSignalHandlers: (() => void) | undefined;
   try {
     config = parseCliConfig(process.argv.slice(2));
+    const abortController = new AbortController();
     removeSignalHandlers = installSignalHandlers((signal) => {
       receivedSignal = signal;
+      abortController.abort(signal);
       process.exitCode = signalExitCode(signal);
       process.stderr.write(
         `Received ${signal}; waiting for active smoke run cleanup before exiting.\n`,
@@ -991,6 +1086,7 @@ async function runCli(): Promise<void> {
           attemptContact: config.attemptContact,
           maxLookupPages: config.maxLookupPages,
           secrets: config.secrets,
+          abortSignal: abortController.signal,
           clientFactory: (selectedTransport) => connectMcpSmokeClient(selectedTransport, config!),
         }),
       );

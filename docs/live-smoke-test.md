@@ -89,9 +89,14 @@ If `alias_create_random` fails after SimpleLogin may already have created an ali
 a bounded `alias_list` lookup for the current run id and only recovers the alias for cleanup when the
 alias note contains that run id.
 
-On the first `SIGINT` or `SIGTERM`, the CLI waits for the active smoke run to reach its cleanup path
-before exiting with the conventional signal exit code. A second interrupt may still force the process
-down immediately.
+The contact path uses the same ownership rule: a returned contact id is only eligible for cleanup
+after `contact_list` confirms the contact value contains the current run id. If `contact_create`
+fails after SimpleLogin may already have created the contact, the runner makes a bounded
+`contact_list` lookup on the temporary alias and only recovers contacts matching the run id.
+
+On the first `SIGINT` or `SIGTERM`, the CLI asks the active smoke run to stop before later mutating
+steps, waits for cleanup, and exits with the conventional signal exit code. A second interrupt may
+still force the process down immediately.
 
 ## Reading Failures
 

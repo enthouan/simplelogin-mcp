@@ -206,6 +206,30 @@ describe('live smoke runner logic', () => {
     expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(true);
   });
 
+  it('does not create a random alias after the smoke run is aborted', async () => {
+    const abortController = new AbortController();
+    const client = makeSuccessfulClient();
+    client.setHandler('alias_list', () => {
+      abortController.abort();
+      return { aliases: [] };
+    });
+    client.setHandler('alias_create_random', () => {
+      throw new Error('alias_create_random should not be called after abort');
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(client),
+      abortSignal: abortController.signal,
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.message).toContain('interrupted');
+    expect(summary.cleanup.alias.status).toBe('not_needed');
+    expect(client.calls.some((call) => call.name === 'alias_create_random')).toBe(false);
+  });
+
   it('does not delete a returned alias id until readback proves smoke ownership', async () => {
     const client = makeSuccessfulClient();
     client.setHandler('alias_get', () => ({
@@ -335,6 +359,55 @@ describe('live smoke runner logic', () => {
     expect(summary.contact.skipped).toBe(false);
     expect(summary.failure?.step).toBe('create temporary contact');
     expect(summary.failure?.message).toContain('not available');
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+  });
+
+  it('recovers and cleans up a contact when create fails after the contact exists', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    let contactExists = false;
+    client.setHandler('contact_create', () => {
+      contactExists = true;
+      throw new Error('tool response validation failed after contact create');
+    });
+    client.setHandler('contact_list', () => ({
+      contacts: contactExists ? [{ id: 202, contact: runNaming.contact }] : [],
+    }));
+    client.setHandler('contact_delete', () => {
+      contactExists = false;
+      return { deleted: true };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('create temporary contact');
+    expect(summary.artifacts.contact?.id).toBe(202);
+    expect(summary.cleanup.contact.status).toBe('succeeded');
+    expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(true);
+  });
+
+  it('does not delete a returned contact id until readback proves smoke ownership', async () => {
+    const client = makeSuccessfulClient();
+    client.setHandler('contact_list', () => ({
+      contacts: [{ id: 202, contact: 'Personal <personal@example.com>' }],
+    }));
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('read temporary contact');
+    expect(summary.artifacts.contact).toBeUndefined();
+    expect(summary.cleanup.contact.status).toBe('not_needed');
+    expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
 
