@@ -3,7 +3,7 @@
  * method, headers, body), per-endpoint request shapes, error mapping, and Zod
  * response validation. No live SimpleLogin calls are made.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import {
   SimpleLoginClient,
@@ -46,11 +46,22 @@ function jsonResponse(data: unknown, status = 200, statusText?: string): Respons
   });
 }
 
+function textResponse(text: string, status: number, statusText?: string): Response {
+  return new Response(text, {
+    status,
+    statusText,
+    headers: { 'Content-Type': 'text/plain' },
+  });
+}
+
 /**
  * Build a client wired to a recording stub fetcher. `respond` may be a fixed
  * Response or a function of the recorded call.
  */
-function stubClient(respond: Response | ((call: RecordedCall) => Response | Promise<never>)) {
+function stubClient(
+  respond: Response | ((call: RecordedCall) => Response | Promise<Response> | Promise<never>),
+  options: { apiKey?: string; timeoutMs?: number } = {},
+) {
   const calls: RecordedCall[] = [];
   const fetchImpl: FetchLike = (input, init = {}) => {
     const url = input instanceof URL ? input : new URL(input);
@@ -62,8 +73,8 @@ function stubClient(respond: Response | ((call: RecordedCall) => Response | Prom
   };
   const client = new SimpleLoginClient({
     apiUrl: 'https://sl.example.com/',
-    apiKey: 'secret-key',
-    timeoutMs: 1000,
+    apiKey: options.apiKey ?? 'secret-key',
+    timeoutMs: options.timeoutMs ?? 1000,
     fetch: fetchImpl,
   });
   return { client, calls };
@@ -721,29 +732,89 @@ describe('error mapping', () => {
     expect(apiError.body).toEqual({ error: 'Alias not found' });
   });
 
-  it('reads the message/msg keys and plain string bodies', async () => {
-    const fromMessage = await stubClient(jsonResponse({ message: 'bad input' }, 400))
+  it.each([
+    [{ error: 'Invalid API key' }, 401, 'Invalid API key'],
+    [{ message: 'Forbidden' }, 403, 'Forbidden'],
+    [{ msg: 'Validation failed' }, 400, 'Validation failed'],
+    [{ error: 'Already exists' }, 409, 'Already exists'],
+    [{ error: 'Upstream unavailable' }, 502, 'Upstream unavailable'],
+  ])('reads JSON error/message/msg bodies for HTTP %s', async (body, status, expected) => {
+    const message = await stubClient(jsonResponse(body, status))
       .client.getAlias(1)
       .catch((e: unknown) => (e as SimpleLoginAPIError).message);
-    expect(fromMessage).toBe('bad input');
-
-    const fromMsg = await stubClient(jsonResponse({ msg: 'nope' }, 400))
-      .client.getAlias(1)
-      .catch((e: unknown) => (e as SimpleLoginAPIError).message);
-    expect(fromMsg).toBe('nope');
-
-    const fromString = await stubClient(jsonResponse('plain failure', 400))
-      .client.getAlias(1)
-      .catch((e: unknown) => (e as SimpleLoginAPIError).message);
-    expect(fromString).toBe('plain failure');
+    expect(message).toBe(expected);
   });
 
-  it('falls back to the status text when the body carries no message', async () => {
+  it('reads plain-text error bodies', async () => {
+    const { client } = stubClient(textResponse('plain failure', 503));
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error.status).toBe(503);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('plain failure');
+    expect(error.body).toBe('plain failure');
+  });
+
+  it('falls back to the status text for an empty error body', async () => {
     const { client } = stubClient(new Response(null, { status: 500, statusText: 'Server Error' }));
     const message = await client
       .getAlias(1)
       .catch((e: unknown) => (e as SimpleLoginAPIError).message);
     expect(message).toBe('Server Error');
+  });
+
+  it('reports malformed JSON error bodies deterministically', async () => {
+    const { client } = stubClient(
+      new Response('{ nope', {
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error.status).toBe(502);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('Bad Gateway (malformed JSON error body)');
+    expect(error.body).toBe('{ nope');
+  });
+
+  it('surfaces rate-limit status, endpoint, message, and retry-after without retrying', async () => {
+    const { client, calls } = stubClient(
+      new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+      }),
+    );
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+
+    expect(error.status).toBe(429);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('Rate limit exceeded (retry after 60)');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('redacts the configured API key if a server error echoes it', async () => {
+    const { client } = stubClient(jsonResponse({ error: 'bad secret-key' }, 401));
+    const error = (await client.getUserInfo().catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error.message).toBe('bad [REDACTED]');
+    expect(error.message).not.toContain('secret-key');
+  });
+
+  it('redacts the configured API key from logged status text', async () => {
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const { client } = stubClient(
+        new Response(null, { status: 500, statusText: 'bad secret-key' }),
+      );
+      const error = (await client.getUserInfo().catch((e: unknown) => e)) as SimpleLoginAPIError;
+      expect(error.message).toBe('bad [REDACTED]');
+
+      const logged = stderrWrite.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(logged).toContain('bad [REDACTED]');
+      expect(logged).not.toContain('secret-key');
+    } finally {
+      stderrWrite.mockRestore();
+    }
   });
 
   it('maps a timeout to status 0 with a timeout message', async () => {
@@ -756,10 +827,50 @@ describe('error mapping', () => {
     expect(error.message).toBe('Request timed out after 1000ms');
   });
 
+  it('maps a response body timeout to a transport error with endpoint context', async () => {
+    const response = jsonResponse(ALIAS);
+    vi.spyOn(response, 'text').mockRejectedValue(
+      Object.assign(new Error('body stalled'), { name: 'TimeoutError' }),
+    );
+    const { client, calls } = stubClient(response);
+
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+
+    expect(error).toBeInstanceOf(SimpleLoginAPIError);
+    expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('Request timed out after 1000ms');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('maps an abort to status 0 with an abort message', async () => {
+    const { client } = stubClient(() =>
+      Promise.reject(Object.assign(new Error('operation aborted'), { name: 'AbortError' })),
+    );
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error).toBeInstanceOf(SimpleLoginAPIError);
+    expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('Request was aborted before SimpleLogin responded');
+  });
+
+  it('maps an invalid timeout configuration before any fetch call', async () => {
+    const { client, calls } = stubClient(jsonResponse(USER_INFO), { timeoutMs: 5_000_000_000 });
+    const error = (await client.getUserInfo().catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error).toBeInstanceOf(SimpleLoginAPIError);
+    expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/user_info');
+    expect(error.message).toBe(
+      'Invalid request timeout 5000000000ms; set SL_REQUEST_TIMEOUT_MS between 1 and 2147483647.',
+    );
+    expect(calls).toHaveLength(0);
+  });
+
   it('maps a network failure to status 0 with a network message', async () => {
     const { client } = stubClient(() => Promise.reject(new Error('connection refused')));
     const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
     expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/aliases/1');
     expect(error.message).toBe('Network error: connection refused');
   });
 });

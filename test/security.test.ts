@@ -2,7 +2,8 @@
  * Host/origin safety predicates: loopback detection and the POST /mcp origin
  * allowlist used for DNS-rebinding / CSRF defense.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { logger, redactForLog, redactSecrets } from '../src/logger.js';
 import { isAllowedOrigin, isLoopbackHost } from '../src/security.js';
 
 describe('isLoopbackHost', () => {
@@ -38,5 +39,57 @@ describe('isAllowedOrigin', () => {
   it('rejects non-http(s) and malformed origins', () => {
     expect(isAllowedOrigin('file:///etc/passwd', [])).toBe(false);
     expect(isAllowedOrigin('not a url', [])).toBe(false);
+  });
+});
+
+describe('logging redaction', () => {
+  it('redacts credential-shaped strings', () => {
+    const text = redactSecrets(
+      'Authentication: sl-secret Authorization: Bearer mcp-secret SL_API_KEY=sl-secret MCP_AUTH_TOKEN=mcp-secret',
+    );
+
+    expect(text).toContain('[REDACTED]');
+    expect(text).not.toContain('sl-secret');
+    expect(text).not.toContain('mcp-secret');
+  });
+
+  it('redacts secret-bearing metadata keys recursively', () => {
+    expect(
+      redactForLog({
+        apiKey: 'sl-secret',
+        headers: { Authorization: 'Bearer mcp-secret', Authentication: 'sl-secret' },
+        nested: [{ MCP_AUTH_TOKEN: 'mcp-secret' }],
+        endpoint: '/api/user_info',
+      }),
+    ).toEqual({
+      apiKey: '[REDACTED]',
+      headers: { Authorization: '[REDACTED]', Authentication: '[REDACTED]' },
+      nested: [{ MCP_AUTH_TOKEN: '[REDACTED]' }],
+      endpoint: '/api/user_info',
+    });
+  });
+
+  it('writes diagnostics only to stderr with redacted metadata', () => {
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      logger.error('request failed Authorization: Bearer mcp-secret', {
+        endpoint: '/api/user_info',
+        headers: { Authentication: 'sl-secret' },
+      });
+
+      expect(stdoutWrite).not.toHaveBeenCalled();
+      expect(stderrWrite).toHaveBeenCalledTimes(1);
+      const line = String(stderrWrite.mock.calls[0]?.[0] ?? '');
+      expect(line).toContain('[simplelogin-mcp] error:');
+      expect(line).toContain('/api/user_info');
+      expect(line).toContain('[REDACTED]');
+      expect(line).not.toContain('sl-secret');
+      expect(line).not.toContain('mcp-secret');
+    } finally {
+      stdoutWrite.mockRestore();
+      stderrWrite.mockRestore();
+    }
   });
 });

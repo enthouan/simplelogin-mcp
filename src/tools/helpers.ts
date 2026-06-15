@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { SimpleLoginAPIError } from '../client/simplelogin.js';
+import { redactSecrets } from '../logger.js';
 
 /** Wrap any JSON-serializable value as a successful tool result. */
 export function jsonResult(data: unknown): CallToolResult {
@@ -15,7 +16,7 @@ export function jsonResult(data: unknown): CallToolResult {
 
 /** Convert a thrown value into an MCP error result with a readable message. */
 export function errorResult(error: unknown): CallToolResult {
-  return { content: [{ type: 'text', text: describeError(error) }], isError: true };
+  return { content: [{ type: 'text', text: redactSecrets(describeError(error)) }], isError: true };
 }
 
 /**

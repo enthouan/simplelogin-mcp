@@ -19,7 +19,7 @@ import {
   customDomainTrashPath,
   notificationReadPath,
 } from '../constants.js';
-import { logger } from '../logger.js';
+import { logger, redactSecrets } from '../logger.js';
 import {
   AliasSchema,
   AliasListResponseSchema,
@@ -189,6 +189,14 @@ interface RequestOptions<S extends z.ZodTypeAny> {
   query?: QueryParams;
   body?: Record<string, unknown>;
 }
+
+type ParsedResponseBody =
+  | { kind: 'empty'; body: undefined }
+  | { kind: 'json'; body: unknown }
+  | { kind: 'text'; body: string }
+  | { kind: 'malformed-json'; body: string };
+
+const MAX_ABORT_SIGNAL_TIMEOUT_MS = 2_147_483_647;
 
 /** Filters supported by {@link SimpleLoginClient.listAliases} (mutually exclusive). */
 export type AliasListFilter = 'enabled' | 'disabled' | 'pinned';
@@ -767,32 +775,51 @@ export class SimpleLoginClient {
     }
 
     let response: Response;
+    let signal: AbortSignal | undefined;
     try {
+      signal = this.buildTimeoutSignal();
       response = await this.fetchImpl(url, {
         method: options.method,
         headers,
         body: bodyInit,
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal,
       });
     } catch (error) {
-      throw this.toTransportError(error, options.endpoint);
+      const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);
+      this.logTransportFailure(options.endpoint, options.method, error, apiError);
+      throw apiError;
     }
 
-    const parsedBody = this.parseJson(await response.text());
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (error) {
+      const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);
+      this.logTransportFailure(options.endpoint, options.method, error, apiError);
+      throw apiError;
+    }
+
+    const parsedBody = this.parseResponseBody(rawText, response.headers.get('content-type'));
 
     if (!response.ok) {
-      const message =
-        this.extractErrorMessage(parsedBody) ?? response.statusText ?? 'Request failed';
+      const message = this.httpErrorMessage(response, parsedBody);
+      const retryAfter = response.headers.get('retry-after') ?? undefined;
       logger.error('SimpleLogin API request failed', {
         endpoint: options.endpoint,
+        method: options.method,
         status: response.status,
+        statusText: response.statusText
+          ? redactSecrets(response.statusText, [this.apiKey])
+          : undefined,
+        responseBody: parsedBody.kind,
+        retryAfter: retryAfter ? redactSecrets(retryAfter, [this.apiKey]) : undefined,
       });
-      throw new SimpleLoginAPIError(response.status, options.endpoint, message, parsedBody);
+      throw new SimpleLoginAPIError(response.status, options.endpoint, message, parsedBody.body);
     }
 
     // `parse` is typed as `any` under ZodTypeAny; the assertion restores the
     // schema's precise output type. A ZodError here propagates to the tool layer.
-    return options.schema.parse(parsedBody) as z.output<S>;
+    return options.schema.parse(parsedBody.body) as z.output<S>;
   }
 
   private buildUrl(endpoint: string, query?: QueryParams): URL {
@@ -805,12 +832,41 @@ export class SimpleLoginClient {
     return url;
   }
 
-  private parseJson(rawText: string): unknown {
-    if (rawText.length === 0) return undefined;
+  private buildTimeoutSignal(): AbortSignal {
+    if (
+      !Number.isInteger(this.timeoutMs) ||
+      this.timeoutMs < 1 ||
+      this.timeoutMs > MAX_ABORT_SIGNAL_TIMEOUT_MS
+    ) {
+      throw new RangeError(
+        `Invalid request timeout ${this.timeoutMs}ms; set SL_REQUEST_TIMEOUT_MS between 1 and ${MAX_ABORT_SIGNAL_TIMEOUT_MS}.`,
+      );
+    }
+    return AbortSignal.timeout(this.timeoutMs);
+  }
+
+  private logTransportFailure(
+    endpoint: string,
+    method: HttpMethod,
+    error: unknown,
+    apiError: SimpleLoginAPIError,
+  ): void {
+    logger.error('SimpleLogin API transport failure', {
+      endpoint,
+      method,
+      errorName: this.errorName(error),
+      errorMessage: apiError.message,
+      timeoutMs: this.timeoutMs,
+    });
+  }
+
+  private parseResponseBody(rawText: string, contentType: string | null): ParsedResponseBody {
+    if (rawText.length === 0) return { kind: 'empty', body: undefined };
+    const expectsJson = contentType?.toLowerCase().includes('json') ?? false;
     try {
-      return JSON.parse(rawText) as unknown;
+      return { kind: 'json', body: JSON.parse(rawText) as unknown };
     } catch {
-      return rawText;
+      return { kind: expectsJson ? 'malformed-json' : 'text', body: rawText };
     }
   }
 
@@ -826,13 +882,59 @@ export class SimpleLoginClient {
     return undefined;
   }
 
-  private toTransportError(error: unknown, endpoint: string): SimpleLoginAPIError {
-    const name =
-      typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined;
-    if (name === 'TimeoutError') {
+  private httpErrorMessage(response: Response, parsedBody: ParsedResponseBody): string {
+    const serverMessage =
+      parsedBody.kind === 'malformed-json' ? undefined : this.extractErrorMessage(parsedBody.body);
+    const fallback = response.statusText || `HTTP ${response.status}`;
+    let message: string;
+
+    if (response.status === 429) {
+      message = serverMessage ?? 'Rate limited by SimpleLogin';
+      const retryAfter = response.headers.get('retry-after');
+      if (retryAfter) message = `${message} (retry after ${retryAfter})`;
+    } else if (serverMessage) {
+      message = serverMessage;
+    } else if (parsedBody.kind === 'malformed-json') {
+      message = `${fallback} (malformed JSON error body)`;
+    } else {
+      message = fallback;
+    }
+
+    return redactSecrets(message, [this.apiKey]);
+  }
+
+  private toTransportError(
+    error: unknown,
+    endpoint: string,
+    timedOut: boolean,
+  ): SimpleLoginAPIError {
+    const name = this.errorName(error);
+    if (timedOut || name === 'TimeoutError') {
       return new SimpleLoginAPIError(0, endpoint, `Request timed out after ${this.timeoutMs}ms`);
     }
-    const detail = error instanceof Error ? error.message : String(error);
+    if (name === 'AbortError') {
+      return new SimpleLoginAPIError(
+        0,
+        endpoint,
+        'Request was aborted before SimpleLogin responded',
+      );
+    }
+    if (error instanceof RangeError && error.message.startsWith('Invalid request timeout ')) {
+      return new SimpleLoginAPIError(0, endpoint, error.message);
+    }
+    const detail = redactSecrets(this.errorDetail(error), [this.apiKey]);
     return new SimpleLoginAPIError(0, endpoint, `Network error: ${detail}`);
+  }
+
+  private errorName(error: unknown): string | undefined {
+    if (typeof error !== 'object' || error === null) return undefined;
+    const name = (error as { name?: unknown }).name;
+    return typeof name === 'string' && name.length > 0 ? name : undefined;
+  }
+
+  private errorDetail(error: unknown): string {
+    if (!(error instanceof Error)) return String(error);
+    const cause = error.cause instanceof Error ? `: ${error.cause.message}` : '';
+    return `${error.message}${cause}`;
   }
 }

@@ -35,6 +35,21 @@ describe('errorResult', () => {
     );
   });
 
+  it('redacts credential-shaped values from MCP tool errors', () => {
+    const result = errorResult(
+      new SimpleLoginAPIError(
+        401,
+        '/api/user_info',
+        'Authentication: sl-secret Authorization: Bearer mcp-secret SL_API_KEY=sl-secret MCP_AUTH_TOKEN=mcp-secret',
+      ),
+    );
+    const text = textOf(result);
+
+    expect(text).toContain('[REDACTED]');
+    expect(text).not.toContain('sl-secret');
+    expect(text).not.toContain('mcp-secret');
+  });
+
   it('summarizes the issues of a ZodError', () => {
     const parsed = z.object({ email: z.string() }).safeParse({});
     expect(parsed.success).toBe(false);
