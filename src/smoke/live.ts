@@ -379,6 +379,13 @@ export function redactSmokeText(text: string, secrets: readonly string[] = []): 
   return redactSecrets(text, secrets);
 }
 
+export function shouldStopSmokeTransportLoop(
+  summary: { cleanup: { overall: 'not_needed' | 'succeeded' | 'failed' } },
+  receivedSignal?: NodeJS.Signals,
+): boolean {
+  return receivedSignal !== undefined || summary.cleanup.overall === 'failed';
+}
+
 export function parseCliConfig(
   argv: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -1080,17 +1087,16 @@ async function runCli(): Promise<void> {
     const summaries: SmokeRunSummary[] = [];
     for (const transport of config.transports) {
       if (receivedSignal) break;
-      summaries.push(
-        await runSmokeTest({
-          transport,
-          attemptContact: config.attemptContact,
-          maxLookupPages: config.maxLookupPages,
-          secrets: config.secrets,
-          abortSignal: abortController.signal,
-          clientFactory: (selectedTransport) => connectMcpSmokeClient(selectedTransport, config!),
-        }),
-      );
-      if (receivedSignal) break;
+      const summary = await runSmokeTest({
+        transport,
+        attemptContact: config.attemptContact,
+        maxLookupPages: config.maxLookupPages,
+        secrets: config.secrets,
+        abortSignal: abortController.signal,
+        clientFactory: (selectedTransport) => connectMcpSmokeClient(selectedTransport, config!),
+      });
+      summaries.push(summary);
+      if (shouldStopSmokeTransportLoop(summary, receivedSignal)) break;
     }
 
     const ok = !receivedSignal && summaries.every((summary) => summary.ok);

@@ -4,6 +4,7 @@ import {
   createSmokeRunNaming,
   parseCliConfig,
   runSmokeTest,
+  shouldStopSmokeTransportLoop,
   type SmokeArtifacts,
   type SmokeMcpClient,
   type SmokeRunNaming,
@@ -477,6 +478,14 @@ describe('live smoke runner logic', () => {
     expect(cleanup.alias.status).toBe('skipped_foreign_artifact');
     expect(cleanup.contact.status).toBe('skipped_foreign_artifact');
     expect(calls).toEqual([]);
+  });
+
+  it('stops the CLI transport loop after cleanup failure or a signal', () => {
+    expect(shouldStopSmokeTransportLoop({ cleanup: { overall: 'failed' } })).toBe(true);
+    expect(shouldStopSmokeTransportLoop({ cleanup: { overall: 'succeeded' } })).toBe(false);
+    expect(shouldStopSmokeTransportLoop({ cleanup: { overall: 'not_needed' } }, 'SIGTERM')).toBe(
+      true,
+    );
   });
 
   it('allows HTTP-only config without a local SimpleLogin API key', () => {
