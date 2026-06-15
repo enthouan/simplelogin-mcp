@@ -11,7 +11,7 @@ into a container and self-host.
 
 Tool names are stable candidates for the 1.0 public surface. Reads that can grow are bounded:
 alias, activity, contact, and notification lists return 20 entries per `page_id`;
-`custom_domain_trash_list` returns at most `limit` deleted aliases (default 100, max 500). See
+`custom_domain_trash_list` is locally paged with `page_id` and `limit` (default 100, max 500). See
 [TOOL_CATALOG.md](TOOL_CATALOG.md) for MCP annotations, bounds, and output shapes.
 
 | Tool                       | Description                                                                                           |
@@ -36,7 +36,7 @@ alias, activity, contact, and notification lists return 20 entries per `page_id`
 | `mailbox_delete`           | Permanently delete a mailbox (requires `confirm: true` and an explicit alias transfer/delete choice). |
 | `custom_domain_list`       | List custom domains with their settings, verification status, and mailboxes.                          |
 | `custom_domain_update`     | Update a custom domain's catch-all, random-prefix, display-name, or mailbox settings.                 |
-| `custom_domain_trash_list` | List a custom domain's deleted aliases (trash; capped by `limit`, default 100, max 500).              |
+| `custom_domain_trash_list` | List a custom domain's deleted aliases (trash; paged by `page_id` + `limit`).                         |
 | `account_get_info`         | Get user info; doubles as an API-key sanity check.                                                    |
 | `account_get_stats`        | Get lifetime counters: aliases, emails forwarded, replied to, and blocked.                            |
 | `notification_list`        | List account notifications (paginated, 20 per page, unread first).                                    |
@@ -131,8 +131,9 @@ own domain instead of a SimpleLogin one.
 3. `custom_domain_trash_list` lists the domain's deleted aliases with their deletion timestamps.
    SimpleLogin remembers them so catch-all does not silently resurrect a deleted address; check it
    when a catch-all address unexpectedly bounces or before reusing an old address. The API does not
-   paginate this endpoint, so the MCP result returns `{ aliases, returned, total, truncated }` and
-   caps `aliases` by `limit` (default 100, max 500).
+   paginate this endpoint server-side, so the MCP result returns
+   `{ aliases, page_id, limit, returned, total, more }` and locally pages `aliases` with `page_id`
+   (starting at 0) plus `limit` (default 100, max 500).
 
 **Non-goals.** Adding or deleting a custom domain, and DNS/MX verification, are account-level
 operations the SimpleLogin API does not expose; do them in the SimpleLogin web UI (Domains tab).

@@ -87,13 +87,20 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         'a Unix deletion timestamp. Deleted addresses on a custom domain are remembered so ' +
         'they are not silently recreated by catch-all; use this to audit what was removed or ' +
         'to check whether an address is in the trash before reusing it. SimpleLogin exposes ' +
-        'this endpoint without pagination, so the MCP result is capped by limit (defaults to ' +
+        'this endpoint without server-side pagination, so the MCP result is locally paged with ' +
+        'page_id (starts at 0) and limit (defaults to ' +
         `${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}, max ${CUSTOM_DOMAIN_TRASH_MAX_LIMIT}).`,
       inputSchema: {
         custom_domain_id: z
           .number()
           .int()
           .describe('Numeric id of the custom domain whose trash to list.'),
+        page_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Zero-based page number; defaults to 0.'),
         limit: z
           .number()
           .int()
@@ -108,13 +115,18 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
     },
     (args) =>
       runTool(async () => {
+        const pageId = args.page_id ?? 0;
         const limit = args.limit ?? CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT;
         const trash = await client.getCustomDomainTrash(args.custom_domain_id);
+        const offset = pageId * limit;
+        const aliases = trash.aliases.slice(offset, offset + limit);
         return {
-          aliases: trash.aliases.slice(0, limit),
-          returned: Math.min(trash.aliases.length, limit),
+          aliases,
+          page_id: pageId,
+          limit,
+          returned: aliases.length,
           total: trash.aliases.length,
-          truncated: trash.aliases.length > limit,
+          more: offset + aliases.length < trash.aliases.length,
         };
       }),
   );

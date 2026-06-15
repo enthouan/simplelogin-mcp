@@ -53,6 +53,13 @@ const IDEMPOTENT_UPDATE: ToolAnnotations = {
   openWorldHint: true,
 };
 
+const IDEMPOTENT_DESTRUCTIVE_UPDATE: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: true,
+};
+
 const DELETE: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: true,
@@ -121,7 +128,7 @@ export const TOOL_CATALOG = [
     name: 'alias_set_enabled',
     category: 'aliases',
     summary: 'Set an alias enabled or disabled without deleting it.',
-    annotations: IDEMPOTENT_UPDATE,
+    annotations: IDEMPOTENT_DESTRUCTIVE_UPDATE,
     bounds: 'single alias state mutation',
     output: '{ enabled }',
   },
@@ -161,7 +168,7 @@ export const TOOL_CATALOG = [
     name: 'contact_set_blocked',
     category: 'contacts',
     summary: 'Set whether forwarding from a contact is blocked.',
-    annotations: IDEMPOTENT_UPDATE,
+    annotations: IDEMPOTENT_DESTRUCTIVE_UPDATE,
     bounds: 'single contact state mutation',
     output: '{ block_forward }',
   },
@@ -226,8 +233,8 @@ export const TOOL_CATALOG = [
     category: 'custom_domains',
     summary: 'List deleted aliases remembered for one custom domain.',
     annotations: READ_ONLY,
-    bounds: `limit, defaults to ${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}, max ${CUSTOM_DOMAIN_TRASH_MAX_LIMIT}`,
-    output: '{ aliases, returned, total, truncated }',
+    bounds: `page_id and limit, defaults to page 0 and ${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT} aliases per page, max ${CUSTOM_DOMAIN_TRASH_MAX_LIMIT}`,
+    output: '{ aliases, page_id, limit, returned, total, more }',
   },
   {
     name: 'account_get_info',
@@ -301,7 +308,7 @@ export function renderToolCatalogMarkdown(): string {
     '',
     'This is the public tool surface for `simplelogin-mcp`. Tool names are stable candidates for the 1.0 line.',
     '',
-    'All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as enable/disable, block/unblock, mark-read, alias updates, custom-domain updates, and settings updates are marked idempotent.',
+    'All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as mark-read, alias updates, custom-domain updates, and settings updates are marked idempotent. Mail-blocking state tools such as enable/disable and block/unblock are marked both idempotent and destructive.',
     '',
     '| Tool | Category | MCP annotations | Bounds | Output |',
     '| ---- | -------- | --------------- | ------ | ------ |',

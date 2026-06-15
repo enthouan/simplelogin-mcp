@@ -109,6 +109,8 @@ describe('registered tool surface', () => {
     );
     expect(namesWith((annotations) => annotations.destructiveHint)).toEqual([
       'alias_delete',
+      'alias_set_enabled',
+      'contact_set_blocked',
       'contact_delete',
       'mailbox_delete',
     ]);
@@ -126,7 +128,7 @@ describe('registered tool surface', () => {
 });
 
 describe('paginated and bounded reads', () => {
-  it('documents page_id, page size, and default page for every paginated tool', () => {
+  it('documents page_id, page size, and default page for server-paginated tools', () => {
     const tools = captureRegisteredTools();
 
     for (const toolName of [
@@ -147,8 +149,25 @@ describe('paginated and bounded reads', () => {
     }
   });
 
+  it('documents page_id, limit, and bounds for the locally paged trash tool', () => {
+    const tool = toolByName(captureRegisteredTools(), 'custom_domain_trash_list');
+
+    const pageSchema = tool.options.inputSchema?.['page_id'];
+    expect(pageSchema, 'custom_domain_trash_list.page_id').toBeTruthy();
+    expect(pageSchema?.description).toContain('defaults to 0');
+
+    const limitSchema = tool.options.inputSchema?.['limit'];
+    expect(limitSchema, 'custom_domain_trash_list.limit').toBeTruthy();
+    expect(limitSchema?.description).toContain(`${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}`);
+
+    expect(tool.options.description).toContain('page_id');
+    expect(tool.options.description).toContain('limit');
+    expect(tool.options.description).toContain('max');
+  });
+
   it('defaults paginated handlers to page 0', async () => {
     const calls: Record<string, unknown[]> = {};
+    const trashCalls: number[] = [];
     const tools = captureRegisteredTools({
       listAliases: (params: unknown) => {
         calls['alias_list'] = [params];
@@ -172,11 +191,21 @@ describe('paginated and bounded reads', () => {
     await toolByName(tools, 'alias_activity_list').handler({ alias_id: 7 });
     await toolByName(tools, 'contact_list').handler({ alias_id: 7 });
     await toolByName(tools, 'notification_list').handler({});
+    await toolByName(
+      captureRegisteredTools({
+        getCustomDomainTrash: (customDomainId: number) => {
+          trashCalls.push(customDomainId);
+          return Promise.resolve({ aliases: [] });
+        },
+      }),
+      'custom_domain_trash_list',
+    ).handler({ custom_domain_id: 3 });
 
     expect(calls['alias_list']).toEqual([{ pageId: 0, filter: undefined, query: undefined }]);
     expect(calls['alias_activity_list']).toEqual([{ aliasId: 7, pageId: 0 }]);
     expect(calls['contact_list']).toEqual([{ aliasId: 7, pageId: 0 }]);
     expect(calls['notification_list']).toEqual([{ pageId: 0 }]);
+    expect(trashCalls).toEqual([3]);
   });
 
   it('caps the unpaginated custom-domain trash result by default', async () => {
@@ -196,18 +225,22 @@ describe('paginated and bounded reads', () => {
     });
     const payload = JSON.parse(textOf(result)) as {
       aliases: unknown[];
+      page_id: number;
+      limit: number;
       returned: number;
       total: number;
-      truncated: boolean;
+      more: boolean;
     };
 
     expect(payload.aliases).toHaveLength(CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT);
+    expect(payload.page_id).toBe(0);
+    expect(payload.limit).toBe(CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT);
     expect(payload.returned).toBe(CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT);
     expect(payload.total).toBe(aliases.length);
-    expect(payload.truncated).toBe(true);
+    expect(payload.more).toBe(true);
   });
 
-  it('honors an explicit smaller custom-domain trash limit', async () => {
+  it('honors an explicit smaller custom-domain trash limit and page', async () => {
     const aliases = [
       { alias: 'first@example.com', deletion_timestamp: 1 },
       { alias: 'second@example.com', deletion_timestamp: 2 },
@@ -219,19 +252,24 @@ describe('paginated and bounded reads', () => {
 
     const result = await toolByName(tools, 'custom_domain_trash_list').handler({
       custom_domain_id: 3,
+      page_id: 1,
       limit: 2,
     });
     const payload = JSON.parse(textOf(result)) as {
       aliases: typeof aliases;
+      page_id: number;
+      limit: number;
       returned: number;
       total: number;
-      truncated: boolean;
+      more: boolean;
     };
 
-    expect(payload.aliases).toEqual(aliases.slice(0, 2));
-    expect(payload.returned).toBe(2);
+    expect(payload.aliases).toEqual(aliases.slice(2, 4));
+    expect(payload.page_id).toBe(1);
+    expect(payload.limit).toBe(2);
+    expect(payload.returned).toBe(1);
     expect(payload.total).toBe(3);
-    expect(payload.truncated).toBe(true);
+    expect(payload.more).toBe(false);
   });
 });
 
