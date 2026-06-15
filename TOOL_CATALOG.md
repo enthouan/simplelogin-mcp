@@ -4,7 +4,7 @@
 
 This is the public tool surface for `simplelogin-mcp`. Tool names are stable candidates for the 1.0 line.
 
-All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as mark-read, alias updates, custom-domain updates, and settings updates are marked idempotent. Mail-blocking state tools such as enable/disable and block/unblock are marked both idempotent and destructive.
+All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as mark-read, alias updates, custom-domain updates, and settings updates are marked idempotent. Mail-blocking or mail-routing state tools such as enable/disable, block/unblock, and custom-domain routing updates are marked both idempotent and destructive.
 
 | Tool                       | Category       | MCP annotations                                    | Bounds                                                                  | Output                                                       |
 | -------------------------- | -------------- | -------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -27,7 +27,7 @@ All tools interact with the configured SimpleLogin API, so their MCP `openWorldH
 | `mailbox_update`           | mailboxes      | write, non-destructive, non-idempotent, open-world | single mailbox mutation                                                 | { updated }                                                  |
 | `mailbox_delete`           | mailboxes      | write, destructive, non-idempotent, open-world     | single irreversible deletion                                            | { deleted }                                                  |
 | `custom_domain_list`       | custom_domains | read-only, non-destructive, idempotent, open-world | account custom-domain set                                               | { custom_domains }                                           |
-| `custom_domain_update`     | custom_domains | write, non-destructive, idempotent, open-world     | single custom-domain mutation                                           | { custom_domain }                                            |
+| `custom_domain_update`     | custom_domains | write, destructive, idempotent, open-world         | single custom-domain mutation                                           | { custom_domain }                                            |
 | `custom_domain_trash_list` | custom_domains | read-only, non-destructive, idempotent, open-world | page_id and limit, defaults to page 0 and 100 aliases per page, max 500 | { aliases, page_id, limit, returned, total, more }           |
 | `account_get_info`         | account        | read-only, non-destructive, idempotent, open-world | single account object                                                   | user info object                                             |
 | `account_get_stats`        | account        | read-only, non-destructive, idempotent, open-world | single stats object                                                     | stats object                                                 |

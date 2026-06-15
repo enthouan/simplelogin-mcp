@@ -42,13 +42,16 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         'From name on the domain (null clears it); mailbox_ids replaces the full set of ' +
         "mailboxes receiving the domain's mail (1 to 20 ids from mailbox_list). Only the " +
         'provided fields change, a call that changes nothing is rejected without contacting ' +
-        'SimpleLogin, and the updated domain is returned.',
+        'SimpleLogin, and the updated domain is returned. Disabling catch_all or replacing ' +
+        'mailbox_ids can stop future delivery for affected domain addresses.',
       inputSchema: {
         custom_domain_id: z.number().int().describe('Numeric id of the custom domain to update.'),
         catch_all: z
           .boolean()
           .optional()
-          .describe('Auto-create an alias when mail arrives for an unknown address on the domain.'),
+          .describe(
+            'Auto-create an alias when mail arrives for an unknown address on the domain; false disables that catch-all routing.',
+          ),
         random_prefix_generation: z
           .boolean()
           .optional()

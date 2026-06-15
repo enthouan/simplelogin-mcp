@@ -97,7 +97,7 @@ describe('registered tool surface', () => {
     }
   });
 
-  it('marks read-only, permanent-delete, and idempotent mutation tools correctly', () => {
+  it('marks read-only, destructive, and idempotent mutation tools correctly', () => {
     const tools = captureRegisteredTools();
     const namesWith = (predicate: (annotations: ToolAnnotations) => boolean): string[] =>
       tools
@@ -113,6 +113,7 @@ describe('registered tool surface', () => {
       'contact_set_blocked',
       'contact_delete',
       'mailbox_delete',
+      'custom_domain_update',
     ]);
     expect(
       namesWith((annotations) => !annotations.readOnlyHint && annotations.idempotentHint),

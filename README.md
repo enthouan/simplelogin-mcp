@@ -122,7 +122,8 @@ own domain instead of a SimpleLogin one.
 2. `custom_domain_update` changes the supported settings; only the fields you pass change:
    - `catch_all: true` makes mail sent to any unknown address on the domain auto-create an alias
      (on-the-fly creation); `random_prefix_generation: true` gives those aliases a random prefix
-     instead of the address that was targeted.
+     instead of the address that was targeted. Disabling catch-all can stop future mail for unknown
+     addresses, so clients should treat this routing update as destructive.
    - `name` sets the display name used as the From name on the domain's aliases; pass `null` to
      clear it.
    - `mailbox_ids` replaces the domain's full mailbox set (1 to 20 ids from `mailbox_list`). An
