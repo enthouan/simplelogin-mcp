@@ -135,7 +135,7 @@ interface CliConfig {
   httpUrl: string;
   cwd: string;
   serverPath: string;
-  apiKey: string;
+  apiKey?: string;
   apiUrl?: string;
   mcpAuthToken?: string;
   stepTimeoutMs: number;
@@ -292,6 +292,13 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     summary.failure = normalizeFailure(error, summary, secrets);
   } finally {
     if (client) {
+      if (!artifacts.alias && summary.failure?.step === 'create temporary random alias') {
+        await recoverAliasCreatedByFailedStep(client, artifacts, summary, {
+          naming,
+          maxLookupPages,
+          secrets,
+        });
+      }
       summary.cleanup = await cleanupSmokeArtifacts(client, artifacts, {
         runId: naming.runId,
         maxLookupPages,
@@ -367,7 +374,11 @@ export function parseCliConfig(
   const transportChoice = normalizeTransportChoice(
     values['transport'] ?? env['SMOKE_TRANSPORT'] ?? 'stdio',
   );
-  const apiKey = requireEnv(env, 'SL_API_KEY');
+  const transports: SmokeTransport[] =
+    transportChoice === 'all' ? ['stdio', 'http'] : [transportChoice];
+  const apiKey = transports.includes('stdio')
+    ? requireEnv(env, 'SL_API_KEY')
+    : optionalEnv(env, 'SL_API_KEY');
   const apiUrl = optionalEnv(env, 'SL_API_URL');
   const mcpAuthToken = optionalEnv(env, 'MCP_AUTH_TOKEN');
   const stepTimeoutMs = parsePositiveInteger(
@@ -384,11 +395,11 @@ export function parseCliConfig(
   );
   const httpUrl = values['http-url'] ?? env['SMOKE_HTTP_URL'] ?? 'http://127.0.0.1:3000/mcp';
   const attemptContact = parseContactSetting(values, env);
-  const serverEnv = buildServerEnv(env, { apiKey, apiUrl });
+  const serverEnv = apiKey ? buildServerEnv(env, { apiKey, apiUrl }) : {};
   const secrets = [apiKey, mcpAuthToken].filter((value): value is string => Boolean(value));
 
   return {
-    transports: transportChoice === 'all' ? ['stdio', 'http'] : [transportChoice],
+    transports,
     attemptContact,
     httpUrl,
     cwd,
@@ -439,6 +450,37 @@ export async function connectMcpSmokeClient(
   return new SdkSmokeClient(client, config.stepTimeoutMs, config.secrets);
 }
 
+async function recoverAliasCreatedByFailedStep(
+  client: SmokeMcpClient,
+  artifacts: SmokeArtifacts,
+  summary: SmokeRunSummary,
+  options: { naming: SmokeRunNaming; maxLookupPages: number; secrets: readonly string[] },
+): Promise<void> {
+  const record = startStep(summary, 'recover temporary alias after failed create', 'alias_list');
+  try {
+    const alias = await findAliasByRunId(client, options.naming.runId, options.maxLookupPages);
+    if (!alias) {
+      record.status = 'skipped';
+      record.note = 'no temporary alias found for this smoke run id';
+      return;
+    }
+
+    const id = requireInteger(alias, 'id', 'alias_list');
+    const email = requireString(alias, 'email', 'alias_list');
+    artifacts.alias = {
+      id,
+      email,
+      runId: options.naming.runId,
+      createdByRun: true,
+    };
+    record.status = 'ok';
+    record.note = `recovered alias ${id} for cleanup`;
+  } catch (error) {
+    record.status = 'failed';
+    record.note = redactSmokeText(errorMessage(error), options.secrets);
+  }
+}
+
 async function maybeExerciseContact(options: {
   client: SmokeMcpClient;
   summary: SmokeRunSummary;
@@ -456,14 +498,14 @@ async function maybeExerciseContact(options: {
   }
   const missingContactTools = CONTACT_TOOLS.filter((tool) => !options.toolNames.includes(tool));
   if (missingContactTools.length > 0) {
-    options.summary.contact.skipped = true;
-    options.summary.contact.reason = `contact tools unavailable: ${missingContactTools.join(', ')}`;
+    const reason = `contact tools unavailable: ${missingContactTools.join(', ')}`;
+    options.summary.contact.reason = reason;
     options.summary.steps.push({
-      step: 'create temporary contact',
-      status: 'skipped',
-      note: options.summary.contact.reason,
+      step: 'check contact tools',
+      status: 'failed',
+      note: reason,
     });
-    return;
+    throw new SmokeStepError('check contact tools', undefined, new Error(reason), options.secrets);
   }
 
   const alias = options.artifacts.alias;
@@ -497,10 +539,15 @@ async function maybeExerciseContact(options: {
 
   if (contact['existed'] === true) {
     const reason = 'contact_create reported an existing contact for the unique smoke address';
-    options.summary.contact.skipped = true;
     options.summary.contact.reason = reason;
-    options.summary.steps.push({ step: 'read temporary contact', status: 'skipped', note: reason });
-    return;
+    createStep.status = 'failed';
+    createStep.note = reason;
+    throw new SmokeStepError(
+      'create temporary contact',
+      'contact_create',
+      new Error(reason),
+      options.secrets,
+    );
   }
 
   if (contactId === undefined) {
@@ -645,6 +692,24 @@ async function cleanupAlias(
       error: redactSmokeText(errorMessage(error), options.secrets),
     };
   }
+}
+
+async function findAliasByRunId(
+  client: SmokeMcpClient,
+  runId: string,
+  maxPages: number,
+): Promise<Record<string, unknown> | undefined> {
+  for (let pageId = 0; pageId < maxPages; pageId++) {
+    const result = await client.callTool('alias_list', { page_id: pageId, query: runId });
+    const aliases = Array.isArray(result['aliases']) ? result['aliases'] : [];
+    for (const candidate of aliases) {
+      if (!isRecord(candidate)) continue;
+      const note = candidate['note'];
+      if (typeof note === 'string' && note.includes(runId)) return candidate;
+    }
+    if (aliases.length < LIST_PAGE_SIZE) return undefined;
+  }
+  return undefined;
 }
 
 async function findContactById(

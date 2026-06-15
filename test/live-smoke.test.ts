@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanupSmokeArtifacts,
   createSmokeRunNaming,
+  parseCliConfig,
   runSmokeTest,
   type SmokeArtifacts,
   type SmokeMcpClient,
@@ -156,6 +157,50 @@ describe('live smoke runner logic', () => {
     expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(true);
   });
 
+  it('recovers and cleans up an alias when create fails after the alias exists', async () => {
+    const runNaming = naming();
+    let aliasExists = false;
+    const client = new FakeSmokeClient(ALL_TOOLS, {
+      account_get_info: () => ({ email: 'maintainer@example.com' }),
+      alias_list: (args) => ({
+        aliases:
+          args['query'] === runNaming.runId && aliasExists
+            ? [
+                {
+                  id: 101,
+                  email: 'smoke@simplelogin.example',
+                  note: runNaming.aliasNote,
+                },
+              ]
+            : [],
+      }),
+      alias_create_random: () => {
+        aliasExists = true;
+        throw new Error('tool response validation failed after create');
+      },
+      alias_get: () => {
+        if (!aliasExists) throw new Error('SimpleLogin API error (HTTP 404): not found');
+        return { id: 101, email: 'smoke@simplelogin.example', note: runNaming.aliasNote };
+      },
+      alias_delete: () => {
+        aliasExists = false;
+        return { deleted: true };
+      },
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('create temporary random alias');
+    expect(summary.artifacts.alias?.id).toBe(101);
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(true);
+  });
+
   it('reports cleanup delete failures separately', async () => {
     const client = makeSuccessfulClient();
     client.setHandler('alias_delete', () => {
@@ -246,6 +291,44 @@ describe('live smoke runner logic', () => {
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
 
+  it('fails when requested contact tools are missing', async () => {
+    const client = makeSuccessfulClient();
+    const toolsWithoutContacts = ALL_TOOLS.filter((tool) => !tool.startsWith('contact_'));
+    const missingContactClient = new FakeSmokeClient(toolsWithoutContacts, client.handlers);
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(missingContactClient),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('check contact tools');
+    expect(summary.failure?.message).toContain('contact_create');
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+  });
+
+  it('fails when a unique smoke contact already exists', async () => {
+    const client = makeSuccessfulClient();
+    client.setHandler('contact_create', () => ({
+      id: 202,
+      contact: naming().contact,
+      existed: true,
+    }));
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('create temporary contact');
+    expect(summary.failure?.message).toContain('existing contact');
+    expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+  });
+
   it('does not destructively clean up artifacts from another run', async () => {
     const calls: string[] = [];
     const client = new FakeSmokeClient(ALL_TOOLS, {
@@ -274,5 +357,22 @@ describe('live smoke runner logic', () => {
     expect(cleanup.alias.status).toBe('skipped_foreign_artifact');
     expect(cleanup.contact.status).toBe('skipped_foreign_artifact');
     expect(calls).toEqual([]);
+  });
+
+  it('allows HTTP-only config without a local SimpleLogin API key', () => {
+    const config = parseCliConfig(['--transport', 'http'], {
+      MCP_AUTH_TOKEN: 'mcp-secret',
+    });
+
+    expect(config.transports).toEqual(['http']);
+    expect(config.apiKey).toBeUndefined();
+    expect(config.serverEnv).toEqual({});
+    expect(config.secrets).toEqual(['mcp-secret']);
+  });
+
+  it('still requires a SimpleLogin API key when stdio is selected', () => {
+    expect(() => parseCliConfig(['--transport', 'stdio'], {})).toThrow(
+      'SL_API_KEY is required for the live SimpleLogin smoke test',
+    );
   });
 });

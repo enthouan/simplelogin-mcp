@@ -6,9 +6,12 @@ It is not part of `pnpm test` or normal CI.
 
 ## Environment
 
-Required:
+Required for stdio and `all` transports:
 
 - `SL_API_KEY`: SimpleLogin API key used by the server. It is never printed in smoke output.
+
+HTTP-only smoke connects to an already running MCP server and does not require `SL_API_KEY` in the
+smoke process. The target server must already have been started with its own `SL_API_KEY`.
 
 Optional:
 
@@ -17,8 +20,9 @@ Optional:
 - `MCP_AUTH_TOKEN`: bearer token for an HTTP server that requires `Authorization`.
 - `SMOKE_TRANSPORT`: `stdio`, `http`, or `all`. Defaults to `stdio`.
 - `SMOKE_HTTP_URL`: MCP endpoint for HTTP mode. Defaults to `http://127.0.0.1:3000/mcp`.
-- `SMOKE_CONTACT`: `create` or `skip`. Defaults to `create`; premium/API limitations are reported
-  as a contact skip, not as a failed alias smoke.
+- `SMOKE_CONTACT`: `create` or `skip`. Defaults to `create`. Missing contact tools and impossible
+  `existed: true` responses fail the smoke when contact coverage is requested; premium/API
+  limitations are reported as a contact skip, not as a failed alias smoke.
 - `SMOKE_STEP_TIMEOUT_MS`: MCP request timeout for each step. Defaults to `60000`.
 - `SMOKE_MAX_LOOKUP_PAGES`: contact read-back/cleanup verification page bound. Defaults to `5`.
 - `SMOKE_STDIO_SERVER`: built server entry for stdio mode. Defaults to `dist/index.js`.
@@ -51,7 +55,7 @@ TRANSPORT=http HOST=127.0.0.1 PORT=3000 SL_API_KEY=sl-your-key pnpm dev
 Run the smoke test in another:
 
 ```bash
-SL_API_KEY=sl-your-key pnpm smoke:live -- --transport http --http-url http://127.0.0.1:3000/mcp
+pnpm smoke:live -- --transport http --http-url http://127.0.0.1:3000/mcp
 ```
 
 If the HTTP server has `MCP_AUTH_TOKEN` set, set the same value for the smoke process. The runner
@@ -80,6 +84,10 @@ Temporary naming is intentionally recognizable:
 Cleanup only runs for alias/contact ids created during the current smoke run. The runner does not
 mutate existing aliases, mailboxes, custom domains, account settings, or notifications, and it does
 not retry mutating calls automatically.
+
+If `alias_create_random` fails after SimpleLogin may already have created an alias, the runner makes
+a bounded `alias_list` lookup for the current run id and only recovers the alias for cleanup when the
+alias note contains that run id.
 
 ## Reading Failures
 
