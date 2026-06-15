@@ -265,17 +265,21 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     );
     const aliasId = requireInteger(alias, 'id', 'alias_create_random');
     const aliasEmail = requireString(alias, 'email', 'alias_create_random');
-    artifacts.alias = { id: aliasId, email: aliasEmail, runId: naming.runId, createdByRun: true };
 
     await runStep(summary, 'read temporary alias', 'alias_get', secrets, async () => {
       const readAlias = await client!.callTool('alias_get', { alias_id: aliasId });
       if (requireInteger(readAlias, 'id', 'alias_get') !== aliasId) {
         throw new Error(`alias_get returned a different id than the created alias ${aliasId}`);
       }
-      const readNote = readAlias['note'];
-      if (typeof readNote === 'string' && readNote !== naming.aliasNote) {
+      if (readAlias['note'] !== naming.aliasNote) {
         throw new Error('alias_get returned an alias note that does not match this smoke run');
       }
+      artifacts.alias = {
+        id: aliasId,
+        email: aliasEmail,
+        runId: naming.runId,
+        createdByRun: true,
+      };
       return readAlias;
     });
 
@@ -292,7 +296,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     summary.failure = normalizeFailure(error, summary, secrets);
   } finally {
     if (client) {
-      if (!artifacts.alias && summary.failure?.step === 'create temporary random alias') {
+      if (!artifacts.alias && shouldAttemptAliasRecovery(summary.failure)) {
         await recoverAliasCreatedByFailedStep(client, artifacts, summary, {
           naming,
           maxLookupPages,
@@ -863,12 +867,18 @@ function summarizeCleanup(cleanup: SmokeCleanupSummary): SmokeCleanupSummary['ov
   return 'not_needed';
 }
 
+function shouldAttemptAliasRecovery(failure: SmokeFailure | undefined): boolean {
+  return (
+    failure?.step === 'create temporary random alias' || failure?.step === 'read temporary alias'
+  );
+}
+
 function ownsArtifact(artifact: SmokeArtifact, runId: string): boolean {
   return artifact.createdByRun && artifact.runId === runId;
 }
 
 function isOptionalContactLimitation(message: string): boolean {
-  return /premium|upgrade|paid plan|subscription|not available|feature is disabled/i.test(message);
+  return /premium|upgrade|paid plan|subscription|plan (?:required|limit|limitation)/i.test(message);
 }
 
 function isNotFoundError(message: string): boolean {
@@ -961,10 +971,20 @@ function buildServerEnv(
 
 async function runCli(): Promise<void> {
   let config: CliConfig | undefined;
+  let receivedSignal: NodeJS.Signals | undefined;
+  let removeSignalHandlers: (() => void) | undefined;
   try {
     config = parseCliConfig(process.argv.slice(2));
+    removeSignalHandlers = installSignalHandlers((signal) => {
+      receivedSignal = signal;
+      process.exitCode = signalExitCode(signal);
+      process.stderr.write(
+        `Received ${signal}; waiting for active smoke run cleanup before exiting.\n`,
+      );
+    });
     const summaries: SmokeRunSummary[] = [];
     for (const transport of config.transports) {
+      if (receivedSignal) break;
       summaries.push(
         await runSmokeTest({
           transport,
@@ -974,18 +994,39 @@ async function runCli(): Promise<void> {
           clientFactory: (selectedTransport) => connectMcpSmokeClient(selectedTransport, config!),
         }),
       );
+      if (receivedSignal) break;
     }
 
-    const ok = summaries.every((summary) => summary.ok);
+    const ok = !receivedSignal && summaries.every((summary) => summary.ok);
     process.stdout.write(`${JSON.stringify({ ok, summaries }, null, 2)}\n`);
-    process.exitCode = ok ? 0 : 1;
+    process.exitCode = receivedSignal ? signalExitCode(receivedSignal) : ok ? 0 : 1;
   } catch (error) {
     const secrets = config?.secrets ?? [];
     process.stderr.write(
       `Live smoke test failed: ${redactSmokeText(errorMessage(error), secrets)}\n`,
     );
     process.exitCode = 1;
+  } finally {
+    removeSignalHandlers?.();
   }
+}
+
+function installSignalHandlers(onSignal: (signal: NodeJS.Signals) => void): () => void {
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+  const handlers = signals.map((signal) => {
+    const handler = (): void => onSignal(signal);
+    process.once(signal, handler);
+    return { signal, handler };
+  });
+  return () => {
+    for (const { signal, handler } of handlers) {
+      process.off(signal, handler);
+    }
+  };
+}
+
+function signalExitCode(signal: NodeJS.Signals): number {
+  return signal === 'SIGINT' ? 130 : 143;
 }
 
 const entrypoint = process.argv[1];

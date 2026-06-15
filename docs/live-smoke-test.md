@@ -89,6 +89,10 @@ If `alias_create_random` fails after SimpleLogin may already have created an ali
 a bounded `alias_list` lookup for the current run id and only recovers the alias for cleanup when the
 alias note contains that run id.
 
+On the first `SIGINT` or `SIGTERM`, the CLI waits for the active smoke run to reach its cleanup path
+before exiting with the conventional signal exit code. A second interrupt may still force the process
+down immediately.
+
 ## Reading Failures
 
 The command prints sanitized JSON. On failure, inspect:

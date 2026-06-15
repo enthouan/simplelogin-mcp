@@ -72,7 +72,12 @@ function makeSuccessfulClient(runNaming = naming()): FakeSmokeClient {
 
   return new FakeSmokeClient(ALL_TOOLS, {
     account_get_info: () => ({ email: 'maintainer@example.com' }),
-    alias_list: () => ({ aliases: [] }),
+    alias_list: (args) => ({
+      aliases:
+        args['query'] === runNaming.runId && aliasExists
+          ? [{ id: 101, email: 'smoke@simplelogin.example', note: runNaming.aliasNote }]
+          : [],
+    }),
     alias_create_random: (args) => {
       expect(args['note']).toBe(runNaming.aliasNote);
       expect(args['hostname']).toBe(runNaming.hostname);
@@ -201,6 +206,29 @@ describe('live smoke runner logic', () => {
     expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(true);
   });
 
+  it('does not delete a returned alias id until readback proves smoke ownership', async () => {
+    const client = makeSuccessfulClient();
+    client.setHandler('alias_get', () => ({
+      id: 101,
+      email: 'personal@example.com',
+      note: 'not created by this smoke run',
+    }));
+    client.setHandler('alias_list', () => ({ aliases: [] }));
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.failure?.step).toBe('read temporary alias');
+    expect(summary.artifacts.alias).toBeUndefined();
+    expect(summary.cleanup.alias.status).toBe('not_needed');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+  });
+
   it('reports cleanup delete failures separately', async () => {
     const client = makeSuccessfulClient();
     client.setHandler('alias_delete', () => {
@@ -288,6 +316,25 @@ describe('live smoke runner logic', () => {
     expect(summary.contact.skipped).toBe(true);
     expect(summary.contact.reason).toContain('premium');
     expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+  });
+
+  it('fails generic contact availability outages instead of skipping them', async () => {
+    const client = makeSuccessfulClient();
+    client.setHandler('contact_create', () => {
+      throw new Error('SimpleLogin API error (HTTP 503): contact service is not available');
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: naming(),
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.ok).toBe(false);
+    expect(summary.contact.skipped).toBe(false);
+    expect(summary.failure?.step).toBe('create temporary contact');
+    expect(summary.failure?.message).toContain('not available');
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
 
