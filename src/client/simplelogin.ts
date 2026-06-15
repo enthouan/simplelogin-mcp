@@ -786,20 +786,20 @@ export class SimpleLoginClient {
       });
     } catch (error) {
       const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);
-      logger.error('SimpleLogin API transport failure', {
-        endpoint: options.endpoint,
-        method: options.method,
-        errorName: this.errorName(error),
-        errorMessage: apiError.message,
-        timeoutMs: this.timeoutMs,
-      });
+      this.logTransportFailure(options.endpoint, options.method, error, apiError);
       throw apiError;
     }
 
-    const parsedBody = this.parseResponseBody(
-      await response.text(),
-      response.headers.get('content-type'),
-    );
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (error) {
+      const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);
+      this.logTransportFailure(options.endpoint, options.method, error, apiError);
+      throw apiError;
+    }
+
+    const parsedBody = this.parseResponseBody(rawText, response.headers.get('content-type'));
 
     if (!response.ok) {
       const message = this.httpErrorMessage(response, parsedBody);
@@ -843,6 +843,21 @@ export class SimpleLoginClient {
       );
     }
     return AbortSignal.timeout(this.timeoutMs);
+  }
+
+  private logTransportFailure(
+    endpoint: string,
+    method: HttpMethod,
+    error: unknown,
+    apiError: SimpleLoginAPIError,
+  ): void {
+    logger.error('SimpleLogin API transport failure', {
+      endpoint,
+      method,
+      errorName: this.errorName(error),
+      errorMessage: apiError.message,
+      timeoutMs: this.timeoutMs,
+    });
   }
 
   private parseResponseBody(rawText: string, contentType: string | null): ParsedResponseBody {

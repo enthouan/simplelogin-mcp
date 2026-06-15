@@ -827,6 +827,22 @@ describe('error mapping', () => {
     expect(error.message).toBe('Request timed out after 1000ms');
   });
 
+  it('maps a response body timeout to a transport error with endpoint context', async () => {
+    const response = jsonResponse(ALIAS);
+    vi.spyOn(response, 'text').mockRejectedValue(
+      Object.assign(new Error('body stalled'), { name: 'TimeoutError' }),
+    );
+    const { client, calls } = stubClient(response);
+
+    const error = (await client.getAlias(1).catch((e: unknown) => e)) as SimpleLoginAPIError;
+
+    expect(error).toBeInstanceOf(SimpleLoginAPIError);
+    expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/aliases/1');
+    expect(error.message).toBe('Request timed out after 1000ms');
+    expect(calls).toHaveLength(1);
+  });
+
   it('maps an abort to status 0 with an abort message', async () => {
     const { client } = stubClient(() =>
       Promise.reject(Object.assign(new Error('operation aborted'), { name: 'AbortError' })),
