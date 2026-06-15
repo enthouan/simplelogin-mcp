@@ -12,7 +12,8 @@
     "simplelogin-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "TOOL_CATALOG.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

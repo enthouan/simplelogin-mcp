@@ -9,6 +9,11 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
+import {
+  CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT,
+  CUSTOM_DOMAIN_TRASH_MAX_LIMIT,
+  toolAnnotations,
+} from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerCustomDomainTools(server: McpServer, client: SimpleLoginClient): void {
@@ -21,7 +26,7 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         'status, alias count, catch-all and random-prefix-generation flags, display name, ' +
         'and the mailboxes that receive its mail. Use the returned ids with ' +
         'custom_domain_update and custom_domain_trash_list.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('custom_domain_list'),
     },
     () => runTool(() => client.listCustomDomains()),
   );
@@ -37,13 +42,16 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         'From name on the domain (null clears it); mailbox_ids replaces the full set of ' +
         "mailboxes receiving the domain's mail (1 to 20 ids from mailbox_list). Only the " +
         'provided fields change, a call that changes nothing is rejected without contacting ' +
-        'SimpleLogin, and the updated domain is returned.',
+        'SimpleLogin, and the updated domain is returned. Disabling catch_all or replacing ' +
+        'mailbox_ids can stop future delivery for affected domain addresses.',
       inputSchema: {
         custom_domain_id: z.number().int().describe('Numeric id of the custom domain to update.'),
         catch_all: z
           .boolean()
           .optional()
-          .describe('Auto-create an alias when mail arrives for an unknown address on the domain.'),
+          .describe(
+            'Auto-create an alias when mail arrives for an unknown address on the domain; false disables that catch-all routing.',
+          ),
         random_prefix_generation: z
           .boolean()
           .optional()
@@ -60,6 +68,7 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
           .optional()
           .describe("Replace the full set of mailboxes that receive the domain's mail, by id."),
       },
+      annotations: toolAnnotations('custom_domain_update'),
     },
     (args) =>
       runTool(() =>
@@ -80,15 +89,48 @@ export function registerCustomDomainTools(server: McpServer, client: SimpleLogin
         "List a custom domain's deleted aliases (its trash), each with the alias address and " +
         'a Unix deletion timestamp. Deleted addresses on a custom domain are remembered so ' +
         'they are not silently recreated by catch-all; use this to audit what was removed or ' +
-        'to check whether an address is in the trash before reusing it.',
+        'to check whether an address is in the trash before reusing it. SimpleLogin exposes ' +
+        'this endpoint without server-side pagination, so the MCP result is locally paged with ' +
+        'page_id (starts at 0) and limit (defaults to ' +
+        `${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}, max ${CUSTOM_DOMAIN_TRASH_MAX_LIMIT}).`,
       inputSchema: {
         custom_domain_id: z
           .number()
           .int()
           .describe('Numeric id of the custom domain whose trash to list.'),
+        page_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Zero-based page number; defaults to 0.'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(CUSTOM_DOMAIN_TRASH_MAX_LIMIT)
+          .optional()
+          .describe(
+            `Maximum deleted aliases to return; defaults to ${CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT}.`,
+          ),
       },
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('custom_domain_trash_list'),
     },
-    (args) => runTool(() => client.getCustomDomainTrash(args.custom_domain_id)),
+    (args) =>
+      runTool(async () => {
+        const pageId = args.page_id ?? 0;
+        const limit = args.limit ?? CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT;
+        const trash = await client.getCustomDomainTrash(args.custom_domain_id);
+        const offset = pageId * limit;
+        const aliases = trash.aliases.slice(offset, offset + limit);
+        return {
+          aliases,
+          page_id: pageId,
+          limit,
+          returned: aliases.length,
+          total: trash.aliases.length,
+          more: offset + aliases.length < trash.aliases.length,
+        };
+      }),
   );
 }

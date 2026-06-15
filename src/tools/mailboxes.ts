@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../client/simplelogin.js';
+import { toolAnnotations } from './catalog.js';
 import { runTool } from './helpers.js';
 
 export function registerMailboxTools(server: McpServer, client: SimpleLoginClient): void {
@@ -20,7 +21,7 @@ export function registerMailboxTools(server: McpServer, client: SimpleLoginClien
         "List the account's mailboxes (verified and unverified), each with its id, email, " +
         'default flag, alias count, and verification status. Use the returned ids as ' +
         'mailbox_ids when creating or updating aliases.',
-      annotations: { readOnlyHint: true },
+      annotations: toolAnnotations('mailbox_list'),
     },
     () => runTool(() => client.listMailboxes()),
   );
@@ -41,6 +42,7 @@ export function registerMailboxTools(server: McpServer, client: SimpleLoginClien
           .email()
           .describe('Address of the new mailbox; it receives the verification email.'),
       },
+      annotations: toolAnnotations('mailbox_create'),
     },
     (args) => runTool(() => client.createMailbox(args.email)),
   );
@@ -74,6 +76,7 @@ export function registerMailboxTools(server: McpServer, client: SimpleLoginClien
           .optional()
           .describe('Cancel a pending email change on this mailbox.'),
       },
+      annotations: toolAnnotations('mailbox_update'),
     },
     (args) =>
       runTool(() =>
@@ -111,7 +114,7 @@ export function registerMailboxTools(server: McpServer, client: SimpleLoginClien
           .literal(true)
           .describe('Must be set to true to confirm this permanent, irreversible deletion.'),
       },
-      annotations: { destructiveHint: true },
+      annotations: toolAnnotations('mailbox_delete'),
     },
     (args) =>
       runTool(() =>

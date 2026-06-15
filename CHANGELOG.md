@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- Standardize the public MCP tool surface for the 0.6 milestone: tool names are documented as
+  stable 1.0 candidates, every registered tool now carries complete MCP behavior annotations, and
+  the generated tool catalog documents each tool's bounds and output shape. Mail-routing updates
+  that can stop future delivery, including alias mailbox reassignments and custom-domain routing
+  changes, are marked destructive.
+- Bound `custom_domain_trash_list` responses with local `page_id`/`limit` pagination (default page
+  0, default limit 100, max 500) and return `{ aliases, page_id, limit, returned, total, more }` so
+  the unpaginated SimpleLogin endpoint cannot produce unbounded MCP responses while still allowing
+  older trash entries to be reached.
+
 ## v0.5.0
 
 ### Added

@@ -9,6 +9,11 @@ into a container and self-host.
 
 ## Tools
 
+Tool names are stable candidates for the 1.0 public surface. Reads that can grow are bounded:
+alias, activity, contact, and notification lists return 20 entries per `page_id`;
+`custom_domain_trash_list` is locally paged with `page_id` and `limit` (default 100, max 500). See
+[TOOL_CATALOG.md](TOOL_CATALOG.md) for MCP annotations, bounds, and output shapes.
+
 | Tool                       | Description                                                                                           |
 | -------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `alias_list`               | List aliases (paginated; filter enabled/disabled/pinned; free-text search).                           |
@@ -16,7 +21,7 @@ into a container and self-host.
 | `alias_activity_list`      | List an alias's forward/reply/block activity (paginated, 20 per page).                                |
 | `alias_create_random`      | Create a random alias (`uuid` or `word` mode).                                                        |
 | `alias_create_custom`      | Create a custom alias from a prefix + signed suffix + mailboxes.                                      |
-| `alias_update`             | Update note, name, owning mailbox(es), PGP, or pinned state.                                          |
+| `alias_update`             | Update note, name, owning mailbox routing, PGP, or pinned state.                                      |
 | `alias_delete`             | Permanently delete an alias (requires `confirm: true`).                                               |
 | `alias_set_enabled`        | Explicitly enable or disable an alias (idempotent).                                                   |
 | `alias_options_get`        | Get creation options (can_create, suffixes, signed suffixes).                                         |
@@ -31,7 +36,7 @@ into a container and self-host.
 | `mailbox_delete`           | Permanently delete a mailbox (requires `confirm: true` and an explicit alias transfer/delete choice). |
 | `custom_domain_list`       | List custom domains with their settings, verification status, and mailboxes.                          |
 | `custom_domain_update`     | Update a custom domain's catch-all, random-prefix, display-name, or mailbox settings.                 |
-| `custom_domain_trash_list` | List a custom domain's deleted aliases (trash).                                                       |
+| `custom_domain_trash_list` | List a custom domain's deleted aliases (trash; paged by `page_id` + `limit`).                         |
 | `account_get_info`         | Get user info; doubles as an API-key sanity check.                                                    |
 | `account_get_stats`        | Get lifetime counters: aliases, emails forwarded, replied to, and blocked.                            |
 | `notification_list`        | List account notifications (paginated, 20 per page, unread first).                                    |
@@ -105,7 +110,9 @@ mailbox owns, so it cannot happen accidentally:
    the mailbox being deleted, so nothing is destroyed on a mistyped id.
 
 To merely stop an alias from delivering to a mailbox, do not delete the mailbox: update the alias
-itself with `alias_update` (`mailbox_ids`) or disable it with `alias_set_enabled`.
+itself with `alias_update` (`mailbox_ids`) or disable it with `alias_set_enabled`. Reassigning an
+alias's mailboxes can stop future mail from landing in removed mailboxes, so clients should treat
+that routing update as destructive.
 
 ### Maintain a custom domain
 
@@ -117,7 +124,8 @@ own domain instead of a SimpleLogin one.
 2. `custom_domain_update` changes the supported settings; only the fields you pass change:
    - `catch_all: true` makes mail sent to any unknown address on the domain auto-create an alias
      (on-the-fly creation); `random_prefix_generation: true` gives those aliases a random prefix
-     instead of the address that was targeted.
+     instead of the address that was targeted. Disabling catch-all can stop future mail for unknown
+     addresses, so clients should treat this routing update as destructive.
    - `name` sets the display name used as the From name on the domain's aliases; pass `null` to
      clear it.
    - `mailbox_ids` replaces the domain's full mailbox set (1 to 20 ids from `mailbox_list`). An
@@ -125,7 +133,10 @@ own domain instead of a SimpleLogin one.
      contacted.
 3. `custom_domain_trash_list` lists the domain's deleted aliases with their deletion timestamps.
    SimpleLogin remembers them so catch-all does not silently resurrect a deleted address; check it
-   when a catch-all address unexpectedly bounces or before reusing an old address.
+   when a catch-all address unexpectedly bounces or before reusing an old address. The API does not
+   paginate this endpoint server-side, so the MCP result returns
+   `{ aliases, page_id, limit, returned, total, more }` and locally pages `aliases` with `page_id`
+   (starting at 0) plus `limit` (default 100, max 500).
 
 **Non-goals.** Adding or deleting a custom domain, and DNS/MX verification, are account-level
 operations the SimpleLogin API does not expose; do them in the SimpleLogin web UI (Domains tab).
@@ -179,7 +190,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3000/health
-# -> {"status":"ok","version":"0.4.0"}
+# -> {"status":"ok","version":"0.5.0"}
 ```
 
 The server now listens on `http://localhost:3000` with the MCP endpoint at `POST /mcp`.
