@@ -21,7 +21,7 @@ alias, activity, contact, and notification lists return 20 entries per `page_id`
 | `alias_activity_list`      | List an alias's forward/reply/block activity (paginated, 20 per page).                                |
 | `alias_create_random`      | Create a random alias (`uuid` or `word` mode).                                                        |
 | `alias_create_custom`      | Create a custom alias from a prefix + signed suffix + mailboxes.                                      |
-| `alias_update`             | Update note, name, owning mailbox(es), PGP, or pinned state.                                          |
+| `alias_update`             | Update note, name, owning mailbox routing, PGP, or pinned state.                                      |
 | `alias_delete`             | Permanently delete an alias (requires `confirm: true`).                                               |
 | `alias_set_enabled`        | Explicitly enable or disable an alias (idempotent).                                                   |
 | `alias_options_get`        | Get creation options (can_create, suffixes, signed suffixes).                                         |
@@ -110,7 +110,9 @@ mailbox owns, so it cannot happen accidentally:
    the mailbox being deleted, so nothing is destroyed on a mistyped id.
 
 To merely stop an alias from delivering to a mailbox, do not delete the mailbox: update the alias
-itself with `alias_update` (`mailbox_ids`) or disable it with `alias_set_enabled`.
+itself with `alias_update` (`mailbox_ids`) or disable it with `alias_set_enabled`. Reassigning an
+alias's mailboxes can stop future mail from landing in removed mailboxes, so clients should treat
+that routing update as destructive.
 
 ### Maintain a custom domain
 

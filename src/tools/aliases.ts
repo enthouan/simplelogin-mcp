@@ -163,12 +163,17 @@ export function registerAliasTools(server: McpServer, client: SimpleLoginClient)
         'the owning mailbox (mailbox_id) or full mailbox set (mailbox_ids), whether PGP is ' +
         'disabled, and whether the alias is pinned. Only the provided fields change. ' +
         'mailbox_id and mailbox_ids are mutually exclusive, and a call that changes nothing ' +
-        'is rejected without contacting SimpleLogin.',
+        'is rejected without contacting SimpleLogin. Replacing mailboxes can stop future mail ' +
+        'from landing in removed mailboxes.',
       inputSchema: {
         alias_id: z.number().int().describe('Numeric id of the alias to update.'),
         note: z.string().optional().describe('Replace the alias note.'),
         name: z.string().optional().describe('Replace the alias display name.'),
-        mailbox_id: z.number().int().optional().describe('Set a single owning mailbox by id.'),
+        mailbox_id: z
+          .number()
+          .int()
+          .optional()
+          .describe('Set a single owning mailbox by id, replacing current alias mailbox routing.'),
         mailbox_ids: z
           .array(z.number().int())
           .optional()

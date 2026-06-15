@@ -4,7 +4,7 @@
 
 This is the public tool surface for `simplelogin-mcp`. Tool names are stable candidates for the 1.0 line.
 
-All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as mark-read, alias updates, custom-domain updates, and settings updates are marked idempotent. Mail-blocking or mail-routing state tools such as enable/disable, block/unblock, and custom-domain routing updates are marked both idempotent and destructive.
+All tools interact with the configured SimpleLogin API, so their MCP `openWorldHint` is `true`. Read tools are marked read-only and idempotent. Permanent delete tools are marked destructive. State-setting updates such as mark-read and settings updates are marked idempotent. Mail-blocking or mail-routing state tools such as alias updates, enable/disable, block/unblock, and custom-domain routing updates are marked both idempotent and destructive.
 
 | Tool                       | Category       | MCP annotations                                    | Bounds                                                                  | Output                                                       |
 | -------------------------- | -------------- | -------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -13,7 +13,7 @@ All tools interact with the configured SimpleLogin API, so their MCP `openWorldH
 | `alias_activity_list`      | aliases        | read-only, non-destructive, idempotent, open-world | page_id, 20 activity entries per page                                   | { activities }                                               |
 | `alias_create_random`      | aliases        | write, non-destructive, non-idempotent, open-world | single alias mutation                                                   | created alias object                                         |
 | `alias_create_custom`      | aliases        | write, non-destructive, non-idempotent, open-world | single alias mutation                                                   | created alias object                                         |
-| `alias_update`             | aliases        | write, non-destructive, idempotent, open-world     | single alias mutation                                                   | { ok: true }                                                 |
+| `alias_update`             | aliases        | write, destructive, idempotent, open-world         | single alias mutation                                                   | { ok: true }                                                 |
 | `alias_delete`             | aliases        | write, destructive, non-idempotent, open-world     | single irreversible deletion                                            | { deleted }                                                  |
 | `alias_set_enabled`        | aliases        | write, destructive, idempotent, open-world         | single alias state mutation                                             | { enabled }                                                  |
 | `alias_options_get`        | aliases        | read-only, non-destructive, idempotent, open-world | small account option set                                                | { can_create, prefix_suggestion, suffixes, recommendation? } |

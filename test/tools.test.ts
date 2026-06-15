@@ -108,6 +108,7 @@ describe('registered tool surface', () => {
       TOOL_CATALOG.filter((tool) => tool.annotations.readOnlyHint).map((tool) => tool.name),
     );
     expect(namesWith((annotations) => annotations.destructiveHint)).toEqual([
+      'alias_update',
       'alias_delete',
       'alias_set_enabled',
       'contact_set_blocked',
