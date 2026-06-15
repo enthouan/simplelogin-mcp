@@ -313,6 +313,10 @@ pnpm lint           # eslint
 pnpm format         # prettier --write
 ```
 
+Live SimpleLogin smoke tests are manual and opt-in; they create a temporary alias and verify cleanup.
+See [docs/live-smoke-test.md](docs/live-smoke-test.md) for the stdio and HTTP commands, required
+environment variables, cleanup guarantees, and failure summary format.
+
 Run locally over HTTP:
 
 ```bash
