@@ -13,7 +13,7 @@ const CONFIG_HINTS: Record<string, string> = {
   SL_API_URL: 'set SL_API_URL to an absolute http(s) URL such as https://app.simplelogin.io.',
   SL_API_KEY: 'set SL_API_KEY to a non-empty SimpleLogin API key.',
   ALLOW_UNAUTHENTICATED_EXPOSURE: 'set ALLOW_UNAUTHENTICATED_EXPOSURE to true, false, 1, or 0.',
-  SL_REQUEST_TIMEOUT_MS: 'set SL_REQUEST_TIMEOUT_MS to a positive integer number of milliseconds.',
+  SL_REQUEST_TIMEOUT_MS: 'set SL_REQUEST_TIMEOUT_MS to an integer from 1 to 2147483647.',
 };
 
 /** Parse an env flag forgivingly: `true`/`1` → true, `false`/`0` → false (default). */
@@ -43,7 +43,7 @@ const ConfigSchema = z.object({
   MCP_AUTH_TOKEN: optionalEnvString,
   MCP_ALLOWED_ORIGINS: optionalEnvString,
   ALLOW_UNAUTHENTICATED_EXPOSURE: boolEnv,
-  SL_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1).default(15000),
+  SL_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1).max(2_147_483_647).default(15000),
 });
 
 /** Fully validated, normalized application configuration. */

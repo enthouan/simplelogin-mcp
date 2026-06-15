@@ -196,6 +196,8 @@ type ParsedResponseBody =
   | { kind: 'text'; body: string }
   | { kind: 'malformed-json'; body: string };
 
+const MAX_ABORT_SIGNAL_TIMEOUT_MS = 2_147_483_647;
+
 /** Filters supported by {@link SimpleLoginClient.listAliases} (mutually exclusive). */
 export type AliasListFilter = 'enabled' | 'disabled' | 'pinned';
 
@@ -773,8 +775,9 @@ export class SimpleLoginClient {
     }
 
     let response: Response;
-    const signal = AbortSignal.timeout(this.timeoutMs);
+    let signal: AbortSignal | undefined;
     try {
+      signal = this.buildTimeoutSignal();
       response = await this.fetchImpl(url, {
         method: options.method,
         headers,
@@ -782,7 +785,7 @@ export class SimpleLoginClient {
         signal,
       });
     } catch (error) {
-      const apiError = this.toTransportError(error, options.endpoint, signal.aborted);
+      const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);
       logger.error('SimpleLogin API transport failure', {
         endpoint: options.endpoint,
         method: options.method,
@@ -805,9 +808,11 @@ export class SimpleLoginClient {
         endpoint: options.endpoint,
         method: options.method,
         status: response.status,
-        statusText: response.statusText || undefined,
+        statusText: response.statusText
+          ? redactSecrets(response.statusText, [this.apiKey])
+          : undefined,
         responseBody: parsedBody.kind,
-        retryAfter,
+        retryAfter: retryAfter ? redactSecrets(retryAfter, [this.apiKey]) : undefined,
       });
       throw new SimpleLoginAPIError(response.status, options.endpoint, message, parsedBody.body);
     }
@@ -825,6 +830,19 @@ export class SimpleLoginClient {
       }
     }
     return url;
+  }
+
+  private buildTimeoutSignal(): AbortSignal {
+    if (
+      !Number.isInteger(this.timeoutMs) ||
+      this.timeoutMs < 1 ||
+      this.timeoutMs > MAX_ABORT_SIGNAL_TIMEOUT_MS
+    ) {
+      throw new RangeError(
+        `Invalid request timeout ${this.timeoutMs}ms; set SL_REQUEST_TIMEOUT_MS between 1 and ${MAX_ABORT_SIGNAL_TIMEOUT_MS}.`,
+      );
+    }
+    return AbortSignal.timeout(this.timeoutMs);
   }
 
   private parseResponseBody(rawText: string, contentType: string | null): ParsedResponseBody {
@@ -885,6 +903,9 @@ export class SimpleLoginClient {
         endpoint,
         'Request was aborted before SimpleLogin responded',
       );
+    }
+    if (error instanceof RangeError && error.message.startsWith('Invalid request timeout ')) {
+      return new SimpleLoginAPIError(0, endpoint, error.message);
     }
     const detail = redactSecrets(this.errorDetail(error), [this.apiKey]);
     return new SimpleLoginAPIError(0, endpoint, `Network error: ${detail}`);

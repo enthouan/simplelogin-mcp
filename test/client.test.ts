@@ -3,7 +3,7 @@
  * method, headers, body), per-endpoint request shapes, error mapping, and Zod
  * response validation. No live SimpleLogin calls are made.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import {
   SimpleLoginClient,
@@ -60,6 +60,7 @@ function textResponse(text: string, status: number, statusText?: string): Respon
  */
 function stubClient(
   respond: Response | ((call: RecordedCall) => Response | Promise<Response> | Promise<never>),
+  options: { apiKey?: string; timeoutMs?: number } = {},
 ) {
   const calls: RecordedCall[] = [];
   const fetchImpl: FetchLike = (input, init = {}) => {
@@ -72,8 +73,8 @@ function stubClient(
   };
   const client = new SimpleLoginClient({
     apiUrl: 'https://sl.example.com/',
-    apiKey: 'secret-key',
-    timeoutMs: 1000,
+    apiKey: options.apiKey ?? 'secret-key',
+    timeoutMs: options.timeoutMs ?? 1000,
     fetch: fetchImpl,
   });
   return { client, calls };
@@ -799,6 +800,23 @@ describe('error mapping', () => {
     expect(error.message).not.toContain('secret-key');
   });
 
+  it('redacts the configured API key from logged status text', async () => {
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const { client } = stubClient(
+        new Response(null, { status: 500, statusText: 'bad secret-key' }),
+      );
+      const error = (await client.getUserInfo().catch((e: unknown) => e)) as SimpleLoginAPIError;
+      expect(error.message).toBe('bad [REDACTED]');
+
+      const logged = stderrWrite.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(logged).toContain('bad [REDACTED]');
+      expect(logged).not.toContain('secret-key');
+    } finally {
+      stderrWrite.mockRestore();
+    }
+  });
+
   it('maps a timeout to status 0 with a timeout message', async () => {
     const { client } = stubClient(() =>
       Promise.reject(Object.assign(new Error('aborted'), { name: 'TimeoutError' })),
@@ -818,6 +836,18 @@ describe('error mapping', () => {
     expect(error.status).toBe(0);
     expect(error.endpoint).toBe('/api/aliases/1');
     expect(error.message).toBe('Request was aborted before SimpleLogin responded');
+  });
+
+  it('maps an invalid timeout configuration before any fetch call', async () => {
+    const { client, calls } = stubClient(jsonResponse(USER_INFO), { timeoutMs: 5_000_000_000 });
+    const error = (await client.getUserInfo().catch((e: unknown) => e)) as SimpleLoginAPIError;
+    expect(error).toBeInstanceOf(SimpleLoginAPIError);
+    expect(error.status).toBe(0);
+    expect(error.endpoint).toBe('/api/user_info');
+    expect(error.message).toBe(
+      'Invalid request timeout 5000000000ms; set SL_REQUEST_TIMEOUT_MS between 1 and 2147483647.',
+    );
+    expect(calls).toHaveLength(0);
   });
 
   it('maps a network failure to status 0 with a network message', async () => {

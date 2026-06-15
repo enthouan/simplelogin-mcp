@@ -115,6 +115,12 @@ describe('loadConfig', () => {
     expect(() => loadConfig(env({ SL_API_KEY: 'k', PORT: '0' }))).toThrowError(/PORT/);
   });
 
+  it('rejects a request timeout above the AbortSignal timeout range', () => {
+    expect(() =>
+      loadConfig(env({ SL_API_KEY: 'k', SL_REQUEST_TIMEOUT_MS: '5000000000' })),
+    ).toThrowError(/SL_REQUEST_TIMEOUT_MS[\s\S]*2147483647/);
+  });
+
   it('rejects an unknown transport', () => {
     expect(() => loadConfig(env({ SL_API_KEY: 'k', TRANSPORT: 'carrier-pigeon' }))).toThrowError(
       /TRANSPORT[\s\S]*stdio[\s\S]*http/,
