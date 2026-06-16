@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.6.0
+
+### Added
+
+- Add an opt-in live SimpleLogin smoke-test workflow through `pnpm smoke:live`, with stdio and HTTP
+  runbook coverage in `docs/live-smoke-test.md` and offline smoke-runner tests for cleanup,
+  failure summaries, HTTP auth, and startup behavior.
 
 ### Changed
 
