@@ -17,7 +17,7 @@ Sources checked:
 ## Status Legend
 
 - **Supported**: exposed as an MCP tool, backed by a typed client method and response schema, and
-  covered by the existing offline test suite.
+  included in public tool-surface drift checks.
 - **Planned**: accepted for existing roadmap work but not implemented yet.
 - **Deferred**: upstream exposes the area, but this project has not accepted support. It needs a
   product decision, response-size strategy, live verification, or focused tests before a milestone
