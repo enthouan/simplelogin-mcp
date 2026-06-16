@@ -13,6 +13,8 @@ Tool names are stable candidates for the 1.0 public surface. Reads that can grow
 alias, activity, contact, and notification lists return 20 entries per `page_id`;
 `custom_domain_trash_list` is locally paged with `page_id` and `limit` (default 100, max 500). See
 [TOOL_CATALOG.md](TOOL_CATALOG.md) for MCP annotations, bounds, and output shapes.
+For endpoint-level SimpleLogin API coverage, deferred areas, and explicit non-goals, see
+[docs/api-coverage.md](docs/api-coverage.md).
 
 | Tool                       | Description                                                                                           |
 | -------------------------- | ----------------------------------------------------------------------------------------------------- |

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add public API coverage and non-goals documentation for supported, deferred, and intentionally
+  excluded SimpleLogin API areas.
+
 ## v0.6.0
 
 ### Added
