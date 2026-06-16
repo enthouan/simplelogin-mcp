@@ -3,9 +3,32 @@
 A self-hostable [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for the
 [SimpleLogin](https://simplelogin.io) email-alias API. It exposes the core alias workflow —
 list, create (random or custom), update, delete, enable/disable — plus mailbox and custom-domain
-management and account utilities (info, stats, notifications, settings), as MCP tools that Claude and other MCP clients can call. Runs
-as a stdio server for local desktop clients or as a stateless Streamable HTTP server you can drop
-into a container and self-host.
+management and account utilities (info, stats, notifications, settings), as MCP tools that Claude
+and other MCP clients can call. It runs as a stdio server for local desktop clients or as a
+stateless Streamable HTTP server you can drop into a container and self-host.
+
+## At a Glance
+
+- **Transports:** `http` by default, serving MCP at `POST /mcp` and health at `GET /health`; set
+  `TRANSPORT=stdio` for local desktop clients.
+- **Fast path:** create a SimpleLogin API key, set `SL_API_KEY`, set `MCP_AUTH_TOKEN` for Docker
+  Compose or any exposed HTTP bind, run the server, then point your client at
+  `http://localhost:3000/mcp`.
+- **Safety model:** `SL_API_KEY` grants control of your SimpleLogin account. HTTP binds to
+  `127.0.0.1` by default, refuses unauthenticated non-loopback binds, and accepts browser origins
+  only from loopback unless you configure `MCP_ALLOWED_ORIGINS`.
+- **Scope:** the supported, deferred, and intentionally excluded SimpleLogin API areas are tracked
+  in [docs/api-coverage.md](docs/api-coverage.md). Tool names and annotations are tracked in
+  [TOOL_CATALOG.md](TOOL_CATALOG.md).
+
+## Documentation
+
+- [API coverage and non-goals](docs/api-coverage.md)
+- [Live smoke-test runbook](docs/live-smoke-test.md)
+- [Security model and vulnerability reporting](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Support policy](SUPPORT.md)
+- [Release process](docs/release-process.md)
 
 ## Tools
 
@@ -174,32 +197,94 @@ alias-behavior fields. Account email/password changes, payment and subscription 
 account deletion, and sudo-mode endpoints are out of scope by design; do them in the
 SimpleLogin web UI.
 
-## Quick start (Docker Compose)
+## Install And Run
+
+### Prerequisites
+
+- A SimpleLogin account with an API key from **Settings -> API Keys**.
+- Either Docker with Docker Compose, or Node.js 22+ with [pnpm](https://pnpm.io).
+- An MCP client that supports Streamable HTTP or stdio.
+
+### Docker Compose
 
 ```bash
-# 1. Clone and enter the repo
 git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
-
-# 2. Create your .env from the template and add your secrets
 cp .env.example .env
-# then edit .env and set:
-#   SL_API_KEY=...
-#   MCP_AUTH_TOKEN=<output of: openssl rand -hex 32>
+```
 
-# 3. Build and run
+Edit `.env` and set at least:
+
+```dotenv
+SL_API_KEY=sl-your-key-here
+MCP_AUTH_TOKEN=replace-with-output-from-openssl-rand-hex-32
+```
+
+Generate a token with:
+
+```bash
+openssl rand -hex 32
+```
+
+Then start and verify the server:
+
+```bash
 docker compose up -d
-
-# 4. Verify
+docker compose ps
 curl http://localhost:3000/health
 # -> {"status":"ok","version":"0.6.0"}
 ```
 
-The server now listens on `http://localhost:3000` with the MCP endpoint at `POST /mcp`.
+The Compose file builds the image locally, binds the container on `HOST=0.0.0.0` for Docker port
+forwarding, and publishes the host port on loopback only (`127.0.0.1:3000:3000`). Because the app
+sees a non-loopback bind inside the container, `MCP_AUTH_TOKEN` is required even for the default
+loopback-only Compose deployment.
 
-> **Prebuilt image:** each tagged release publishes a multi-arch image to
-> `ghcr.io/enthouan/simplelogin-mcp`. To use it instead of building locally, comment out the
-> `build: .` line in `docker-compose.yml` and uncomment the `image:` line.
+### GHCR Image
+
+Each release publishes a multi-arch image to `ghcr.io/enthouan/simplelogin-mcp`. To run the
+prebuilt image with Compose, edit `docker-compose.yml` so the service uses the registry image
+instead of building from source:
+
+```yaml
+services:
+  simplelogin-mcp:
+    # build: .
+    image: ghcr.io/enthouan/simplelogin-mcp:0.6.0
+```
+
+Pin a release tag for repeatable deployments. `latest` follows the repository's default branch and
+is useful for testing current main.
+
+### Local pnpm
+
+Local runs do not automatically read `.env`; export the variables in your shell or source the file
+before starting:
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+cp .env.example .env
+# edit .env, then:
+set -a
+. ./.env
+set +a
+pnpm build
+pnpm start
+```
+
+For source-mode development over HTTP:
+
+```bash
+TRANSPORT=http HOST=127.0.0.1 PORT=3000 SL_API_KEY=sl-your-key pnpm dev
+curl http://localhost:3000/health
+```
+
+For stdio after a local build:
+
+```bash
+TRANSPORT=stdio SL_API_KEY=sl-your-key node dist/index.js
+```
 
 ## Configuration
 
@@ -228,17 +313,17 @@ validates them at startup and exits with a readable message if anything required
 > Docker Compose sets `HOST=0.0.0.0` inside the container for port forwarding, so its quick start
 > requires `MCP_AUTH_TOKEN` even though the host port is published on loopback.
 
-## Getting a SimpleLogin API key
+## Getting a SimpleLogin API Key
 
 1. Sign in at [app.simplelogin.io](https://app.simplelogin.io) (or your self-hosted instance).
 2. Go to **Settings → API Keys**.
 3. Create a new API key and copy it into `SL_API_KEY` in your `.env`.
 
-## Connecting a client
+## Connecting A Client
 
 ### Claude Code (HTTP)
 
-With the server running (see Quick start), register it with the token from `.env`:
+With the HTTP server running, register it with the token from `.env`:
 
 ```bash
 claude mcp add --transport http simplelogin http://localhost:3000/mcp \
@@ -250,6 +335,18 @@ For loopback-only, non-container use with no `MCP_AUTH_TOKEN`, omit the header:
 ```bash
 claude mcp add --transport http simplelogin http://localhost:3000/mcp
 ```
+
+### Generic HTTP Clients
+
+Use the Streamable HTTP endpoint:
+
+- URL: `http://localhost:3000/mcp` (or your reverse-proxy URL)
+- Method: `POST`
+- Auth header when `MCP_AUTH_TOKEN` is set: `Authorization: Bearer <token>`
+- Health check: `GET http://localhost:3000/health`
+
+Non-browser clients usually send no `Origin` header. Browser-based clients on a non-loopback origin
+must use an exact origin listed in `MCP_ALLOWED_ORIGINS`.
 
 ### Claude Desktop (stdio)
 
@@ -269,7 +366,7 @@ stdio in a one-shot container:
         "TRANSPORT=stdio",
         "-e",
         "SL_API_KEY=sl-your-key-here",
-        "ghcr.io/enthouan/simplelogin-mcp:latest"
+        "ghcr.io/enthouan/simplelogin-mcp:0.6.0"
       ]
     }
   }
@@ -290,6 +387,17 @@ Or, after building locally (`pnpm install && pnpm build`), point it at the compi
 }
 ```
 
+### Generic stdio Clients
+
+Configure the client to launch a command that keeps stdin/stdout attached to the MCP process:
+
+- Command: `node`
+- Args: `/absolute/path/to/simplelogin-mcp/dist/index.js`
+- Environment: `TRANSPORT=stdio`, `SL_API_KEY=<your SimpleLogin API key>`, and optionally
+  `SL_API_URL=<your self-hosted SimpleLogin origin>`
+
+`MCP_AUTH_TOKEN` is not needed for stdio-only use; it only protects the HTTP endpoint.
+
 ## Self-hosted SimpleLogin
 
 Point the server at your own SimpleLogin instance by setting `SL_API_URL`:
@@ -299,7 +407,35 @@ SL_API_URL=https://app.example.com
 SL_API_KEY=your-self-hosted-api-key
 ```
 
-Everything else is unchanged — the same API paths are used against your instance.
+Use the web app origin, not an `/api`-suffixed URL; the server appends SimpleLogin API paths itself.
+Create the API key on that same instance and keep it separate from any key used for
+`app.simplelogin.io`.
+
+Compatibility depends on the self-hosted SimpleLogin version exposing the same API paths and
+response shapes documented upstream. Start with `account_get_info` as a credential sanity check,
+then use [docs/live-smoke-test.md](docs/live-smoke-test.md) only when you intentionally want a live
+write test. If a self-hosted fork or older deployment returns different payloads, this server may
+surface a validation or SimpleLogin API error rather than guessing.
+
+Network exposure is separate from SimpleLogin hosting. If this MCP server is reachable outside the
+local machine, set `MCP_AUTH_TOKEN`, terminate TLS at a reverse proxy, and configure
+`MCP_ALLOWED_ORIGINS` only for browser clients that need it. The server itself speaks plain HTTP.
+
+## Troubleshooting
+
+| Symptom                                                         | What to check                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Startup says `SL_API_KEY is required`                           | Set a non-empty `SL_API_KEY`. Docker Compose reads it from `.env`; local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                                           |
+| Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                      |
+| SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                          |
+| HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                 |
+| Browser client gets `403 {"error":"Forbidden origin"}`          | Add the exact browser origin, including scheme and port, to `MCP_ALLOWED_ORIGINS`. Loopback origins are allowed by default; non-browser MCP clients normally send no `Origin` and are unaffected.                                                                              |
+| Startup refuses `HOST=0.0.0.0` without `MCP_AUTH_TOKEN`         | Set `MCP_AUTH_TOKEN`, bind to `127.0.0.1`, or use `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when another layer already authenticates or isolates the endpoint.                                                                                                                |
+| Docker container is unhealthy                                   | Run `docker compose logs simplelogin-mcp`, confirm `.env` contains `SL_API_KEY` and `MCP_AUTH_TOKEN`, and check `curl http://localhost:3000/health` from the host. A config error exits before the health check can pass.                                                      |
+| Port `3000` is already in use                                   | Change `PORT` and the Compose `ports` mapping together, then update client URLs to the new `/mcp` endpoint. For local pnpm HTTP runs, set `PORT=<free-port>`.                                                                                                                  |
+| Self-hosted SimpleLogin calls fail                              | Set `SL_API_URL` to the instance origin without `/api`, create `SL_API_KEY` on that instance, and confirm the deployment matches upstream API behavior. Older or forked instances can differ from the response schemas this server validates.                                  |
+| `contact_create` or mailbox/domain tools report plan/API limits | Some SimpleLogin capabilities, especially reverse-alias contact creation and additional mailboxes/domains, can depend on account plan and upstream API support. The server surfaces SimpleLogin's error; use the SimpleLogin web UI or account plan details to confirm access. |
+| Live smoke test warns cleanup failed or could not be verified   | Do not rerun blindly. Follow [docs/live-smoke-test.md](docs/live-smoke-test.md), inspect the temporary alias/contact ids from the sanitized output, delete leftovers in SimpleLogin if needed, and include the run id plus cleanup status in a follow-up issue.                |
 
 ## Development
 
@@ -312,8 +448,13 @@ pnpm build          # compile TypeScript to dist/
 pnpm start          # run the compiled server
 pnpm typecheck      # tsc --noEmit
 pnpm lint           # eslint
+pnpm test           # vitest unit tests; no live SimpleLogin credentials
 pnpm format         # prettier --write
+pnpm format:check   # prettier --check
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup requirements, test expectations, API endpoint
+addition patterns, generated catalog expectations, and branch/PR hygiene.
 
 Live SimpleLogin smoke tests are manual and opt-in; they create a temporary alias and verify cleanup.
 See [docs/live-smoke-test.md](docs/live-smoke-test.md) for the stdio and HTTP commands, required
@@ -351,6 +492,9 @@ The `SL_API_KEY` grants full control of your SimpleLogin account, so treat it li
 The HTTP server is safe by default (loopback bind) and refuses to start exposed without a token.
 For the credential risk model, network exposure patterns, and how to report a vulnerability, see
 [SECURITY.md](SECURITY.md).
+
+For questions and non-security bug reports, see [SUPPORT.md](SUPPORT.md). Maintainer release steps
+are documented in [docs/release-process.md](docs/release-process.md).
 
 ## License
 
