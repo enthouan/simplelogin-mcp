@@ -232,7 +232,7 @@ Then start and verify the server:
 docker compose up -d
 docker compose ps
 curl http://localhost:3000/health
-# -> {"status":"ok","version":"0.6.0"}
+# -> {"status":"ok","version":"0.7.0"}
 ```
 
 The Compose file builds the image locally, binds the container on `HOST=0.0.0.0` for Docker port
@@ -250,7 +250,7 @@ instead of building from source:
 services:
   simplelogin-mcp:
     # build: .
-    image: ghcr.io/enthouan/simplelogin-mcp:0.6.0
+    image: ghcr.io/enthouan/simplelogin-mcp:0.7.0
 ```
 
 Pin a release tag for repeatable deployments. `latest` follows the repository's default branch and
@@ -369,7 +369,7 @@ stdio in a one-shot container:
         "TRANSPORT=stdio",
         "-e",
         "SL_API_KEY=sl-your-key-here",
-        "ghcr.io/enthouan/simplelogin-mcp:0.6.0"
+        "ghcr.io/enthouan/simplelogin-mcp:0.7.0"
       ]
     }
   }
