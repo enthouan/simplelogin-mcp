@@ -53,6 +53,8 @@ function startHttp(config: AppConfig, client: SimpleLoginClient): void {
 
   app.get('/health', (c) => c.json({ status: 'ok', version: VERSION }));
 
+  app.get('/mcp', (c) => c.text('Method Not Allowed', 405, { Allow: 'POST' }));
+
   app.post('/mcp', async (c) => {
     // Reject cross-origin browser requests (DNS-rebinding / CSRF defense). Non-browser
     // MCP clients send no Origin header and are unaffected; only a present, disallowed
