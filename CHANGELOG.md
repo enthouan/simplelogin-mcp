@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add public-ready repository documentation: expanded install, configuration, client setup,
+  self-hosted SimpleLogin, and troubleshooting guidance in the README, plus contributing, support,
+  and release-process docs.
 - Add public API coverage and non-goals documentation for supported, deferred, and intentionally
   excluded SimpleLogin API areas.
 
