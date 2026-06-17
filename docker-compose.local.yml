@@ -1,8 +1,10 @@
 services:
   simplelogin-mcp:
-    # Operator/self-hosted path: pull the published multi-arch image from GHCR.
-    image: ghcr.io/enthouan/simplelogin-mcp:${SIMPLELOGIN_MCP_IMAGE_TAG:-latest}
-    container_name: simplelogin-mcp
+    # Development/image-validation path: build from the local checkout.
+    build:
+      context: .
+    image: simplelogin-mcp:local
+    container_name: simplelogin-mcp-local
     restart: unless-stopped
     env_file: .env
     environment:

@@ -207,6 +207,9 @@ SimpleLogin web UI.
 
 ### Docker Compose
 
+Use this path for operator or self-hosted deployments. The default Compose file pulls the published
+GHCR image and does not build from your checkout.
+
 ```bash
 git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
@@ -235,26 +238,50 @@ curl http://localhost:3000/health
 # -> {"status":"ok","version":"0.7.0"}
 ```
 
-The Compose file builds the image locally, binds the container on `HOST=0.0.0.0` for Docker port
-forwarding, and publishes the host port on loopback only (`127.0.0.1:3000:3000`). Because the app
-sees a non-loopback bind inside the container, `MCP_AUTH_TOKEN` is required even for the default
-loopback-only Compose deployment.
+The default `docker-compose.yml` uses
+`ghcr.io/enthouan/simplelogin-mcp:${SIMPLELOGIN_MCP_IMAGE_TAG:-latest}`. `latest` follows the
+repository's default branch; pin a release tag such as `0.7.0` for repeatable deployments:
 
-### GHCR Image
-
-Each release publishes a multi-arch image to `ghcr.io/enthouan/simplelogin-mcp`. To run the
-prebuilt image with Compose, edit `docker-compose.yml` so the service uses the registry image
-instead of building from source:
-
-```yaml
-services:
-  simplelogin-mcp:
-    # build: .
-    image: ghcr.io/enthouan/simplelogin-mcp:0.7.0
+```bash
+SIMPLELOGIN_MCP_IMAGE_TAG=latest docker compose up -d
+SIMPLELOGIN_MCP_IMAGE_TAG=0.7.0 docker compose up -d
 ```
 
-Pin a release tag for repeatable deployments. `latest` follows the repository's default branch and
-is useful for testing current main.
+You can also set the same value in `.env`:
+
+```dotenv
+SIMPLELOGIN_MCP_IMAGE_TAG=0.7.0
+```
+
+The Compose files bind the container on `HOST=0.0.0.0` for Docker port forwarding, keep the
+container's internal HTTP listener on port `3000`, and publish the host port on loopback only by
+default (`127.0.0.1:3000:3000`). Because the app sees a non-loopback bind inside the container,
+`MCP_AUTH_TOKEN` is required even for the default loopback-only Compose deployment.
+
+Change the host-side bind or port with the Compose-specific variables, not `PORT`:
+
+```bash
+SIMPLELOGIN_MCP_HOST_PORT=3001 docker compose up -d
+curl http://localhost:3001/health
+
+SIMPLELOGIN_MCP_HOST_BIND_IP=0.0.0.0 SIMPLELOGIN_MCP_HOST_PORT=3000 docker compose up -d
+```
+
+Set `SIMPLELOGIN_MCP_HOST_BIND_IP=0.0.0.0` only when you intentionally want LAN access, and keep
+`MCP_AUTH_TOKEN` set before widening exposure.
+
+### Local Docker Build
+
+Use this path when developing the project, testing source changes, or validating the Docker image
+from the local checkout:
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+This uses `docker-compose.local.yml`, builds from the local `Dockerfile`, tags the image as
+`simplelogin-mcp:local`, and keeps the same loopback-only host publishing and `MCP_AUTH_TOKEN`
+expectations as the published-image Compose file.
 
 ### Local pnpm
 
@@ -296,7 +323,10 @@ validates them at startup and exits with a readable message if anything required
 | `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
 | `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                                               |
 | `HOST`                           | No       | `127.0.0.1`                  | Interface the HTTP server binds to. Loopback by default; `0.0.0.0` exposes it (requires a token).    |
-| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode.                                                     |
+| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode; Compose keeps the container listener on `3000`.     |
+| `SIMPLELOGIN_MCP_HOST_BIND_IP`   | No       | `127.0.0.1`                  | Docker Compose host interface bind address. Keep loopback unless intentionally exposing the service. |
+| `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                   |
+| `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.             |
 | `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
 | `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
 | `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
@@ -311,7 +341,9 @@ validates them at startup and exits with a readable message if anything required
 > machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup, so exposing
 > the endpoint is always an explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
 > Docker Compose sets `HOST=0.0.0.0` inside the container for port forwarding, so its quick start
-> requires `MCP_AUTH_TOKEN` even though the host port is published on loopback.
+> requires `MCP_AUTH_TOKEN` even though the host port is published on loopback. Use
+> `SIMPLELOGIN_MCP_HOST_PORT` for Compose host-port changes; leave `PORT` at `3000` unless you are
+> deliberately editing the container's internal listener.
 
 ## Getting a SimpleLogin API Key
 
@@ -427,19 +459,19 @@ The server itself speaks plain HTTP.
 
 ## Troubleshooting
 
-| Symptom                                                         | What to check                                                                                                                                                                                                                                                                                              |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup says `SL_API_KEY is required`                           | Set a non-empty `SL_API_KEY`. Docker Compose reads it from `.env`; local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                                                                       |
-| Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                                                  |
-| SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                                                      |
-| HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                                             |
-| Browser client gets `403 {"error":"Forbidden origin"}`          | Add the exact browser origin, including scheme and port, to `MCP_ALLOWED_ORIGINS`. Loopback origins are allowed by default; non-browser MCP clients normally send no `Origin` and are unaffected.                                                                                                          |
-| Startup refuses `HOST=0.0.0.0` without `MCP_AUTH_TOKEN`         | Set `MCP_AUTH_TOKEN`, bind to `127.0.0.1`, or use `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when another layer already authenticates or isolates the endpoint.                                                                                                                                            |
-| Docker container is unhealthy                                   | Run `docker compose logs simplelogin-mcp`, confirm `.env` contains `SL_API_KEY` and `MCP_AUTH_TOKEN`, and check `curl http://localhost:3000/health` from the host. A config error exits before the health check can pass.                                                                                  |
-| Port `3000` is already in use                                   | For Compose, change only the host side of the port mapping, e.g. `127.0.0.1:3001:3000`, and point clients at port 3001. If you also change the container `PORT`, update `PORT`, the container side of `ports`, and the Compose healthcheck URL together. For local pnpm HTTP runs, set `PORT=<free-port>`. |
-| Self-hosted SimpleLogin calls fail                              | Set `SL_API_URL` to the instance origin without `/api`, create `SL_API_KEY` on that instance, and confirm the deployment matches upstream API behavior. Older or forked instances can differ from the response schemas this server validates.                                                              |
-| `contact_create` or mailbox/domain tools report plan/API limits | Some SimpleLogin capabilities, especially reverse-alias contact creation and additional mailboxes/domains, can depend on account plan and upstream API support. The server surfaces SimpleLogin's error; use the SimpleLogin web UI or account plan details to confirm access.                             |
-| Live smoke test warns cleanup failed or could not be verified   | Do not rerun blindly. Follow [docs/live-smoke-test.md](docs/live-smoke-test.md), inspect the temporary alias/contact ids from the sanitized output, delete leftovers in SimpleLogin if needed, and include the run id plus cleanup status in a follow-up issue.                                            |
+| Symptom                                                         | What to check                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Startup says `SL_API_KEY is required`                           | Set a non-empty `SL_API_KEY`. Docker Compose reads it from `.env`; local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                                           |
+| Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                      |
+| SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                          |
+| HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                 |
+| Browser client gets `403 {"error":"Forbidden origin"}`          | Add the exact browser origin, including scheme and port, to `MCP_ALLOWED_ORIGINS`. Loopback origins are allowed by default; non-browser MCP clients normally send no `Origin` and are unaffected.                                                                              |
+| Startup refuses `HOST=0.0.0.0` without `MCP_AUTH_TOKEN`         | Set `MCP_AUTH_TOKEN`, bind to `127.0.0.1`, or use `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when another layer already authenticates or isolates the endpoint.                                                                                                                |
+| Docker container is unhealthy                                   | Run `docker compose logs simplelogin-mcp`, confirm `.env` contains `SL_API_KEY` and `MCP_AUTH_TOKEN`, and check `curl http://localhost:3000/health` from the host. A config error exits before the health check can pass.                                                      |
+| Port `3000` is already in use                                   | For Compose, set `SIMPLELOGIN_MCP_HOST_PORT=3001` and point clients at port 3001. Leave `PORT=3000` for Compose unless you also edit the container side of `ports` and the healthcheck URL. For local pnpm HTTP runs, set `PORT=<free-port>`.                                  |
+| Self-hosted SimpleLogin calls fail                              | Set `SL_API_URL` to the instance origin without `/api`, create `SL_API_KEY` on that instance, and confirm the deployment matches upstream API behavior. Older or forked instances can differ from the response schemas this server validates.                                  |
+| `contact_create` or mailbox/domain tools report plan/API limits | Some SimpleLogin capabilities, especially reverse-alias contact creation and additional mailboxes/domains, can depend on account plan and upstream API support. The server surfaces SimpleLogin's error; use the SimpleLogin web UI or account plan details to confirm access. |
+| Live smoke test warns cleanup failed or could not be verified   | Do not rerun blindly. Follow [docs/live-smoke-test.md](docs/live-smoke-test.md), inspect the temporary alias/contact ids from the sanitized output, delete leftovers in SimpleLogin if needed, and include the run id plus cleanup status in a follow-up issue.                |
 
 ## Development
 
