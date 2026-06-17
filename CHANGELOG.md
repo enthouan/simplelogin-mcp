@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Split Docker Compose workflows so `docker-compose.yml` runs the published GHCR image by default,
+  `docker-compose.local.yml` builds from the checkout as `simplelogin-mcp:local`, and the Docker
+  docs distinguish operator deployments from local image validation.
+
 ## v0.7.0
 
 ### Added

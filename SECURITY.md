@@ -84,12 +84,12 @@ Non-browser MCP clients send no `Origin` and are unaffected.
 - **Local use (default):** keep `HOST=127.0.0.1`. Reach it from the same machine, or
   from elsewhere over an SSH tunnel (`ssh -L 3000:127.0.0.1:3000 host`). No token
   strictly required, though setting one adds defense in depth.
-- **Docker:** the bundled `docker-compose.yml` binds the container to `0.0.0.0`
-  (required for Docker port forwarding) but publishes only to the host's loopback
-  (`127.0.0.1:3000:3000`), so it is host-local by default. Because the app sees a
-  non-loopback bind inside the container, keep `MCP_AUTH_TOKEN` set even for this
-  default Compose deployment. To reach it from the LAN, keep the token set and widen
-  the `ports` mapping.
+- **Docker:** the bundled Compose files bind the container to `0.0.0.0` (required
+  for Docker port forwarding) but publish only to the host's loopback by default
+  (`127.0.0.1:3000:3000`), so they are host-local by default. Because the app sees a
+  non-loopback bind inside the container, keep `MCP_AUTH_TOKEN` set even for default
+  Compose deployments. To reach it from the LAN, keep the token set and set
+  `SIMPLELOGIN_MCP_HOST_BIND_IP=0.0.0.0` or a specific LAN IP.
 - **Public / LAN exposure:** set `MCP_AUTH_TOKEN`, and put the server behind a reverse
   proxy that terminates TLS (the server speaks plain HTTP). Never expose plain HTTP with
   a bearer token directly to the internet: the token would travel in cleartext.

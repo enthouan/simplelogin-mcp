@@ -48,6 +48,16 @@ pnpm test
 pnpm format:check
 ```
 
+When changing Docker behavior, validate both Compose paths. The default `docker-compose.yml` is the
+published-image operator path; use `docker-compose.local.yml` for source changes and image
+validation:
+
+```bash
+docker compose config
+docker compose -f docker-compose.local.yml config
+docker compose -f docker-compose.local.yml build
+```
+
 Live smoke tests are not part of normal CI. Use them only when a change needs live SimpleLogin
 verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 
