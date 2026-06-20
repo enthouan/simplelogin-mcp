@@ -7,6 +7,8 @@
 - Split Docker Compose workflows so `docker-compose.yml` runs the published GHCR image by default,
   `docker-compose.local.yml` builds from the checkout as `simplelogin-mcp:local`, and the Docker
   docs distinguish operator deployments from local image validation.
+- Refresh the runtime baseline to Node.js 24 and `node:24-bookworm-slim`, align CI, engines, types,
+  and docs with that floor, and switch Docker healthchecks to Node's built-in `fetch`.
 
 ## v0.7.0
 
