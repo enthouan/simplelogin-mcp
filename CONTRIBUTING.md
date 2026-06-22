@@ -64,7 +64,7 @@ verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 ## Dependency Maintenance
 
 Dependabot checks GitHub Actions and Docker image references weekly. CI remains the gate for every
-generated dependency pull request.
+generated dependency pull request, including a non-publishing Docker/release dry run for PRs.
 
 npm/pnpm version updates are deferred while the repository is pinned to pnpm 11 and GitHub's
 Dependabot documentation only lists pnpm support through v10. Keep major JavaScript dependency

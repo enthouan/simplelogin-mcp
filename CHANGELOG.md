@@ -5,7 +5,8 @@
 ### Added
 
 - Add weekly, grouped Dependabot version checks for GitHub Actions and Docker image references, with
-  npm/pnpm version updates deferred while pnpm 11 support remains unverified.
+  npm/pnpm version updates deferred while pnpm 11 support remains unverified, and gate PRs with a
+  non-publishing Docker/release dry run.
 
 ### Changed
 
