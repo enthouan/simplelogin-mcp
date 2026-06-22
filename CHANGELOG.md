@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Add weekly, grouped Dependabot version checks for GitHub Actions and Docker image references, with
+  npm/pnpm version updates deferred while pnpm 11 support remains unverified.
+
 ### Changed
 
 - Split Docker Compose workflows so `docker-compose.yml` runs the published GHCR image by default,

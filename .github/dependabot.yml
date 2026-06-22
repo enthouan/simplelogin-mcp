@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/Los_Angeles'
+    open-pull-requests-limit: 1
+    labels:
+      - 'area:ci'
+      - 'area:security'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:30'
+      timezone: 'America/Los_Angeles'
+    open-pull-requests-limit: 1
+    labels:
+      - 'area:docker'
+      - 'area:security'
+    groups:
+      docker-images:
+        patterns:
+          - '*'
+
+# npm/pnpm version updates are intentionally deferred. This repository is pinned
+# to pnpm 11, while GitHub Dependabot support currently documents pnpm support
+# through v10. Keep broad JavaScript dependency upgrades manual until Dependabot
+# can prove clean pnpm 11 lockfile handling in this repository.
