@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 jobs:
   check:
@@ -49,6 +48,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Prepare Compose environment
         run: cp .env.example .env
@@ -64,13 +65,6 @@ jobs:
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
 
       - name: Derive image tags
         id: meta
@@ -102,8 +96,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
-          load: true
+          platforms: linux/amd64,linux/arm64
           push: false
+          outputs: type=cacheonly
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
