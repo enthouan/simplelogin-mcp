@@ -66,10 +66,10 @@ verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 Dependabot checks GitHub Actions and Docker image references weekly. CI remains the gate for every
 generated dependency pull request, including a non-publishing Docker/release dry run for PRs.
 
-Repository auto-merge is enabled for low-risk Dependabot updates, but only the
-`dependabot-auto-merge` workflow can opt a pull request into it. The workflow is limited to
-same-repository, non-draft pull requests authored by `dependabot[bot]` and targeting `main`; it
-does not check out or execute pull request code.
+Repository auto-merge must be enabled for low-risk Dependabot updates, but only the
+`Dependabot Auto-Merge` workflow can opt a pull request into it. The workflow is limited to
+same-repository, non-draft pull requests authored and triggered by `dependabot[bot]` and targeting
+`main`; it does not check out or execute pull request code.
 
 Auto-merge is allowed only for Dependabot metadata classified as `version-update:semver-patch` or
 `version-update:semver-minor` in these ecosystems:
@@ -80,6 +80,10 @@ Auto-merge is allowed only for Dependabot metadata classified as `version-update
 Branch protection remains the final merge gate. `main` requires strict required checks and
 conversation resolution, and Docker Dependabot updates rely on the required `docker` CI dry-run
 before they can land automatically.
+
+The workflow uses the built-in GitHub Actions token only. Do not add a PAT, GitHub App token,
+package-write permission, registry secret, or release-publishing credential for dependency
+auto-merge without a separate security decision.
 
 Keep these dependency updates manual:
 

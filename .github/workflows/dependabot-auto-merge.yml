@@ -1,20 +1,26 @@
-name: dependabot-auto-merge
+name: Dependabot Auto-Merge
 
 # Enable GitHub auto-merge for low-risk Dependabot updates. This workflow runs
 # with write permissions, so it never checks out or executes pull request code.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
 
 permissions:
   contents: write
   pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   enable-auto-merge:
     name: Enable auto-merge
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.draft == false
@@ -26,7 +32,7 @@ jobs:
         id: metadata
         uses: dependabot/fetch-metadata@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
 
       - name: Evaluate auto-merge policy
         id: policy
@@ -84,6 +90,6 @@ jobs:
       - name: Enable GitHub auto-merge
         if: steps.policy.outputs.allowed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR_URL"
