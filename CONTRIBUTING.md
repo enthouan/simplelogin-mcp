@@ -61,6 +61,15 @@ docker compose -f docker-compose.local.yml build
 Live smoke tests are not part of normal CI. Use them only when a change needs live SimpleLogin
 verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 
+## Dependency Maintenance
+
+Dependabot checks GitHub Actions and Docker image references weekly. CI remains the gate for every
+generated dependency pull request, including a non-publishing Docker/release dry run for PRs.
+
+npm/pnpm version updates are deferred while the repository is pinned to pnpm 11 and GitHub's
+Dependabot documentation only lists pnpm support through v10. Keep major JavaScript dependency
+upgrades manual unless a Dependabot pass proves clean pnpm 11 lockfile handling for this repository.
+
 ## Adding Or Changing API Coverage
 
 Keep endpoint changes small and traceable:
