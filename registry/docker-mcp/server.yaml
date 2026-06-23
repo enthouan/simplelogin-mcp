@@ -16,7 +16,7 @@ about:
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main
-  commit: b306dfed6fd55ca30496669ef2d867b58e234f4a
+  commit: 7b5ad0d9f81d0fb3753b46266c77c60d9d994eb4
 config:
   description: Configure SimpleLogin API access for simplelogin-mcp.
   secrets:

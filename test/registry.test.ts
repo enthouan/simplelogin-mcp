@@ -5,6 +5,9 @@ import { renderDockerMcpToolsJson } from '../src/tools/catalog.js';
 
 const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
+const RELEASE_COMMITS = {
+  '0.7.0': '7b5ad0d9f81d0fb3753b46266c77c60d9d994eb4',
+} as const;
 
 interface PackageJson {
   version: string;
@@ -136,9 +139,12 @@ describe('Docker MCP Registry staging metadata', () => {
     const packageJson = readJson<PackageJson>('package.json');
     const serverYaml = readRepoFile('registry/docker-mcp/server.yaml');
     const imageTag = new RegExp(`image: ${GHCR_IMAGE}:(\\S+)`).exec(serverYaml)?.[1] ?? '';
+    const expectedReleaseCommit =
+      RELEASE_COMMITS[packageJson.version as keyof typeof RELEASE_COMMITS];
 
     expect(serverYaml).toContain(`image: ${GHCR_IMAGE}:${packageJson.version}`);
     expectSpecificVersion(imageTag);
+    expect(serverYaml).toContain(`commit: ${expectedReleaseCommit}`);
     expect(serverYaml).toContain('env: SL_API_KEY');
     expect(serverYaml).toContain('name: TRANSPORT\n      value: stdio');
     expect(serverYaml).toContain('project: https://github.com/enthouan/simplelogin-mcp');

@@ -55,10 +55,10 @@ jobs:
         run: cp .env.example .env
 
       - name: Validate operator Compose config
-        run: docker compose --env-file .env.example config --no-env-resolution --quiet
+        run: docker compose --env-file .env.example config --quiet
 
       - name: Validate local Compose config
-        run: docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
+        run: docker compose --env-file .env.example -f docker-compose.local.yml config --quiet
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
