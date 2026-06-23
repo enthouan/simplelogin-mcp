@@ -81,10 +81,6 @@ Branch protection remains the final merge gate. `main` requires strict required 
 conversation resolution, and Docker Dependabot updates rely on the required `docker` CI dry-run
 before they can land automatically.
 
-The workflow uses the built-in GitHub Actions token only. Do not add a PAT, GitHub App token,
-package-write permission, registry secret, or release-publishing credential for dependency
-auto-merge without a separate security decision.
-
 Keep these dependency updates manual:
 
 - major updates, including grouped GitHub Actions PRs where Dependabot reports a major update;
