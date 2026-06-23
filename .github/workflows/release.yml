@@ -50,9 +50,11 @@ jobs:
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=MIT
+            io.modelcontextprotocol.server.name=io.github.enthouan/simplelogin-mcp
             io.github.actions.run.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           annotations: |
             org.opencontainers.image.description=Self-hostable MCP server for SimpleLogin email-alias workflows.
+            io.modelcontextprotocol.server.name=io.github.enthouan/simplelogin-mcp
             io.github.actions.run.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index

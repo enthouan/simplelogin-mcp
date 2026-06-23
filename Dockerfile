@@ -17,6 +17,7 @@ RUN pnpm run build
 
 # ---- Runtime: production deps + compiled output only ----
 FROM node:24-bookworm-slim AS runtime
+LABEL io.modelcontextprotocol.server.name="io.github.enthouan/simplelogin-mcp"
 ENV NODE_ENV=production
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app

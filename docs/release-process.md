@@ -37,6 +37,10 @@ Update release metadata:
   `## Unreleased` section if needed.
 - [README.md](../README.md): update versioned examples such as `/health` output and pinned GHCR
   image tags when they should point at the new release.
+- [server.json](../server.json): update the top-level version, OCI package version, and GHCR image
+  tag to `X.Y.Z`; keep the registry server name unchanged.
+- [registry/docker-mcp/server.yaml](../registry/docker-mcp/server.yaml): update the staged Docker
+  MCP Registry image tag and source commit if preparing a public registry submission.
 
 Run the local validation gate:
 
@@ -47,6 +51,18 @@ pnpm lint
 pnpm build
 pnpm test
 pnpm format:check
+docker compose config
+docker compose -f docker-compose.local.yml config
+```
+
+When registry metadata changes, also validate `server.json` against the current MCP Registry schema
+and confirm the official registry still has no stale entry for this server before publication:
+
+```bash
+curl -fsSL https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json \
+  -o /tmp/mcp-server.schema.json
+pnpm dlx ajv-cli validate -s /tmp/mcp-server.schema.json -d server.json
+curl -fsSL 'https://registry.modelcontextprotocol.io/v0.1/servers?search=simplelogin'
 ```
 
 Open a pull request titled exactly `vX.Y.Z`. Include the validation commands and results in the PR

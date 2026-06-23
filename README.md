@@ -25,6 +25,7 @@ stateless Streamable HTTP server you can drop into a container and self-host.
 
 - [API coverage and non-goals](docs/api-coverage.md)
 - [Live smoke-test runbook](docs/live-smoke-test.md)
+- [Registry readiness](docs/registry-readiness.md)
 - [Security model and vulnerability reporting](SECURITY.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Support policy](SUPPORT.md)
