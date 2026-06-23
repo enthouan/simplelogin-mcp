@@ -53,6 +53,7 @@ pnpm lint
 pnpm build
 pnpm test
 pnpm format:check
+test -f .env || cp .env.example .env
 docker compose --env-file .env.example config --no-env-resolution --quiet
 docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
 ```

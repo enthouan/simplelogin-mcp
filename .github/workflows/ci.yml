@@ -51,6 +51,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare Compose environment
+        run: cp .env.example .env
+
       - name: Validate operator Compose config
         run: docker compose --env-file .env.example config --no-env-resolution --quiet
 
