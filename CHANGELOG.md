@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add a Dependabot auto-merge workflow for same-repository GitHub Actions and Docker patch/minor
+  updates, while keeping major updates, npm/pnpm updates, and Docker runtime baseline jumps manual.
 - Add weekly, grouped Dependabot version checks for GitHub Actions and Docker image references, with
   npm/pnpm version updates deferred while pnpm 11 support remains unverified, and gate PRs with a
   non-publishing Docker/release dry run.
