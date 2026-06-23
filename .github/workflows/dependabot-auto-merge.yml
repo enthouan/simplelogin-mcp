@@ -45,10 +45,10 @@ jobs:
           set -euo pipefail
 
           allowed=false
-          reason="Only GitHub Actions and Docker patch/minor Dependabot updates are auto-merged."
+          reason="Only npm, GitHub Actions, and Docker patch/minor Dependabot updates are auto-merged."
 
           case "$PACKAGE_ECOSYSTEM" in
-            github-actions|docker)
+            npm|github-actions|docker)
               case "$UPDATE_TYPE" in
                 version-update:semver-patch|version-update:semver-minor)
                   allowed=true

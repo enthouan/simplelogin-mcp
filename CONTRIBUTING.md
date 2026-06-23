@@ -63,8 +63,9 @@ verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 
 ## Dependency Maintenance
 
-Dependabot checks GitHub Actions and Docker image references weekly. CI remains the gate for every
-generated dependency pull request, including a non-publishing Docker/release dry run for PRs.
+Dependabot checks npm/pnpm dependencies, GitHub Actions, and Docker image references weekly. CI
+remains the gate for every generated dependency pull request, including a non-publishing
+Docker/release dry run for PRs.
 
 Repository auto-merge must be enabled for low-risk Dependabot updates, but only the
 `Dependabot Auto-Merge` workflow can opt a pull request into it. The workflow is limited to
@@ -76,6 +77,7 @@ Auto-merge is allowed only for Dependabot metadata classified as `version-update
 
 - `github-actions`
 - `docker`
+- `npm`
 
 Branch protection remains the final merge gate. `main` requires strict required checks and
 conversation resolution, and Docker Dependabot updates rely on the required `docker` CI dry-run
@@ -85,13 +87,7 @@ Keep these dependency updates manual:
 
 - major updates, including grouped GitHub Actions PRs where Dependabot reports a major update;
 - Docker runtime baseline jumps such as `node:24-bookworm-slim` to `node:26-bookworm-slim`;
-- npm/pnpm Dependabot PRs, including security updates, until pnpm 11 handling is explicitly
-  revisited;
 - pull requests from forks, draft pull requests, and non-Dependabot dependency updates.
-
-npm/pnpm version updates are deferred while the repository is pinned to pnpm 11 and GitHub's
-Dependabot documentation only lists pnpm support through v10. Keep major JavaScript dependency
-upgrades manual unless a Dependabot pass proves clean pnpm 11 lockfile handling for this repository.
 
 ## Adding Or Changing API Coverage
 
