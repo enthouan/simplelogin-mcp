@@ -43,7 +43,8 @@ Release PRs should create or update these fields together:
 - `server.json` top-level `version`.
 - `server.json` OCI package `version`.
 - `server.json` OCI package identifier tag.
-- `registry/docker-mcp/server.yaml` image tag and source commit.
+- `registry/docker-mcp/server.yaml` image tag, with source commit filled in only after the
+  release merge/tag SHA exists.
 
 ## Docker MCP Registry
 

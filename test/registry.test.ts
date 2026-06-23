@@ -114,11 +114,13 @@ describe('Docker MCP Registry staging metadata', () => {
     const packageJson = readJson<PackageJson>('package.json');
     const serverYaml = readRepoFile('registry/docker-mcp/server.yaml');
     const imageTag = new RegExp(`image: ${GHCR_IMAGE}:(\\S+)`).exec(serverYaml)?.[1] ?? '';
-    const sourceCommit = /^ {2}commit: ([0-9a-f]{40})$/m.exec(serverYaml)?.[1] ?? '';
 
     expect(serverYaml).toContain(`image: ${GHCR_IMAGE}:${packageJson.version}`);
     expectSpecificVersion(imageTag);
-    expect(sourceCommit).toMatch(/^[0-9a-f]{40}$/);
+    expect(serverYaml).toContain(
+      'Set commit to the merged main SHA after v0.8.0 is tagged so it matches the image source.',
+    );
+    expect(serverYaml).not.toMatch(/^ {2}commit: [0-9a-f]{40}$/m);
     expect(serverYaml).toContain('env: SL_API_KEY');
     expect(serverYaml).toContain('name: TRANSPORT\n      value: stdio');
     expect(serverYaml).toContain('project: https://github.com/enthouan/simplelogin-mcp');

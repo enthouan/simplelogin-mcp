@@ -16,7 +16,8 @@ about:
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main
-  commit: 7c0cfebabea45cc991204a2524b52234386a6d59
+  # Set commit to the merged main SHA after v0.8.0 is tagged so it matches the image source.
+  # commit: <merged-main-sha>
 config:
   description: Configure SimpleLogin API access for simplelogin-mcp.
   secrets:
