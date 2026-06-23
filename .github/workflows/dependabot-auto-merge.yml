@@ -1,0 +1,95 @@
+name: Dependabot Auto-Merge
+
+# Enable GitHub auto-merge for low-risk Dependabot updates. This workflow runs
+# with write permissions, so it never checks out or executes pull request code.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable-auto-merge:
+    name: Enable auto-merge
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Evaluate auto-merge policy
+        id: policy
+        env:
+          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          DEPENDENCY_GROUP: ${{ steps.metadata.outputs.dependency-group }}
+        run: |
+          set -euo pipefail
+
+          allowed=false
+          reason="Only npm, GitHub Actions, and Docker patch/minor Dependabot updates are auto-merged."
+
+          case "$PACKAGE_ECOSYSTEM" in
+            npm|github-actions|github_actions|docker)
+              case "$UPDATE_TYPE" in
+                version-update:semver-patch|version-update:semver-minor)
+                  allowed=true
+                  reason="Allowed $PACKAGE_ECOSYSTEM $UPDATE_TYPE update."
+                  ;;
+                version-update:semver-major)
+                  if [[ "$PACKAGE_ECOSYSTEM" == "docker" && "$DEPENDENCY_NAMES" == *"node"* ]]; then
+                    reason="Docker runtime baseline major updates, such as Node image jumps, stay manual."
+                  else
+                    reason="Major dependency updates stay manual."
+                  fi
+                  ;;
+                *)
+                  reason="Unsupported Dependabot update type: $UPDATE_TYPE."
+                  ;;
+              esac
+              ;;
+            *)
+              reason="Unsupported Dependabot ecosystem: $PACKAGE_ECOSYSTEM."
+              ;;
+          esac
+
+          {
+            echo "allowed=$allowed"
+            echo "reason=$reason"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Dependabot auto-merge policy"
+            echo
+            echo "- Ecosystem: \`$PACKAGE_ECOSYSTEM\`"
+            echo "- Update type: \`$UPDATE_TYPE\`"
+            echo "- Dependencies: \`$DEPENDENCY_NAMES\`"
+            echo "- Group: \`${DEPENDENCY_GROUP:-none}\`"
+            echo "- Decision: \`$allowed\`"
+            echo "- Reason: $reason"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enable GitHub auto-merge
+        if: steps.policy.outputs.allowed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
