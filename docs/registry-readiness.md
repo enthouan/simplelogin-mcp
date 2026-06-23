@@ -10,12 +10,10 @@ secrets unless that publication step is explicitly approved.
 - Repository visibility: private, which blocks public registry publication and public source review.
 - Official MCP Registry lookup for `simplelogin`: no registered servers.
 - Glama API lookup for `enthouan/simplelogin-mcp`: `404` / server not found.
-- Current committed package version: `0.7.0`; the `ghcr.io/enthouan/simplelogin-mcp:0.7.0` image was
-  built before the MCP ownership annotation was added. Do not commit or publish root `server.json`
-  for `0.7.0`.
-- Official MCP Registry publication is deferred until a target semver image such as
-  `ghcr.io/enthouan/simplelogin-mcp:X.Y.Z` has been published with the
-  `io.modelcontextprotocol.server.name` annotation.
+- Current committed package version: `0.8.0`; registry metadata intentionally points at
+  `ghcr.io/enthouan/simplelogin-mcp:0.8.0`, not `latest`.
+- Official MCP Registry publication is deferred until the `0.8.0` semver image has been published
+  with the `io.modelcontextprotocol.server.name` annotation.
 - Registry server name: `io.github.enthouan/simplelogin-mcp`.
 - Local readiness drift checks are covered by `test/registry.test.ts`.
 
@@ -24,15 +22,15 @@ secrets unless that publication step is explicitly approved.
 Readiness checklist:
 
 - [x] Server name uses the GitHub-authenticated namespace `io.github.enthouan/simplelogin-mcp`.
-- [x] Future Docker image metadata includes `io.modelcontextprotocol.server.name` in the Dockerfile,
+- [x] Docker image metadata includes `io.modelcontextprotocol.server.name` in the Dockerfile,
       release workflow, and CI dry-run workflow.
-- [ ] Create or update root `server.json` with the current `2025-12-11` schema URL during the
+- [x] Create or update root `server.json` with the current `2025-12-11` schema URL during the
       release path for the target semver image.
-- [ ] Use package type `oci` with the GHCR distribution path.
-- [ ] Pin the package identifier to the target semver image tag; do not use `latest` or a version
+- [x] Use package type `oci` with the GHCR distribution path.
+- [x] Pin the package identifier to the target semver image tag; do not use `latest` or a version
       range.
-- [ ] Represent stdio execution with `transport.type=stdio` and `TRANSPORT=stdio`.
-- [ ] Mark `SL_API_KEY` required and secret without a committed value.
+- [x] Represent stdio execution with `transport.type=stdio` and `TRANSPORT=stdio`.
+- [x] Mark `SL_API_KEY` required and secret without a committed value.
 - [ ] Make the repository and the GHCR image publicly accessible before publication.
 - [ ] Publish a semver GHCR image for the target release before publishing matching registry
       metadata.
@@ -45,7 +43,8 @@ Release PRs should create or update these fields together:
 - `server.json` top-level `version`.
 - `server.json` OCI package `version`.
 - `server.json` OCI package identifier tag.
-- `registry/docker-mcp/server.yaml` image tag and source commit.
+- `registry/docker-mcp/server.yaml` image tag, with source commit filled in only after the
+  release merge/tag SHA exists.
 
 ## Docker MCP Registry
 
@@ -83,8 +82,8 @@ Current readiness:
 
 - GHCR image publishing is automated by [.github/workflows/release.yml](../.github/workflows/release.yml)
   on `main` and semver tags.
-- Future image labels and index annotations include source, revision, license, Actions run URL, and
-  MCP server-name metadata.
+- Image labels and index annotations include source, revision, license, Actions run URL, and MCP
+  server-name metadata.
 - CI pull requests validate the Docker metadata path without publishing.
 - The default Compose file pulls from GHCR, while `docker-compose.local.yml` builds from the local
   checkout for image validation.

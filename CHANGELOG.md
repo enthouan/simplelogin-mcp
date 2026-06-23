@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.8.0
+
 ### Added
 
 - Add a Dependabot auto-merge workflow for same-repository npm/pnpm, GitHub Actions, and Docker
