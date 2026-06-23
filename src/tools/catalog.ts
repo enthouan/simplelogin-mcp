@@ -322,6 +322,15 @@ export function renderToolCatalogMarkdown(): string {
   return lines.join('\n');
 }
 
+export function renderDockerMcpToolsJson(): string {
+  const tools = TOOL_CATALOG.map((tool) => ({
+    name: tool.name,
+    description: tool.summary,
+  }));
+
+  return `${JSON.stringify(tools, null, 2)}\n`;
+}
+
 function formatAnnotations(annotations: ToolAnnotations): string {
   const flags = [
     annotations.readOnlyHint ? 'read-only' : 'write',

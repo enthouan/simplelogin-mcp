@@ -8,6 +8,8 @@
   patch/minor updates, while keeping major updates and Docker runtime baseline jumps manual.
 - Add weekly, grouped Dependabot version checks for npm/pnpm dependencies, GitHub Actions, and
   Docker image references, and gate PRs with a non-publishing Docker/release dry run.
+- Add MCP Registry readiness documentation, Docker MCP Registry staging metadata, and drift checks
+  for the existing GHCR distribution path.
 
 ### Changed
 

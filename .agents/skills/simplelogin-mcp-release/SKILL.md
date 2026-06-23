@@ -60,6 +60,10 @@ For `vX.Y.Z`, update only release metadata unless the requested release needs ot
 - `CHANGELOG.md`: promote `## Unreleased` to `## vX.Y.Z`.
 - `README.md`: update the `/health` example to `X.Y.Z`.
 - `src/version.ts`: update any version example comment if it would otherwise look stale.
+- `server.json`: create or update the official MCP Registry manifest for `X.Y.Z`, keeping
+  `name` as `io.github.enthouan/simplelogin-mcp` and pointing the OCI package identifier at
+  `ghcr.io/enthouan/simplelogin-mcp:X.Y.Z`. Do not point a root manifest at an older image that
+  lacks `io.modelcontextprotocol.server.name`.
 
 The runtime version comes from `package.json`, so always smoke-test the compiled server before
 tagging.
@@ -75,6 +79,12 @@ pnpm lint
 pnpm build
 pnpm test
 pnpm format:check
+test -f .env || cp .env.example .env
+docker compose --env-file .env.example config --no-env-resolution --quiet
+docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
+curl -fsSL https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json \
+  -o /tmp/mcp-server.schema.json
+pnpm dlx ajv-cli validate --strict=false -s /tmp/mcp-server.schema.json -d server.json
 ```
 
 If local `pnpm test` fails with a Rolldown native binding/code-signing error on macOS, rerun through
@@ -127,7 +137,7 @@ Create the release branch from fetched `origin/main`:
 ```bash
 git switch --detach origin/main
 git switch -c release-vX.Y.Z
-git add CHANGELOG.md README.md package.json src/version.ts
+git add CHANGELOG.md README.md package.json src/version.ts server.json registry/docker-mcp/server.yaml
 git commit -m "vX.Y.Z"
 git push -u origin HEAD
 ```
@@ -207,6 +217,8 @@ Verify image tags before creating the GitHub Release:
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
+docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z \
+  | grep 'io.modelcontextprotocol.server.name'
 ```
 
 Create the GitHub Release after the tag workflow and GHCR image checks pass.

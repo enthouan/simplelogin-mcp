@@ -53,8 +53,9 @@ published-image operator path; use `docker-compose.local.yml` for source changes
 validation:
 
 ```bash
-docker compose config
-docker compose -f docker-compose.local.yml config
+test -f .env || cp .env.example .env
+docker compose --env-file .env.example config --no-env-resolution --quiet
+docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
 docker compose -f docker-compose.local.yml build
 ```
 

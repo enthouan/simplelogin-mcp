@@ -37,6 +37,12 @@ Update release metadata:
   `## Unreleased` section if needed.
 - [README.md](../README.md): update versioned examples such as `/health` output and pinned GHCR
   image tags when they should point at the new release.
+- `server.json`: create or update the official MCP Registry manifest for the target version only;
+  set the top-level version, OCI package version, and GHCR image tag to `X.Y.Z` so the manifest
+  points at the semver image produced by the release workflow. Do not carry a root manifest for an
+  older image that lacks the MCP ownership annotation.
+- [registry/docker-mcp/server.yaml](../registry/docker-mcp/server.yaml): update the staged Docker
+  MCP Registry image tag and source commit if preparing a public registry submission.
 
 Run the local validation gate:
 
@@ -47,6 +53,20 @@ pnpm lint
 pnpm build
 pnpm test
 pnpm format:check
+test -f .env || cp .env.example .env
+docker compose --env-file .env.example config --no-env-resolution --quiet
+docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
+```
+
+When official MCP Registry metadata changes, also validate `server.json` against the current MCP
+Registry schema and confirm the official registry still has no stale entry for this server before
+publication:
+
+```bash
+curl -fsSL https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json \
+  -o /tmp/mcp-server.schema.json
+pnpm dlx ajv-cli validate --strict=false -s /tmp/mcp-server.schema.json -d server.json
+curl -fsSL 'https://registry.modelcontextprotocol.io/v0.1/servers?search=simplelogin'
 ```
 
 Open a pull request titled exactly `vX.Y.Z`. Include the validation commands and results in the PR
@@ -97,6 +117,8 @@ Verify the published images before announcing the release:
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y
 docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
+docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z \
+  | grep 'io.modelcontextprotocol.server.name'
 ```
 
 ## GitHub Release
