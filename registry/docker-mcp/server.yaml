@@ -1,5 +1,5 @@
 name: simplelogin-mcp
-image: ghcr.io/enthouan/simplelogin-mcp:0.7.0
+image: ghcr.io/enthouan/simplelogin-mcp:0.8.0
 type: server
 meta:
   category: productivity
@@ -16,7 +16,7 @@ about:
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main
-  commit: 7b5ad0d9f81d0fb3753b46266c77c60d9d994eb4
+  commit: 7c0cfebabea45cc991204a2524b52234386a6d59
 config:
   description: Configure SimpleLogin API access for simplelogin-mcp.
   secrets:
