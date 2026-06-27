@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Builder: install all deps and compile TypeScript -> dist/ ----
-FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS builder
+FROM --platform=$BUILDPLATFORM node:26-bookworm-slim AS builder
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 RUN corepack enable
@@ -16,7 +16,7 @@ COPY src ./src
 RUN pnpm run build
 
 # ---- Runtime: production deps + compiled output only ----
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 LABEL io.modelcontextprotocol.server.name="io.github.enthouan/simplelogin-mcp"
 ENV NODE_ENV=production
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
