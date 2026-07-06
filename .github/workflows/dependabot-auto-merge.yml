@@ -48,7 +48,7 @@ jobs:
           reason="Only npm, GitHub Actions, and Docker patch/minor Dependabot updates are auto-merged."
 
           case "$PACKAGE_ECOSYSTEM" in
-            npm|github-actions|github_actions|docker)
+            npm|npm_and_yarn|github-actions|github_actions|docker)
               case "$UPDATE_TYPE" in
                 version-update:semver-patch|version-update:semver-minor)
                   allowed=true
