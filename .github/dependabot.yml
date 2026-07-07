@@ -40,6 +40,8 @@ updates:
       time: '09:00'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 1
+    cooldown:
+      default-days: 1
     labels:
       - 'area:ci'
       - 'area:security'
@@ -59,6 +61,8 @@ updates:
       time: '09:30'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 1
+    cooldown:
+      default-days: 1
     labels:
       - 'area:docker'
       - 'area:security'

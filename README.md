@@ -203,7 +203,7 @@ SimpleLogin web UI.
 ### Prerequisites
 
 - A SimpleLogin account with an API key from **Settings -> API Keys**.
-- Either Docker with Docker Compose, or Node.js 24+ with [pnpm](https://pnpm.io).
+- Either Docker with Docker Compose, or Node.js 24.x with [pnpm](https://pnpm.io).
 - An MCP client that supports Streamable HTTP or stdio.
 
 ### Docker Compose
@@ -480,7 +480,7 @@ The server itself speaks plain HTTP.
 
 ## Development
 
-Requires Node.js 24+ and [pnpm](https://pnpm.io).
+Requires Node.js 24.x and [pnpm](https://pnpm.io).
 
 ```bash
 pnpm install        # install dependencies
