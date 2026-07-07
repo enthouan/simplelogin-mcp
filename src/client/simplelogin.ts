@@ -817,9 +817,8 @@ export class SimpleLoginClient {
       throw new SimpleLoginAPIError(response.status, options.endpoint, message, parsedBody.body);
     }
 
-    // `parse` is typed as `any` under ZodTypeAny; the assertion restores the
-    // schema's precise output type. A ZodError here propagates to the tool layer.
-    return options.schema.parse(parsedBody.body) as z.output<S>;
+    // A ZodError here propagates to the tool layer.
+    return options.schema.parse(parsedBody.body);
   }
 
   private buildUrl(endpoint: string, query?: QueryParams): URL {
