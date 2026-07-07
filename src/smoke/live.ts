@@ -22,11 +22,7 @@ export type SmokeTransport = 'stdio' | 'http';
 type SmokeTransportChoice = SmokeTransport | 'all';
 type StepStatus = 'ok' | 'failed' | 'skipped';
 type CleanupStatus =
-  | 'not_needed'
-  | 'skipped_foreign_artifact'
-  | 'succeeded'
-  | 'delete_failed'
-  | 'verification_failed';
+  'not_needed' | 'skipped_foreign_artifact' | 'succeeded' | 'delete_failed' | 'verification_failed';
 
 const REQUIRED_TOOLS = [
   'account_get_info',

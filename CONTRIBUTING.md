@@ -6,7 +6,7 @@ without explicit documentation and tests.
 
 ## Requirements
 
-- Node.js 24 or newer.
+- Node.js 24.x.
 - pnpm, preferably through Corepack (`corepack enable`).
 - Docker and Docker Compose when changing container behavior.
 - A SimpleLogin API key only when intentionally running the manual live smoke test.
