@@ -182,7 +182,7 @@ export interface SimpleLoginClientOptions {
   fetch?: FetchLike;
 }
 
-interface RequestOptions<S extends z.ZodTypeAny> {
+interface RequestOptions<S extends z.ZodType> {
   method: HttpMethod;
   endpoint: string;
   schema: S;
@@ -762,7 +762,7 @@ export class SimpleLoginClient {
 
   // --- Shared request helper -------------------------------------------------
 
-  private async request<S extends z.ZodTypeAny>(options: RequestOptions<S>): Promise<z.output<S>> {
+  private async request<S extends z.ZodType>(options: RequestOptions<S>): Promise<z.output<S>> {
     const url = this.buildUrl(options.endpoint, options.query);
     const headers: Record<string, string> = {
       Authentication: this.apiKey,
