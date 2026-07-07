@@ -9,9 +9,17 @@ updates:
       time: '08:30'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 4
+    cooldown:
+      semver-patch-days: 1
+      semver-minor-days: 1
+      semver-major-days: 30
     labels:
       - 'dependencies'
       - 'area:security'
+    ignore:
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       production-minor-patch:
         dependency-type: 'production'
@@ -54,6 +62,10 @@ updates:
     labels:
       - 'area:docker'
       - 'area:security'
+    ignore:
+      - dependency-name: 'node'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       docker-images:
         patterns:
