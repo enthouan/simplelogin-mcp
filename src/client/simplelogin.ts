@@ -182,7 +182,7 @@ export interface SimpleLoginClientOptions {
   fetch?: FetchLike;
 }
 
-interface RequestOptions<S extends z.ZodTypeAny> {
+interface RequestOptions<S extends z.ZodType> {
   method: HttpMethod;
   endpoint: string;
   schema: S;
@@ -762,7 +762,7 @@ export class SimpleLoginClient {
 
   // --- Shared request helper -------------------------------------------------
 
-  private async request<S extends z.ZodTypeAny>(options: RequestOptions<S>): Promise<z.output<S>> {
+  private async request<S extends z.ZodType>(options: RequestOptions<S>): Promise<z.output<S>> {
     const url = this.buildUrl(options.endpoint, options.query);
     const headers: Record<string, string> = {
       Authentication: this.apiKey,
@@ -817,9 +817,8 @@ export class SimpleLoginClient {
       throw new SimpleLoginAPIError(response.status, options.endpoint, message, parsedBody.body);
     }
 
-    // `parse` is typed as `any` under ZodTypeAny; the assertion restores the
-    // schema's precise output type. A ZodError here propagates to the tool layer.
-    return options.schema.parse(parsedBody.body) as z.output<S>;
+    // A ZodError here propagates to the tool layer.
+    return options.schema.parse(parsedBody.body);
   }
 
   private buildUrl(endpoint: string, query?: QueryParams): URL {
