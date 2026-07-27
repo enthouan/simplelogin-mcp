@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v0.8.1
+
+### Changed
+
+- Refresh production and development dependencies, including Hono, the MCP SDK, ESLint, Prettier,
+  TypeScript, Vitest, and their supporting packages.
+- Refresh the Docker and GitHub Actions toolchain, including the pnpm setup, build, metadata, and
+  Buildx actions.
+
 ## v0.8.0
 
 ### Added
