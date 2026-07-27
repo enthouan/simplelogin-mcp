@@ -14,5 +14,5 @@ const manifest = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as PackageManifest;
 
-/** The current package version (e.g. "0.8.0"). */
+/** The current package version (e.g. "0.8.1"). */
 export const VERSION: string = manifest.version;

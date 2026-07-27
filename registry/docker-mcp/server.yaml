@@ -1,5 +1,5 @@
 name: simplelogin-mcp
-image: ghcr.io/enthouan/simplelogin-mcp:0.8.0
+image: ghcr.io/enthouan/simplelogin-mcp:0.8.1
 type: server
 meta:
   category: productivity
@@ -16,7 +16,7 @@ about:
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main
-  # Set commit to the merged main SHA after v0.8.0 is tagged so it matches the image source.
+  # Set commit to the merged main SHA after v0.8.1 is tagged so it matches the image source.
   # commit: <merged-main-sha>
 config:
   description: Configure SimpleLogin API access for simplelogin-mcp.

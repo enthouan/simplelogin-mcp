@@ -118,7 +118,7 @@ describe('Docker MCP Registry staging metadata', () => {
     expect(serverYaml).toContain(`image: ${GHCR_IMAGE}:${packageJson.version}`);
     expectSpecificVersion(imageTag);
     expect(serverYaml).toContain(
-      'Set commit to the merged main SHA after v0.8.0 is tagged so it matches the image source.',
+      'Set commit to the merged main SHA after v0.8.1 is tagged so it matches the image source.',
     );
     expect(serverYaml).not.toMatch(/^ {2}commit: [0-9a-f]{40}$/m);
     expect(serverYaml).toContain('env: SL_API_KEY');

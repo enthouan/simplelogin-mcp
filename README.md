@@ -236,22 +236,22 @@ Then start and verify the server:
 docker compose up -d
 docker compose ps
 curl http://localhost:3000/health
-# -> {"status":"ok","version":"0.8.0"}
+# -> {"status":"ok","version":"0.8.1"}
 ```
 
 The default `docker-compose.yml` uses
 `ghcr.io/enthouan/simplelogin-mcp:${SIMPLELOGIN_MCP_IMAGE_TAG:-latest}`. `latest` follows the
-repository's default branch; pin a release tag such as `0.8.0` for repeatable deployments:
+repository's default branch; pin a release tag such as `0.8.1` for repeatable deployments:
 
 ```bash
 SIMPLELOGIN_MCP_IMAGE_TAG=latest docker compose up -d
-SIMPLELOGIN_MCP_IMAGE_TAG=0.8.0 docker compose up -d
+SIMPLELOGIN_MCP_IMAGE_TAG=0.8.1 docker compose up -d
 ```
 
 You can also set the same value in `.env`:
 
 ```dotenv
-SIMPLELOGIN_MCP_IMAGE_TAG=0.8.0
+SIMPLELOGIN_MCP_IMAGE_TAG=0.8.1
 ```
 
 The Compose files bind the container on `HOST=0.0.0.0` for Docker port forwarding, keep the
@@ -406,7 +406,7 @@ stdio in a one-shot container:
         "TRANSPORT=stdio",
         "-e",
         "SL_API_KEY=sl-your-key-here",
-        "ghcr.io/enthouan/simplelogin-mcp:0.8.0"
+        "ghcr.io/enthouan/simplelogin-mcp:0.8.1"
       ]
     }
   }
