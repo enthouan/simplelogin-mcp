@@ -10,9 +10,9 @@ secrets unless that publication step is explicitly approved.
 - Repository visibility: private, which blocks public registry publication and public source review.
 - Official MCP Registry lookup for `simplelogin`: no registered servers.
 - Glama API lookup for `enthouan/simplelogin-mcp`: `404` / server not found.
-- Current committed package version: `0.8.0`; registry metadata intentionally points at
-  `ghcr.io/enthouan/simplelogin-mcp:0.8.0`, not `latest`.
-- Official MCP Registry publication is deferred until the `0.8.0` semver image has been published
+- Current committed package version: `0.8.1`; registry metadata intentionally points at
+  `ghcr.io/enthouan/simplelogin-mcp:0.8.1`, not `latest`.
+- Official MCP Registry publication is deferred until the `0.8.1` semver image has been published
   with the `io.modelcontextprotocol.server.name` annotation.
 - Registry server name: `io.github.enthouan/simplelogin-mcp`.
 - Local readiness drift checks are covered by `test/registry.test.ts`.
