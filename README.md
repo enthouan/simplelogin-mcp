@@ -335,6 +335,7 @@ validates them at startup and exits with a readable message if anything required
 | `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                   |
 | `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.             |
 | `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
+| `NODE_EXTRA_CA_CERTS`            | No       | _(none)_                     | Path to an additional PEM CA file. Compose users must mount the file at the same container path.     |
 | `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
 | `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
 | `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
@@ -452,6 +453,24 @@ SL_API_KEY=your-self-hosted-api-key
 Use the web app origin, not an `/api`-suffixed URL; the server appends SimpleLogin API paths itself.
 Create the API key on that same instance and keep it separate from any key used for
 `app.simplelogin.io`.
+
+If the instance uses a private certificate authority, set `NODE_EXTRA_CA_CERTS` to the mounted PEM
+file's path inside the container. For example, add this Compose override:
+
+```yaml
+services:
+  simplelogin-mcp:
+    volumes:
+      - ./internal-ca.pem:/certificates/internal-ca.pem:ro
+```
+
+Then set the matching container path in `.env`:
+
+```dotenv
+NODE_EXTRA_CA_CERTS=/certificates/internal-ca.pem
+```
+
+Only trust a CA file you control. Restart the container after changing the file or variable.
 
 Compatibility depends on the self-hosted SimpleLogin version exposing the same API paths and
 response shapes documented upstream. Start with `account_get_info` as a credential sanity check,

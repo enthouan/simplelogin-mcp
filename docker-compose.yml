@@ -10,6 +10,7 @@
 # - SIMPLELOGIN_MCP_HOST_PORT:-3000
 # - SIMPLELOGIN_MCP_IMAGE_TAG:-latest
 # - SL_API_URL:-https://app.simplelogin.io
+# - NODE_EXTRA_CA_CERTS:-
 # - MCP_AUTH_TOKEN:-
 # - MCP_ALLOWED_ORIGINS:-
 # - ALLOW_UNAUTHENTICATED_EXPOSURE:-false
@@ -24,6 +25,7 @@ services:
     environment:
       - SL_API_KEY=${SL_API_KEY:?Set SL_API_KEY in .env}
       - SL_API_URL=${SL_API_URL:-https://app.simplelogin.io}
+      - NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-}
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-}
       - ALLOW_UNAUTHENTICATED_EXPOSURE=${ALLOW_UNAUTHENTICATED_EXPOSURE:-false}
