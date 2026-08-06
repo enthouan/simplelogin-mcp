@@ -1,3 +1,25 @@
+######################
+# Environment        #
+######################
+
+### Required
+# - SL_API_KEY
+
+### Service-Specific
+# - SIMPLELOGIN_MCP_HOST_BIND_IP:-127.0.0.1
+# - SIMPLELOGIN_MCP_HOST_PORT:-3000
+# - SL_API_URL (unset default: https://app.simplelogin.io)
+# - NODE_EXTRA_CA_CERTS:-
+# - NODE_USE_ENV_PROXY:-
+# - NODE_OPTIONS:-
+# - HTTP_PROXY:- / http_proxy:-
+# - HTTPS_PROXY:- / https_proxy:-
+# - NO_PROXY:- / no_proxy:-
+# - MCP_AUTH_TOKEN:-
+# - MCP_ALLOWED_ORIGINS:-
+# - ALLOW_UNAUTHENTICATED_EXPOSURE:-false
+# - SL_REQUEST_TIMEOUT_MS:-15000
+
 services:
   simplelogin-mcp:
     # Development/image-validation path: build from the local checkout.
@@ -6,16 +28,35 @@ services:
     image: simplelogin-mcp:local
     container_name: simplelogin-mcp-local
     restart: unless-stopped
-    env_file: .env
     environment:
+      - SL_API_KEY=${SL_API_KEY:?Set SL_API_KEY in .env}
+      # Default only when unset so an explicitly empty self-hosted URL still
+      # reaches application validation instead of silently using the public API.
+      - SL_API_URL=${SL_API_URL-https://app.simplelogin.io}
+      - NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-}
+      - NODE_USE_ENV_PROXY=${NODE_USE_ENV_PROXY:-}
+      - NODE_OPTIONS=${NODE_OPTIONS:-}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-}
+      # Node prefers lowercase proxy variables, so inherit uppercase values
+      # when their lowercase counterparts are unset.
+      - http_proxy=${http_proxy-${HTTP_PROXY:-}}
+      - https_proxy=${https_proxy-${HTTPS_PROXY:-}}
+      - no_proxy=${no_proxy-${NO_PROXY:-}}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+      - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-}
+      - ALLOW_UNAUTHENTICATED_EXPOSURE=${ALLOW_UNAUTHENTICATED_EXPOSURE:-false}
+      - SL_REQUEST_TIMEOUT_MS=${SL_REQUEST_TIMEOUT_MS:-15000}
       # Inside the container the app must bind all interfaces, otherwise Docker's
       # published port can't reach it. Keep MCP_AUTH_TOKEN set in .env; the
       # non-loopback startup guard remains active so widening `ports` cannot
       # accidentally publish an unauthenticated server.
-      HOST: 0.0.0.0
+      - TRANSPORT=http
+      - HOST=0.0.0.0
       # Keep the container listener fixed for Compose. Use
       # SIMPLELOGIN_MCP_HOST_PORT to change the host-side published port.
-      PORT: '3000'
+      - PORT=3000
     ports:
       # Published on the host's loopback only: the server is reachable from this
       # machine but NOT from your LAN. To expose it on the LAN, keep

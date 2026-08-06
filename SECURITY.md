@@ -34,8 +34,9 @@ directly against SimpleLogin, without going through this server at all.
 
 - Scope it down: create a dedicated API key for this server (SimpleLogin → Settings →
   API Keys) rather than reusing one. Revoke it there if it leaks.
-- Never commit it. `.env` is git-ignored; keep it that way. Inject it via your
-  secrets manager or `env_file` in production, not into the image.
+- Never commit it. `.env` is git-ignored; keep it that way. The bundled Compose
+  files explicitly map it from `.env`; production deployments can use the same
+  contract or a secrets manager. Never bake it into the image.
 - It is never written to logs or returned in error output (see Logging below).
 
 ### `MCP_AUTH_TOKEN`: gate to this server

@@ -53,10 +53,9 @@ published-image operator path; use `docker-compose.local.yml` for source changes
 validation:
 
 ```bash
-test -f .env || cp .env.example .env
-docker compose --env-file .env.example config --no-env-resolution --quiet
-docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
-docker compose -f docker-compose.local.yml build
+SL_API_KEY=compose-validation docker compose --env-file .env.example config --no-env-resolution --quiet
+SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
+SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml build
 ```
 
 Live smoke tests are not part of normal CI. Use them only when a change needs live SimpleLogin

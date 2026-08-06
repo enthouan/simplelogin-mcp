@@ -258,6 +258,8 @@ The Compose files bind the container on `HOST=0.0.0.0` for Docker port forwardin
 container's internal HTTP listener on port `3000`, and publish the host port on loopback only by
 default (`127.0.0.1:3000:3000`). Because the app sees a non-loopback bind inside the container,
 `MCP_AUTH_TOKEN` is required even for the default loopback-only Compose deployment.
+Compose reads `.env` for variable interpolation and explicitly passes only the supported server
+settings into the container; it does not inject every variable from the file.
 
 Change the host-side bind or port with the Compose-specific variables, not `PORT`:
 
@@ -320,19 +322,26 @@ TRANSPORT=stdio SL_API_KEY=sl-your-key node dist/index.js
 
 ## Configuration
 
-All configuration is via environment variables (see [`.env.example`](.env.example)). The server
-validates them at startup and exits with a readable message if anything required is missing.
+Configuration is via environment variables (see [`.env.example`](.env.example)). The server
+validates its application settings at startup and exits with a readable message if anything
+required is missing; Node handles the documented CA and proxy runtime variables.
 
 | Variable                         | Required | Default                      | Description                                                                                          |
 | -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
-| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                                               |
-| `HOST`                           | No       | `127.0.0.1`                  | Interface the HTTP server binds to. Loopback by default; `0.0.0.0` exposes it (requires a token).    |
+| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients). Compose fixes this to `http`.                 |
+| `HOST`                           | No       | `127.0.0.1`                  | Interface for direct runs. Compose fixes this to `0.0.0.0` internally for port forwarding.           |
 | `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode; Compose keeps the container listener on `3000`.     |
 | `SIMPLELOGIN_MCP_HOST_BIND_IP`   | No       | `127.0.0.1`                  | Docker Compose host interface bind address. Keep loopback unless intentionally exposing the service. |
 | `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                   |
 | `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.             |
 | `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
+| `NODE_EXTRA_CA_CERTS`            | No       | _(none)_                     | Path to an additional PEM CA file. Compose users must mount the file at the same container path.     |
+| `NODE_USE_ENV_PROXY`             | No       | _(none)_                     | Set to `1` to enable Node's built-in environment-proxy support.                                      |
+| `NODE_OPTIONS`                   | No       | _(none)_                     | Trusted Node runtime options; forwarded for compatibility with `--use-env-proxy`.                    |
+| `HTTP_PROXY` / `http_proxy`      | No       | _(none)_                     | Proxy URL for outbound HTTP requests; lowercase takes precedence when both are set.                  |
+| `HTTPS_PROXY` / `https_proxy`    | No       | _(none)_                     | Proxy URL for outbound HTTPS requests; lowercase takes precedence when both are set.                 |
+| `NO_PROXY` / `no_proxy`          | No       | _(none)_                     | Comma-separated hosts that bypass the proxy; lowercase takes precedence when both are set.           |
 | `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
 | `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
 | `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
@@ -451,6 +460,38 @@ Use the web app origin, not an `/api`-suffixed URL; the server appends SimpleLog
 Create the API key on that same instance and keep it separate from any key used for
 `app.simplelogin.io`.
 
+If the instance uses a private certificate authority, set `NODE_EXTRA_CA_CERTS` to the mounted PEM
+file's path inside the container. For example, add this Compose override:
+
+```yaml
+services:
+  simplelogin-mcp:
+    volumes:
+      - ./internal-ca.pem:/certificates/internal-ca.pem:ro
+```
+
+Then set the matching container path in `.env`:
+
+```dotenv
+NODE_EXTRA_CA_CERTS=/certificates/internal-ca.pem
+```
+
+Only trust a CA file you control. Restart the container after changing the file or variable.
+
+If the container requires an outbound proxy, enable Node's environment-proxy support and set the
+applicable proxy URLs:
+
+```dotenv
+NODE_USE_ENV_PROXY=1
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=http://proxy.example.com:8080
+NO_PROXY=localhost,127.0.0.1
+```
+
+Lowercase `http_proxy`, `https_proxy`, and `no_proxy` are also forwarded and take precedence over
+their uppercase counterparts. Existing deployments using `NODE_OPTIONS=--use-env-proxy` remain
+supported. Treat proxy URLs containing credentials as secrets.
+
 Compatibility depends on the self-hosted SimpleLogin version exposing the same API paths and
 response shapes documented upstream. Start with `account_get_info` as a credential sanity check,
 then use [docs/live-smoke-test.md](docs/live-smoke-test.md) only when you intentionally want a live
@@ -466,7 +507,7 @@ The server itself speaks plain HTTP.
 
 | Symptom                                                         | What to check                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Startup says `SL_API_KEY is required`                           | Set a non-empty `SL_API_KEY`. Docker Compose reads it from `.env`; local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                                           |
+| Compose says `SL_API_KEY` must be set                           | Set a non-empty `SL_API_KEY` in `.env`; Compose validates it before creating the container. Local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                  |
 | Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                      |
 | SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                          |
 | HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                 |

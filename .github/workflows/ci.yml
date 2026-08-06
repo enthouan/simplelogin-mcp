@@ -51,14 +51,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Prepare Compose environment
-        run: cp .env.example .env
-
       - name: Validate operator Compose config
-        run: docker compose --env-file .env.example config --quiet
+        run: SL_API_KEY=compose-validation docker compose --env-file .env.example config --quiet
 
       - name: Validate local Compose config
-        run: docker compose --env-file .env.example -f docker-compose.local.yml config --quiet
+        run: SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml config --quiet
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
