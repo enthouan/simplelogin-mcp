@@ -322,8 +322,9 @@ TRANSPORT=stdio SL_API_KEY=sl-your-key node dist/index.js
 
 ## Configuration
 
-All configuration is via environment variables (see [`.env.example`](.env.example)). The server
-validates them at startup and exits with a readable message if anything required is missing.
+Configuration is via environment variables (see [`.env.example`](.env.example)). The server
+validates its application settings at startup and exits with a readable message if anything
+required is missing; Node handles the documented CA and proxy runtime variables.
 
 | Variable                         | Required | Default                      | Description                                                                                          |
 | -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -336,6 +337,11 @@ validates them at startup and exits with a readable message if anything required
 | `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.             |
 | `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
 | `NODE_EXTRA_CA_CERTS`            | No       | _(none)_                     | Path to an additional PEM CA file. Compose users must mount the file at the same container path.     |
+| `NODE_USE_ENV_PROXY`             | No       | _(none)_                     | Set to `1` to enable Node's built-in environment-proxy support.                                      |
+| `NODE_OPTIONS`                   | No       | _(none)_                     | Trusted Node runtime options; forwarded for compatibility with `--use-env-proxy`.                    |
+| `HTTP_PROXY` / `http_proxy`      | No       | _(none)_                     | Proxy URL for outbound HTTP requests; lowercase takes precedence when both are set.                  |
+| `HTTPS_PROXY` / `https_proxy`    | No       | _(none)_                     | Proxy URL for outbound HTTPS requests; lowercase takes precedence when both are set.                 |
+| `NO_PROXY` / `no_proxy`          | No       | _(none)_                     | Comma-separated hosts that bypass the proxy; lowercase takes precedence when both are set.           |
 | `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
 | `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
 | `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
@@ -471,6 +477,20 @@ NODE_EXTRA_CA_CERTS=/certificates/internal-ca.pem
 ```
 
 Only trust a CA file you control. Restart the container after changing the file or variable.
+
+If the container requires an outbound proxy, enable Node's environment-proxy support and set the
+applicable proxy URLs:
+
+```dotenv
+NODE_USE_ENV_PROXY=1
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=http://proxy.example.com:8080
+NO_PROXY=localhost,127.0.0.1
+```
+
+Lowercase `http_proxy`, `https_proxy`, and `no_proxy` are also forwarded and take precedence over
+their uppercase counterparts. Existing deployments using `NODE_OPTIONS=--use-env-proxy` remain
+supported. Treat proxy URLs containing credentials as secrets.
 
 Compatibility depends on the self-hosted SimpleLogin version exposing the same API paths and
 response shapes documented upstream. Start with `account_get_info` as a credential sanity check,

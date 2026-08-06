@@ -9,8 +9,13 @@
 # - SIMPLELOGIN_MCP_HOST_BIND_IP:-127.0.0.1
 # - SIMPLELOGIN_MCP_HOST_PORT:-3000
 # - SIMPLELOGIN_MCP_IMAGE_TAG:-latest
-# - SL_API_URL:-https://app.simplelogin.io
+# - SL_API_URL (unset default: https://app.simplelogin.io)
 # - NODE_EXTRA_CA_CERTS:-
+# - NODE_USE_ENV_PROXY:-
+# - NODE_OPTIONS:-
+# - HTTP_PROXY:- / http_proxy:-
+# - HTTPS_PROXY:- / https_proxy:-
+# - NO_PROXY:- / no_proxy:-
 # - MCP_AUTH_TOKEN:-
 # - MCP_ALLOWED_ORIGINS:-
 # - ALLOW_UNAUTHENTICATED_EXPOSURE:-false
@@ -24,8 +29,18 @@ services:
     restart: unless-stopped
     environment:
       - SL_API_KEY=${SL_API_KEY:?Set SL_API_KEY in .env}
-      - SL_API_URL=${SL_API_URL:-https://app.simplelogin.io}
+      # Default only when unset so an explicitly empty self-hosted URL still
+      # reaches application validation instead of silently using the public API.
+      - SL_API_URL=${SL_API_URL-https://app.simplelogin.io}
       - NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-}
+      - NODE_USE_ENV_PROXY=${NODE_USE_ENV_PROXY:-}
+      - NODE_OPTIONS=${NODE_OPTIONS:-}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-}
+      - http_proxy=${http_proxy:-}
+      - https_proxy=${https_proxy:-}
+      - no_proxy=${no_proxy:-}
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-}
       - ALLOW_UNAUTHENTICATED_EXPOSURE=${ALLOW_UNAUTHENTICATED_EXPOSURE:-false}
