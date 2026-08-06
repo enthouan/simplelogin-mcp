@@ -39,9 +39,11 @@ services:
       - HTTP_PROXY=${HTTP_PROXY:-}
       - HTTPS_PROXY=${HTTPS_PROXY:-}
       - NO_PROXY=${NO_PROXY:-}
-      - http_proxy=${http_proxy:-}
-      - https_proxy=${https_proxy:-}
-      - no_proxy=${no_proxy:-}
+      # Node prefers lowercase proxy variables, so inherit uppercase values
+      # when their lowercase counterparts are unset.
+      - http_proxy=${http_proxy-${HTTP_PROXY:-}}
+      - https_proxy=${https_proxy-${HTTPS_PROXY:-}}
+      - no_proxy=${no_proxy-${NO_PROXY:-}}
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-}
       - ALLOW_UNAUTHENTICATED_EXPOSURE=${ALLOW_UNAUTHENTICATED_EXPOSURE:-false}
