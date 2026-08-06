@@ -258,6 +258,8 @@ The Compose files bind the container on `HOST=0.0.0.0` for Docker port forwardin
 container's internal HTTP listener on port `3000`, and publish the host port on loopback only by
 default (`127.0.0.1:3000:3000`). Because the app sees a non-loopback bind inside the container,
 `MCP_AUTH_TOKEN` is required even for the default loopback-only Compose deployment.
+Compose reads `.env` for variable interpolation and explicitly passes only the supported server
+settings into the container; it does not inject every variable from the file.
 
 Change the host-side bind or port with the Compose-specific variables, not `PORT`:
 
@@ -326,8 +328,8 @@ validates them at startup and exits with a readable message if anything required
 | Variable                         | Required | Default                      | Description                                                                                          |
 | -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
-| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients).                                               |
-| `HOST`                           | No       | `127.0.0.1`                  | Interface the HTTP server binds to. Loopback by default; `0.0.0.0` exposes it (requires a token).    |
+| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients). Compose fixes this to `http`.                 |
+| `HOST`                           | No       | `127.0.0.1`                  | Interface for direct runs. Compose fixes this to `0.0.0.0` internally for port forwarding.           |
 | `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode; Compose keeps the container listener on `3000`.     |
 | `SIMPLELOGIN_MCP_HOST_BIND_IP`   | No       | `127.0.0.1`                  | Docker Compose host interface bind address. Keep loopback unless intentionally exposing the service. |
 | `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                   |
@@ -466,7 +468,7 @@ The server itself speaks plain HTTP.
 
 | Symptom                                                         | What to check                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Startup says `SL_API_KEY is required`                           | Set a non-empty `SL_API_KEY`. Docker Compose reads it from `.env`; local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                                           |
+| Compose says `SL_API_KEY` must be set                           | Set a non-empty `SL_API_KEY` in `.env`; Compose validates it before creating the container. Local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                  |
 | Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                      |
 | SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                          |
 | HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                 |
