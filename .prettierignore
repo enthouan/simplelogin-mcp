@@ -1,4 +1,5 @@
 dist
+website/dist
 node_modules
 pnpm-lock.yaml
 .claude

@@ -24,6 +24,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "website:build": "tsx website/scripts/build.ts",
+    "website:check": "pnpm website:build && vitest run test/website.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "smoke:live": "tsc -p tsconfig.build.json && tsx src/smoke/live.ts"

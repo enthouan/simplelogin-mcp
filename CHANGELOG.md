@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Add a dependency-light static project website with transport setup examples, prominent security
+  guidance, accessible install controls, and tool coverage generated from the canonical catalog.
+
 ## v0.8.1
 
 ### Changed

@@ -38,8 +38,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check website
+        run: pnpm website:check
+
       - name: Test
         run: pnpm test
+
+      - name: Check formatting
+        run: pnpm format:check
 
   docker:
     if: github.event_name == 'pull_request'

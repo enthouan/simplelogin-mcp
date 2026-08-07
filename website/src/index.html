@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Manage SimpleLogin aliases, contacts, mailboxes, custom domains, settings, and account utilities from MCP clients over stdio or Streamable HTTP."
+    />
+    <meta name="theme-color" content="#f7f3ea" />
+    <meta name="robots" content="{{ROBOTS_META}}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="simplelogin-mcp — Self-hosted MCP server for SimpleLogin" />
+    <meta
+      property="og:description"
+      content="Manage SimpleLogin aliases, contacts, mailboxes, custom domains, settings, and account utilities from MCP clients."
+    />
+    {{PUBLICATION_METADATA}}
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>simplelogin-mcp — Self-hosted MCP server for SimpleLogin</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="simplelogin-mcp home">
+          <span class="brand-mark" aria-hidden="true">SL</span>
+          <span>simplelogin-mcp</span>
+        </a>
+        <nav aria-label="Primary navigation">
+          <a href="#install">Install</a>
+          <a href="#workflows">Workflows</a>
+          <a href="#tools">Tools</a>
+          <a href="#security">Security</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">SimpleLogin × Model Context Protocol</p>
+            <h1 id="hero-title">Manage SimpleLogin aliases from your MCP client.</h1>
+            <p class="hero-summary">
+              A self-hostable MCP server for people who use SimpleLogin. Give a compatible client a
+              typed tool surface for aliases, reverse aliases, mailboxes, custom domains, settings,
+              stats, and notifications—over local stdio or Streamable HTTP.
+            </p>
+            <p class="mobile-summary">
+              Self-hostable SimpleLogin tools over local stdio or Streamable HTTP.
+            </p>
+            <ul class="hero-facts" aria-label="Project facts">
+              <li><strong>{{TOOL_COUNT}}</strong> catalog-backed tools</li>
+              <li><strong>2</strong> transport modes</li>
+              <li><strong>0</strong> hosted credentials</li>
+            </ul>
+            <a class="inline-link" href="#workflows"
+              >See what it can do <span aria-hidden="true">↓</span></a
+            >
+          </div>
+
+          <div class="install-card" id="install">
+            <div class="install-heading">
+              <div>
+                <p class="section-kicker">Start here</p>
+                <h2>Choose how it runs</h2>
+              </div>
+              <span class="local-badge">Self-hosted</span>
+            </div>
+
+            <p class="install-warning">
+              <strong>Protect your key:</strong> <code>SL_API_KEY</code> grants full account
+              control. Any HTTP bind beyond loopback also needs <code>MCP_AUTH_TOKEN</code>.
+            </p>
+
+            <div class="tab-list" role="tablist" aria-label="Installation method">
+              <button
+                id="tab-docker"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-docker"
+                tabindex="0"
+              >
+                Docker
+              </button>
+              <button
+                id="tab-http"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-http"
+                tabindex="-1"
+              >
+                HTTP
+              </button>
+              <button
+                id="tab-stdio"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-stdio"
+                tabindex="-1"
+              >
+                stdio
+              </button>
+            </div>
+
+            <section
+              id="panel-docker"
+              class="install-panel"
+              role="tabpanel"
+              aria-labelledby="tab-docker"
+              tabindex="0"
+            >
+              <div class="snippet-heading">
+                <p>Docker Compose quick start</p>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-target="snippet-docker"
+                  data-copy-name="Docker setup commands"
+                  aria-label="Copy Docker setup commands"
+                >
+                  <span aria-hidden="true">□</span><span class="copy-label">Copy</span>
+                </button>
+              </div>
+              <pre
+                tabindex="0"
+                aria-label="Docker setup commands"
+              ><code id="snippet-docker">git clone https://github.com/enthouan/simplelogin-mcp.git
+cd simplelogin-mcp
+cp .env.example .env
+# Set SL_API_KEY and MCP_AUTH_TOKEN in .env
+docker compose up -d
+docker compose ps
+curl http://localhost:3000/health</code></pre>
+              <p class="snippet-note">
+                Compose listens on <code>0.0.0.0:3000</code> inside the container, publishes only to
+                <code>127.0.0.1</code> by default, and still requires <code>MCP_AUTH_TOKEN</code>.
+              </p>
+            </section>
+
+            <section
+              id="panel-http"
+              class="install-panel"
+              role="tabpanel"
+              aria-labelledby="tab-http"
+              tabindex="0"
+            >
+              <div class="snippet-heading">
+                <p>Direct Node.js on loopback</p>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-target="snippet-http"
+                  data-copy-name="HTTP setup commands"
+                  aria-label="Copy HTTP setup commands"
+                >
+                  <span aria-hidden="true">□</span><span class="copy-label">Copy</span>
+                </button>
+              </div>
+              <pre
+                tabindex="0"
+                aria-label="HTTP setup commands"
+              ><code id="snippet-http">corepack enable
+pnpm install --frozen-lockfile
+pnpm build
+TRANSPORT=http HOST=127.0.0.1 PORT=3000 \
+  SL_API_KEY=sl-your-key-here pnpm start</code></pre>
+              <p class="snippet-note">
+                Connect to <code>POST http://127.0.0.1:3000/mcp</code>. A direct loopback run does
+                not require <code>MCP_AUTH_TOKEN</code>; any wider bind does.
+              </p>
+            </section>
+
+            <section
+              id="panel-stdio"
+              class="install-panel"
+              role="tabpanel"
+              aria-labelledby="tab-stdio"
+              tabindex="0"
+            >
+              <div class="snippet-heading">
+                <p>Desktop client process configuration</p>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-target="snippet-stdio"
+                  data-copy-name="stdio client configuration"
+                  aria-label="Copy stdio client configuration"
+                >
+                  <span aria-hidden="true">□</span><span class="copy-label">Copy</span>
+                </button>
+              </div>
+              <pre tabindex="0" aria-label="stdio client configuration"><code id="snippet-stdio">{
+  "mcpServers": {
+    "simplelogin": {
+      "command": "node",
+      "args": ["/absolute/path/to/simplelogin-mcp/dist/index.js"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "SL_API_KEY": "sl-your-key-here"
+      }
+    }
+  }
+}</code></pre>
+              <p class="snippet-note">
+                Run <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code> first. Stdio
+                does not need <code>MCP_AUTH_TOKEN</code>; keep the client config private because it
+                contains your API key.
+              </p>
+            </section>
+
+            <p class="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="credential-banner" aria-label="Credential warning">
+        <div class="shell credential-grid">
+          <p>
+            <strong><code>SL_API_KEY</code> grants full SimpleLogin account control.</strong>
+            Create a dedicated key, never commit it, and revoke it at SimpleLogin if it leaks.
+          </p>
+          <p>
+            <strong><code>MCP_AUTH_TOKEN</code> protects the HTTP server.</strong>
+            It is a separate credential; generate one with <code>openssl rand -hex 32</code> before
+            using Docker or exposing HTTP beyond loopback.
+          </p>
+        </div>
+      </aside>
+
+      <section class="section workflows" id="workflows" aria-labelledby="workflows-title">
+        <div class="shell">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="section-kicker">Useful by design</p>
+              <h2 id="workflows-title">From alias creation to delivery investigation</h2>
+            </div>
+            <p>
+              The server focuses on repeatable SimpleLogin workflows that fit an MCP conversation,
+              with bounded reads and explicit guards around permanent changes.
+            </p>
+          </div>
+
+          <ol class="workflow-list">
+            <li>
+              <span>01</span>
+              <div>
+                <h3>Create and tune aliases</h3>
+                <p>
+                  Find an alias, create a random or custom one, then update routing or enabled
+                  state.
+                </p>
+                <code>alias_list → alias_create_random → alias_update → alias_set_enabled</code>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <h3>Investigate recent mail</h3>
+                <p>
+                  Walk bounded activity pages to inspect forwards, replies, blocks, and bounces.
+                </p>
+                <code>alias_get → alias_activity_list</code>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <h3>Send from an alias</h3>
+                <p>
+                  Create or reuse a reverse alias for a recipient; block before permanently
+                  deleting.
+                </p>
+                <code>contact_create → contact_set_blocked</code>
+              </div>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <h3>Maintain account routing</h3>
+                <p>
+                  Verify mailboxes, inspect custom domains, and change supported alias settings.
+                </p>
+                <code>mailbox_list → custom_domain_list → settings_update</code>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section security-section" id="security" aria-labelledby="security-title">
+        <div class="shell security-grid">
+          <div>
+            <p class="section-kicker">Two secrets, two trust boundaries</p>
+            <h2 id="security-title">Keep account access close. Put exposed HTTP behind TLS.</h2>
+          </div>
+          <div class="security-rules">
+            <article>
+              <h3>Default to local</h3>
+              <p>
+                Direct HTTP binds to <code>127.0.0.1</code>. The server refuses an unauthenticated
+                non-loopback bind unless you deliberately enable the unsafe override.
+              </p>
+            </article>
+            <article>
+              <h3>Authenticate every wider bind</h3>
+              <p>
+                Set <code>MCP_AUTH_TOKEN</code> for LAN or public access. Terminate TLS at a reverse
+                proxy—never send its bearer token over plain HTTP on the internet.
+              </p>
+            </article>
+            <article>
+              <h3>Know what origin checks do</h3>
+              <p>
+                <code>MCP_ALLOWED_ORIGINS</code> permits browser origins for <code>POST /mcp</code>.
+                It is an origin allowlist, not a CORS or authentication configuration.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section tools-section" id="tools" aria-labelledby="tools-title">
+        <div class="shell">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="section-kicker">One canonical catalog</p>
+              <h2 id="tools-title">
+                {{TOOL_COUNT}} tools across {{TOOL_GROUP_COUNT}} focused areas
+              </h2>
+            </div>
+            <p>
+              Names, summaries, groups, and counts below are generated from the same catalog used by
+              the MCP server. The site cannot quietly drift into a second tool inventory.
+            </p>
+          </div>
+
+          {{TOOL_PREVIEW}}
+
+          <div class="tool-groups">{{TOOL_GROUPS}}</div>
+        </div>
+      </section>
+
+      <section class="section closing-section" aria-labelledby="closing-title">
+        <div class="shell closing-grid">
+          <div>
+            <p class="section-kicker">Bring your own account and host</p>
+            <h2 id="closing-title">Built for SimpleLogin users who want MCP on their terms.</h2>
+          </div>
+          <p>
+            Run it locally with stdio, keep HTTP on loopback, or place an authenticated deployment
+            behind infrastructure you control. The runtime sends requests only to your configured
+            SimpleLogin API.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <p><strong>simplelogin-mcp</strong> · MIT licensed</p>
+        <nav aria-label="Related projects">
+          <a href="https://simplelogin.io/">SimpleLogin</a>
+          <a href="https://modelcontextprotocol.io/">Model Context Protocol</a>
+          <a href="#top">Back to top</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
