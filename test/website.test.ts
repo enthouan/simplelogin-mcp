@@ -168,11 +168,13 @@ describe('Starlight website', () => {
   it('uses a caution panel to credit the developer and distinguish the official service', async () => {
     const disclaimer =
       'It is not an official SimpleLogin or Proton product, service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by SimpleLogin or Proton.';
+    const productionHomeHtml = await readOutputFile('index.html', productionRoot);
 
-    for (const page of [homeHtml, installHtml]) {
+    for (const page of [homeHtml, installHtml, productionHomeHtml]) {
       const normalizedPage = page.replace(/\s+/g, ' ');
+      const normalizedText = normalizedPage.replace(/<[^>]+>/g, '');
 
-      expect(normalizedPage.split(disclaimer)).toHaveLength(2);
+      expect(normalizedText.split(disclaimer)).toHaveLength(2);
       expect(normalizedPage).toContain(
         'aria-label="Independent project" class="starlight-aside starlight-aside--caution"',
       );
@@ -182,11 +184,16 @@ describe('Starlight website', () => {
       expect(normalizedPage).toMatch(
         /<a[^>]+href="https:\/\/www\.antoinemenard\.com"[^>]*>Antoine Ménard<\/a>/,
       );
+      expect(normalizedPage).toMatch(
+        /sponsored by <a href="https:\/\/simplelogin\.io\/">SimpleLogin<\/a> or <a href="https:\/\/proton\.me\/">Proton<\/a>\./,
+      );
       expect(normalizedPage).toMatch(/Looking for SimpleLogin['’]s official service\?/);
       expect(normalizedPage).toMatch(
         /<a[^>]+href="https:\/\/simplelogin\.io\/"[^>]*>SimpleLogin<\/a>/,
       );
-      expect(normalizedPage.indexOf(disclaimer)).toBeGreaterThan(normalizedPage.indexOf('<h1'));
+      expect(normalizedPage.indexOf('It is not an official')).toBeGreaterThan(
+        normalizedPage.indexOf('<h1'),
+      );
     }
 
     expect(homeHtml).toContain(`href="${REPOSITORY_URL}"`);
