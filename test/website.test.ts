@@ -226,6 +226,17 @@ describe('Starlight website', () => {
     }
   });
 
+  it('uses the homepage catalog preview width to show four tools per category', () => {
+    const previewHtml =
+      /<figure class="catalog-preview[^"]*"[\s\S]*?<\/figure>/.exec(homeHtml)?.[0] ?? '';
+
+    expect(previewHtml).not.toBe('');
+    for (const category of new Set(TOOL_CATALOG.map((tool) => tool.category))) {
+      const previewedTools = TOOL_CATALOG.filter((tool) => tool.category === category).slice(0, 4);
+      for (const tool of previewedTools) expect(previewHtml).toContain(tool.name);
+    }
+  });
+
   it('keeps Docker, HTTP, and stdio examples aligned with repository contracts', async () => {
     const [readme, compose, config, packageSource] = await Promise.all([
       readRepoFile('README.md'),

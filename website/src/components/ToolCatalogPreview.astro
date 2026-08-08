@@ -22,10 +22,10 @@ import { CATEGORY_ENTRIES } from '../data/catalog.js';
             <dd>
               <strong>{tools.length}</strong>{' '}
               {tools
-                .slice(0, 2)
+                .slice(0, 4)
                 .map((tool) => tool.name)
                 .join(', ')}
-              {tools.length > 2 ? ', …' : ''}
+              {tools.length > 4 ? ', …' : ''}
             </dd>
           </div>
         ))
