@@ -1,0 +1,56 @@
+---
+import { LinkButton } from '@astrojs/starlight/components';
+import { env } from 'node:process';
+import { REPOSITORY_VISIBILITY_ENV, resolveRepositoryUrl } from '../data/repository.js';
+
+const repositoryUrl = resolveRepositoryUrl(Astro.site, env[REPOSITORY_VISIBILITY_ENV]);
+---
+
+{
+  repositoryUrl && (
+    <aside class="repository-link not-content" aria-label="Project repository">
+      <LinkButton
+        href={repositoryUrl}
+        icon="github"
+        iconPlacement="start"
+        variant="secondary"
+        rel="external"
+        referrerpolicy="no-referrer"
+      >
+        Star on GitHub
+      </LinkButton>
+      <p>Browse the source, report an issue, or follow the project.</p>
+    </aside>
+  )
+}
+
+<style>
+  .repository-link {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem 1rem;
+    margin-block: 1.25rem 2rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 6px;
+    background: var(--sl-color-gray-7);
+  }
+
+  .repository-link :global(.sl-link-button) {
+    min-height: 44px;
+    flex: 0 0 auto;
+  }
+
+  .repository-link p {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  @media (max-width: 30rem) {
+    .repository-link {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+</style>

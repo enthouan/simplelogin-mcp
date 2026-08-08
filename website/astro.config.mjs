@@ -3,9 +3,11 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { env } from 'node:process';
 import { normalizePublicationUrl } from './src/data/publication.js';
+import { REPOSITORY_VISIBILITY_ENV, resolveRepositoryUrl } from './src/data/repository.js';
 
 const PUBLICATION_ENV = 'WEBSITE_BASE_URL';
 const publicationUrl = normalizePublicationUrl(env[PUBLICATION_ENV]);
+const repositoryUrl = resolveRepositoryUrl(publicationUrl, env[REPOSITORY_VISIBILITY_ENV]);
 const base = publicationUrl?.pathname ?? '/';
 
 // Astro exposes its configured base as BASE_URL internally. Ignore an ambient shell value so
@@ -21,13 +23,23 @@ export default defineConfig({
       title: 'simplelogin-mcp',
       titleDelimiter: '—',
       description:
-        'Manage SimpleLogin aliases, contacts, mailboxes, custom domains, settings, and account utilities from MCP clients over stdio or Streamable HTTP.',
+        'An independent MCP server for managing SimpleLogin aliases, contacts, mailboxes, custom domains, settings, and account utilities over stdio or Streamable HTTP.',
       favicon: '/favicon.svg',
       credits: false,
       customCss: ['./src/styles/custom.css'],
       components: {
+        Banner: './src/components/Banner.astro',
         Head: './src/components/Head.astro',
       },
+      social: repositoryUrl
+        ? [
+            {
+              icon: 'github',
+              label: 'simplelogin-mcp source repository',
+              href: repositoryUrl,
+            },
+          ]
+        : [],
       head: [
         {
           tag: 'meta',
@@ -36,7 +48,7 @@ export default defineConfig({
             content: publicationUrl ? 'index, follow' : 'noindex, nofollow',
           },
         },
-        { tag: 'meta', attrs: { name: 'theme-color', content: '#f7f3ea' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#ea319f' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary' } },
       ],

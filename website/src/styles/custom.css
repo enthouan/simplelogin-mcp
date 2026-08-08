@@ -1,18 +1,26 @@
 :root {
   color-scheme: dark;
-  --sl-color-accent-low: #3a211b;
-  --sl-color-accent: #ef9a88;
-  --sl-color-accent-high: #ffe0d9;
-  --sl-color-white: #f7f3ea;
-  --sl-color-gray-1: #e5ded1;
-  --sl-color-gray-2: #c7c1b7;
-  --sl-color-gray-3: #9da59f;
-  --sl-color-gray-4: #737e78;
-  --sl-color-gray-5: #46524c;
-  --sl-color-gray-6: #26312b;
-  --sl-color-gray-7: #1b231f;
-  --sl-color-black: #121916;
-  --sl-color-text-accent: #ef9a88;
+  --sl-color-accent-low: #3a1830;
+  --sl-color-accent: #ff83bf;
+  --sl-color-accent-high: #ffd6ea;
+  --sl-color-white: #fbf7fc;
+  --sl-color-gray-1: #e9e3ed;
+  --sl-color-gray-2: #cbc2d2;
+  --sl-color-gray-3: #a298aa;
+  --sl-color-gray-4: #7a7183;
+  --sl-color-gray-5: #554c60;
+  --sl-color-gray-6: #352d40;
+  --sl-color-gray-7: #231c2d;
+  --sl-color-black: #15121d;
+  --sl-color-text-accent: #ff93c9;
+  --sl-color-route: #22c0e8;
+  --site-code-bg: #15121d;
+  --site-code-surface: #231c2d;
+  --site-code-border: #4f455a;
+  --site-code-text: #fbf7fc;
+  --site-code-muted: #cbc2d2;
+  --site-code-pink: #ff93c9;
+  --site-code-cyan: #7adcf0;
   --sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --sl-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   --sl-content-width: 50rem;
@@ -20,19 +28,20 @@
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --sl-color-accent-low: #f1ddd7;
-  --sl-color-accent: #a83a2a;
-  --sl-color-accent-high: #6f251c;
-  --sl-color-white: #19221d;
-  --sl-color-gray-1: #303a34;
-  --sl-color-gray-2: #46524c;
-  --sl-color-gray-3: #55615b;
-  --sl-color-gray-4: #7b837f;
-  --sl-color-gray-5: #c9c2b5;
-  --sl-color-gray-6: #e7e1d7;
-  --sl-color-gray-7: #f2ede4;
-  --sl-color-black: #fffefa;
-  --sl-color-text-accent: #8d3023;
+  --sl-color-accent-low: #f9e2ef;
+  --sl-color-accent: #b72570;
+  --sl-color-accent-high: #64133f;
+  --sl-color-white: #1b1730;
+  --sl-color-gray-1: #30283b;
+  --sl-color-gray-2: #4d4458;
+  --sl-color-gray-3: #6d6477;
+  --sl-color-gray-4: #92899b;
+  --sl-color-gray-5: #cbc4d1;
+  --sl-color-gray-6: #e6e0e9;
+  --sl-color-gray-7: #f6f1f7;
+  --sl-color-black: #fffafd;
+  --sl-color-text-accent: #92205a;
+  --sl-color-route: #087f99;
 }
 
 * {
@@ -155,9 +164,9 @@ html[data-has-hero] .hero .actions {
   position: relative;
   margin-block: 0.75rem 1rem;
   overflow: hidden;
-  border: 1px solid #46564e;
-  color: #f7f3ea;
-  background: #121916;
+  border: 1px solid var(--site-code-border);
+  color: var(--site-code-text);
+  background: var(--site-code-bg);
 }
 
 .copyable-code__bar {
@@ -167,9 +176,9 @@ html[data-has-hero] .hero .actions {
   justify-content: space-between;
   gap: 1rem;
   padding-inline-start: 0.85rem;
-  border-bottom: 1px solid #46564e;
-  color: #c7d1cb;
-  background: #1b2520;
+  border-bottom: 1px solid var(--site-code-border);
+  color: var(--site-code-muted);
+  background: var(--site-code-surface);
   font-family: var(--sl-font-mono);
   font-size: 0.75rem;
 }
@@ -182,8 +191,8 @@ html[data-has-hero] .hero .actions {
   justify-content: center;
   gap: 0.45rem;
   border: 0;
-  border-left: 1px solid #46564e;
-  color: #f7f3ea;
+  border-left: 1px solid var(--site-code-border);
+  color: var(--site-code-text);
   background: transparent;
   font: inherit;
   font-weight: 700;
@@ -191,13 +200,13 @@ html[data-has-hero] .hero .actions {
 }
 
 .copyable-code button:hover {
-  background: #26342d;
+  background: #352d40;
 }
 
 .copyable-code button:focus-visible,
 .copyable-code pre:focus-visible,
 .install-methods [role='tab']:focus-visible {
-  outline-color: #9ed2ff;
+  outline-color: var(--sl-color-route);
   outline-offset: -4px;
 }
 
@@ -206,8 +215,8 @@ html[data-has-hero] .hero .actions {
   margin: 0;
   padding: 1rem;
   overflow-x: auto;
-  color: #f7f3ea;
-  background: #121916;
+  color: var(--site-code-text);
+  background: var(--site-code-bg);
   font-family: var(--sl-font-mono);
   font-size: clamp(0.73rem, 1.7vw, 0.86rem);
   line-height: 1.65;
@@ -312,9 +321,9 @@ html[data-has-hero] .hero .actions {
 .catalog-preview {
   margin-block: 1.5rem;
   overflow: hidden;
-  border: 1px solid #46564e;
-  color: #f7f3ea;
-  background: #121916;
+  border: 1px solid var(--site-code-border);
+  color: var(--site-code-text);
+  background: var(--site-code-bg);
 }
 
 .catalog-preview__bar {
@@ -323,20 +332,20 @@ html[data-has-hero] .hero .actions {
   align-items: center;
   gap: 0.45rem;
   padding: 0.65rem 0.8rem;
-  border-bottom: 1px solid #46564e;
-  background: #1b2520;
+  border-bottom: 1px solid var(--site-code-border);
+  background: var(--site-code-surface);
 }
 
 .catalog-preview__bar > span {
   width: 0.55rem;
   height: 0.55rem;
-  border: 1px solid #829189;
+  border: 1px solid #8f8199;
   border-radius: 50%;
 }
 
 .catalog-preview__bar strong {
   margin-inline-start: 0.35rem;
-  color: #c7d1cb;
+  color: var(--site-code-muted);
   font-family: var(--sl-font-mono);
   font-size: 0.75rem;
   font-weight: 600;
@@ -353,7 +362,7 @@ html[data-has-hero] .hero .actions {
 }
 
 .catalog-preview__success {
-  color: #a9dbc8;
+  color: var(--site-code-cyan);
 }
 
 .catalog-preview dl {
@@ -365,11 +374,11 @@ html[data-has-hero] .hero .actions {
   grid-template-columns: minmax(7rem, 0.45fr) minmax(0, 1fr);
   gap: 1rem;
   padding-block: 0.65rem;
-  border-top: 1px solid #36443d;
+  border-top: 1px solid #403649;
 }
 
 .catalog-preview dt {
-  color: #f2a999;
+  color: var(--site-code-pink);
   font-weight: 700;
 }
 
@@ -377,7 +386,7 @@ html[data-has-hero] .hero .actions {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
-  color: #c7d1cb;
+  color: var(--site-code-muted);
 }
 
 .catalog-preview dd strong {
@@ -386,16 +395,16 @@ html[data-has-hero] .hero .actions {
   min-height: 1.75rem;
   place-items: center;
   margin-inline-end: 0.4rem;
-  border: 1px solid #577266;
+  border: 1px solid #566b77;
   border-radius: 4px;
-  color: #d2eee3;
+  color: #d7f6fb;
 }
 
 .catalog-preview figcaption {
   padding: 0.75rem 1rem;
-  border-top: 1px solid #46564e;
-  color: #adb9b2;
-  background: #1b2520;
+  border-top: 1px solid var(--site-code-border);
+  color: #b8aec0;
+  background: var(--site-code-surface);
   font-size: 0.78rem;
 }
 

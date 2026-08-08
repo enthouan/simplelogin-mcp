@@ -1,0 +1,31 @@
+---
+import DefaultBanner from '@astrojs/starlight/components/Banner.astro';
+
+const disclaimer =
+  'simplelogin-mcp is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
+---
+
+<DefaultBanner />
+<aside class="affiliation-notice" aria-label="Project relationship" data-pagefind-ignore>
+  <strong>Independent project.</strong>
+  <span>{disclaimer}</span>
+</aside>
+
+<style>
+  @layer starlight.core {
+    .affiliation-notice {
+      padding: 0.7rem clamp(1rem, 3vw, 2.5rem);
+      border-bottom: 1px solid var(--sl-color-hairline);
+      color: var(--sl-color-gray-1);
+      background: var(--sl-color-accent-low);
+      font-size: var(--sl-text-sm);
+      line-height: 1.5;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .affiliation-notice strong {
+      color: var(--sl-color-accent-high);
+    }
+  }
+</style>

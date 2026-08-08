@@ -47,6 +47,19 @@ subpath deployment is served at its real base path. A production build adds cano
 URLs, emits an indexable `robots.txt`, and lets Starlight create its sitemap. Do not set a placeholder
 URL or link the site from the project README until the public deployment responds successfully.
 
+Local builds show the source-repository link for review. Production builds deliberately omit that
+link while the repository is private. Once anonymous access to the repository has been verified,
+enable the header link and the homepage “Star on GitHub” action in the production build:
+
+```bash
+WEBSITE_BASE_URL=https://example.com/simplelogin-mcp/ \
+  WEBSITE_REPOSITORY_PUBLIC=true \
+  pnpm website:build
+```
+
+Do not set `WEBSITE_REPOSITORY_PUBLIC=true` before the repository is actually public; the resulting
+link would otherwise send signed-out visitors to a login or not-found page.
+
 For a subpath deployment, crawlers still request the origin-root `/robots.txt`; they do not use the
 copy served below `/simplelogin-mcp/robots.txt`. Configure the hosting layer’s root robots file to
 allow the site path and reference the generated subpath sitemap, or publish on a dedicated origin.

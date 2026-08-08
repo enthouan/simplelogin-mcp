@@ -6,6 +6,11 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TOOL_CATALOG, TOOL_NAMES } from '../src/tools/catalog.js';
 import { normalizePublicationUrl } from '../website/src/data/publication.js';
+import {
+  REPOSITORY_URL,
+  REPOSITORY_VISIBILITY_ENV,
+  resolveRepositoryUrl,
+} from '../website/src/data/repository.js';
 
 interface PackageJson {
   dependencies: Record<string, string>;
@@ -16,6 +21,7 @@ interface PackageJson {
 
 let outputRoot = '';
 let productionRoot = '';
+let publicRepositoryRoot = '';
 let homeHtml = '';
 let installHtml = '';
 let securityHtml = '';
@@ -42,7 +48,11 @@ async function listFiles(root: string, directory = root): Promise<string[]> {
   return files.flat().sort();
 }
 
-async function buildWebsiteInFreshProcess(outputDir: string, baseUrl: string): Promise<void> {
+async function buildWebsiteInFreshProcess(
+  outputDir: string,
+  baseUrl: string,
+  repositoryPublic = false,
+): Promise<void> {
   const websiteRoot = join(process.cwd(), 'website');
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -53,6 +63,8 @@ async function buildWebsiteInFreshProcess(outputDir: string, baseUrl: string): P
   delete childEnv['VITEST_POOL_ID'];
   delete childEnv['VITEST_WORKER_ID'];
   delete childEnv['TEST'];
+  delete childEnv[REPOSITORY_VISIBILITY_ENV];
+  if (repositoryPublic) childEnv[REPOSITORY_VISIBILITY_ENV] = 'true';
   // Exercise the config guard against ambient values injected by Vitest, shells, or CI runners.
   childEnv['BASE_URL'] = '/ambient-base-that-must-not-leak/';
 
@@ -92,8 +104,16 @@ function stepItemCounts(html: string): number[] {
 
 beforeAll(async () => {
   productionRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-production-'));
+  publicRepositoryRoot = await mkdtemp(
+    join(tmpdir(), 'simplelogin-mcp-starlight-public-repository-'),
+  );
   outputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-'));
   await buildWebsiteInFreshProcess(productionRoot, 'https://docs.example.test/simplelogin-mcp');
+  await buildWebsiteInFreshProcess(
+    publicRepositoryRoot,
+    'https://docs.example.test/simplelogin-mcp',
+    true,
+  );
   await buildWebsiteInFreshProcess(outputRoot, '');
   [homeHtml, installHtml, securityHtml, toolsHtml] = await Promise.all([
     readOutputFile('index.html'),
@@ -106,6 +126,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (outputRoot) await rm(outputRoot, { recursive: true, force: true });
   if (productionRoot) await rm(productionRoot, { recursive: true, force: true });
+  if (publicRepositoryRoot) await rm(publicRepositoryRoot, { recursive: true, force: true });
 });
 
 describe('Starlight website', () => {
@@ -129,6 +150,44 @@ describe('Starlight website', () => {
         'reference/tools/index.html',
       ]),
     );
+  });
+
+  it('identifies the project as independent and links to its source without inventing stars', async () => {
+    const normalPages = await Promise.all([
+      readOutputFile('index.html'),
+      readOutputFile('getting-started/index.html'),
+      readOutputFile('getting-started/docker/index.html'),
+      readOutputFile('getting-started/http/index.html'),
+      readOutputFile('getting-started/stdio/index.html'),
+      readOutputFile('guides/workflows/index.html'),
+      readOutputFile('guides/security/index.html'),
+      readOutputFile('reference/tools/index.html'),
+    ]);
+    const disclaimer =
+      'simplelogin-mcp is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
+
+    for (const page of normalPages) {
+      expect(page.split(disclaimer)).toHaveLength(2);
+      expect(page).toContain(`href="${REPOSITORY_URL}"`);
+      expect(page.indexOf(disclaimer)).toBeLessThan(page.indexOf('<h1'));
+    }
+
+    expect(homeHtml).toContain('Independent MCP integration for SimpleLogin');
+    expect(homeHtml).toContain('>Star on GitHub<');
+    expect(homeHtml).toContain('rel="external" referrerpolicy="no-referrer"');
+    expect(homeHtml).not.toContain('SimpleLogin × Model Context Protocol');
+    expect(homeHtml).not.toMatch(/api\.github\.com|shields\.io|\/stargazers/);
+    expect(homeHtml).not.toMatch(/\b\d[\d,.]*\s+(?:GitHub\s+)?stars?\b/i);
+    expect(resolveRepositoryUrl(undefined, undefined)).toBe(REPOSITORY_URL);
+    expect(resolveRepositoryUrl(new URL('https://docs.example.test/'), undefined)).toBeUndefined();
+    expect(resolveRepositoryUrl(new URL('https://docs.example.test/'), 'true')).toBe(
+      REPOSITORY_URL,
+    );
+
+    const customCss = await readRepoFile('website/src/styles/custom.css');
+    expect(customCss).toMatch(/#ea319f|#ff93c9/);
+    expect(customCss).toContain('#22c0e8');
+    expect(customCss).toMatch(/#1b1340|#1b1730/);
   });
 
   it('renders every documented procedure as distinct Starlight steps', async () => {
@@ -303,7 +362,7 @@ describe('Starlight website', () => {
     expect(homeHtml).not.toMatch(/googletagmanager|segment\.com|posthog|plausible\.io/i);
     expect(homeHtml).not.toMatch(/sl-[A-Za-z0-9]{20,}/);
     expect(websiteSources).not.toMatch(/(?<![\d.])\d+\.\d+\.\d+(?![\d.])/);
-    expect(homeHtml).not.toMatch(/<a[^>]+href="https:\/\/(?:github\.com\/enthouan|ghcr\.io)/);
+    expect(homeHtml).not.toMatch(/<a[^>]+href="https:\/\/ghcr\.io/);
   });
 
   it('keeps unconfigured builds out of indexes and adds no false canonical URL', async () => {
@@ -328,6 +387,7 @@ describe('Starlight website', () => {
 
   it('adds canonical, Open Graph, robots, and Starlight sitemap data for a real HTTPS URL', async () => {
     const productionHtml = await readOutputFile('index.html', productionRoot);
+    const publicRepositoryHtml = await readOutputFile('index.html', publicRepositoryRoot);
     const robots = await readOutputFile('robots.txt', productionRoot);
     const notFoundHtml = await readOutputFile('404.html', productionRoot);
     const sitemapIndex = await readOutputFile('sitemap-index.xml', productionRoot);
@@ -345,6 +405,12 @@ describe('Starlight website', () => {
     expect(productionHtml).not.toContain('<link rel="shortcut icon" href="/favicon.svg"');
     expect(productionHtml).toContain('href="/simplelogin-mcp/getting-started/docker/"');
     expect(productionHtml).not.toMatch(/href="\/(?:getting-started|guides|reference)\//);
+    expect(productionHtml).not.toMatch(
+      /<a[^>]+href="https:\/\/github\.com\/enthouan\/simplelogin-mcp"/,
+    );
+    expect(productionHtml).not.toContain('>Star on GitHub<');
+    expect(publicRepositoryHtml).toContain(`href="${REPOSITORY_URL}"`);
+    expect(publicRepositoryHtml).toContain('>Star on GitHub<');
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
     expect(notFoundHtml).not.toContain('<meta name="robots" content="index, follow"/>');
     expect(robots).toContain('Allow: /');
