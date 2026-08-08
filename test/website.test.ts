@@ -221,10 +221,11 @@ describe('Starlight website', () => {
     expect(securityHtml).toContain('not CORS configuration and not authentication');
   });
 
-  it('ships Starlight tabs plus explicit clipboard success and failure states', () => {
+  it('ships keyboard-complete Starlight tabs plus explicit clipboard states', async () => {
     const tabs = [...homeHtml.matchAll(/<a role="tab"/g)];
     const panels = [...homeHtml.matchAll(/<div id="tab-panel-[^"]+"[^>]+role="tabpanel"/g)];
     const copyButtons = [...homeHtml.matchAll(/aria-label="Copy [^"]+"/g)];
+    const installMethodsSource = await readRepoFile('website/src/components/InstallMethods.astro');
 
     expect(homeHtml).toContain('<starlight-tabs');
     expect(tabs).toHaveLength(3);
@@ -238,6 +239,7 @@ describe('Starlight website', () => {
     expect(homeHtml).toContain('<noscript>');
     expect(homeHtml).toContain('JavaScript is disabled');
     expect(homeHtml).toContain('Installation guides without JavaScript');
+    expect(installMethodsSource).toMatch(/destination\.focus\(\);\s*destination\.click\(\);/);
   });
 
   it('resolves every generated internal page, asset, and fragment', async () => {

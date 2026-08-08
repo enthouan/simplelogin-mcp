@@ -58,10 +58,13 @@ const guideRoot = `${base}getting-started/`;
               ? 0
               : -1;
         if (wrapTo < 0) return;
+        const destination = tabs[wrapTo];
+        if (!destination) return;
 
         event.preventDefault();
         event.stopPropagation();
-        tabs[wrapTo]?.click();
+        destination.focus();
+        destination.click();
       },
       { capture: true },
     );
