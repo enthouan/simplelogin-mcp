@@ -1,38 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect x="24" y="24" width="464" height="464" rx="104" fill="#1b1340" />
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1b1340" />
+  <path d="M13 18h38v28H13z" fill="#fffafd" />
   <path
-    d="M104 350V218c0-72 58-130 130-130h64c64 0 116 52 116 116v146H104Z"
-    fill="none"
-    stroke="#fffafd"
-    stroke-linejoin="round"
-    stroke-width="24"
-  />
-
-  <path
-    d="M100 270V132"
+    d="m14 20 18 14 18-14"
     fill="none"
     stroke="#ea319f"
-    stroke-linecap="round"
+    stroke-width="5"
     stroke-linejoin="round"
-    stroke-width="22"
   />
-  <rect x="100" y="108" width="60" height="48" rx="5" fill="#ea319f" />
-
   <path
-    d="M194 230h72m0 0 52-48m-52 48 52 48"
+    d="m14 44 13-12m23 12L37 32"
     fill="none"
     stroke="#22c0e8"
+    stroke-width="4"
     stroke-linecap="round"
-    stroke-linejoin="round"
-    stroke-width="20"
-  />
-
-  <path
-    d="M224 350v68"
-    fill="none"
-    stroke="#fffafd"
-    stroke-linecap="round"
-    stroke-width="24"
   />
 </svg>

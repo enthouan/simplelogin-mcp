@@ -152,13 +152,18 @@ describe('Starlight website', () => {
     );
   });
 
-  it('renders the original mailbox mark as a local hero asset', async () => {
+  it('renders the favicon artwork as a local hero asset', async () => {
     const files = await listFiles(outputRoot);
+    const [favicon, heroMark] = await Promise.all([
+      readRepoFile('website/public/favicon.svg'),
+      readRepoFile('website/src/assets/simplelogin-mcp-mark.svg'),
+    ]);
 
     expect(homeHtml).toMatch(
       /<img[^>]+src="\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"[^>]+alt="simplelogin-mcp"/,
     );
     expect(files.some((path) => /^_astro\/simplelogin-mcp-mark\..+\.svg$/.test(path))).toBe(true);
+    expect(heroMark).toBe(favicon);
   });
 
   it('uses a caution panel to credit the developer and distinguish the official service', async () => {
