@@ -1,0 +1,34 @@
+---
+title: stdio
+description: Let a local desktop MCP client launch simplelogin-mcp as a child process.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import InstallMethod from '../../../components/InstallMethod.astro';
+
+Stdio is the smallest trust boundary: the MCP client launches the compiled server and communicates
+over its standard input and output streams. No network listener is opened.
+
+<InstallMethod method="stdio" />
+
+## Configure a client
+
+<Steps>
+
+1. **Build the server.** Run `pnpm install --frozen-lockfile` and `pnpm build`.
+
+2. **Use an absolute entry path.** Point the client at this checkout's `dist/index.js`.
+
+3. **Set the transport and key.** Pass `TRANSPORT=stdio` and `SL_API_KEY` in the client process
+   environment.
+
+4. **Restart the client.** Reopen it so the process configuration is reloaded.
+
+</Steps>
+
+<Aside type="caution" title="Keep the client configuration private">
+  `MCP_AUTH_TOKEN` is not needed for stdio because there is no HTTP endpoint. The client config
+  still contains `SL_API_KEY`, which grants full account control. Never commit or share it.
+</Aside>
+
+The server writes diagnostics to stderr because stdout is reserved for MCP messages.

@@ -1,0 +1,48 @@
+---
+title: Install and run
+description: Choose Docker Compose, direct Streamable HTTP, or a local stdio process.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import InstallMethods from '../../../components/InstallMethods.astro';
+
+`simplelogin-mcp` runs in three practical shapes. All use the same server and the same SimpleLogin
+tool catalog; choose based on where your MCP client and server should live.
+
+## Prerequisites
+
+- A SimpleLogin account with an API key from **Settings → API Keys**.
+- Docker with Docker Compose, or Node.js 24.x with pnpm.
+- An MCP client that supports Streamable HTTP or stdio.
+
+<Aside type="caution" title="Treat the API key like a password">
+  `SL_API_KEY` grants full SimpleLogin account control. Create a dedicated key, never commit it, and
+  revoke it at SimpleLogin if it leaks.
+</Aside>
+
+## Choose a setup
+
+<InstallMethods />
+
+## Common path
+
+<Steps>
+
+1. **Choose the trust boundary.** Use stdio for a client-launched local process, direct HTTP for a
+   loopback service, or Compose for an operator-managed service.
+
+2. **Set `SL_API_KEY`.** Keep it in an ignored `.env`, client secret store, or deployment secret.
+
+3. **Protect HTTP when required.** Compose and every non-loopback bind need `MCP_AUTH_TOKEN`.
+
+4. **Verify before connecting.** For HTTP, check `GET /health`; for stdio, keep stdout reserved for
+   the MCP protocol.
+
+</Steps>
+
+## Next
+
+- [Docker Compose](docker/) for the published-image operator path.
+- [Streamable HTTP](http/) for a direct Node.js process.
+- [stdio](stdio/) for desktop and local MCP clients.
+- [Security](../guides/security/) before widening network access.

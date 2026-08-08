@@ -1,0 +1,124 @@
+---
+title: Manage SimpleLogin aliases from your MCP client.
+description: A self-hostable MCP server for SimpleLogin over local stdio or Streamable HTTP.
+template: splash
+hero:
+  tagline: A self-hostable MCP server for existing SimpleLogin users, with a typed tool surface over local stdio or Streamable HTTP.
+  actions:
+    - text: Choose an install
+      link: '#install'
+      icon: right-arrow
+    - text: Explore the tools
+      link: reference/tools/
+      icon: open-book
+      variant: minimal
+---
+
+import { Aside, LinkButton } from '@astrojs/starlight/components';
+import { TOOL_CATALOG } from '../../../../src/tools/catalog.js';
+import InstallMethods from '../../components/InstallMethods.astro';
+import ToolCatalogPreview from '../../components/ToolCatalogPreview.astro';
+
+<p className="home-kicker">SimpleLogin × Model Context Protocol</p>
+
+<h2 id="install">Choose how it runs</h2>
+
+Use the project-provided Compose setup for a self-hosted service, run Streamable HTTP directly on
+loopback, or let a desktop MCP client launch the server over stdio.
+
+<InstallMethods />
+
+<Aside type="danger" title="Protect both credentials">
+  **`SL_API_KEY` grants full control of your SimpleLogin account.** `MCP_AUTH_TOKEN` is a separate
+  credential that protects access to this server. Docker and every non-loopback HTTP bind require
+  the server token; public or LAN HTTP belongs behind TLS. [Read the complete security
+  model](guides/security/).
+</Aside>
+
+<dl className="home-facts not-content" aria-label="Project facts">
+  <div>
+    <dt>catalog-backed tools</dt>
+    <dd>{TOOL_CATALOG.length}</dd>
+  </div>
+  <div>
+    <dt>transport modes</dt>
+    <dd>2</dd>
+  </div>
+  <div>
+    <dt>keeps credentials</dt>
+    <dd>Your host</dd>
+  </div>
+</dl>
+
+## Useful by design
+
+The server focuses on repeatable SimpleLogin workflows that fit an MCP conversation, with bounded
+reads and explicit guards around permanent changes.
+
+<ul className="workflow-list not-content">
+  <li>
+    <article>
+      <h3>Create and tune aliases</h3>
+
+    Find an alias, create a random or custom one, update its routing, then explicitly enable or
+    disable it.
+
+    `alias_list → alias_create_random → alias_update → alias_set_enabled`
+    </article>
+
+  </li>
+  <li>
+    <article>
+      <h3>Investigate recent mail</h3>
+
+    Inspect one alias, then walk bounded activity pages for forwards, replies, blocks, and bounces.
+
+    `alias_get → alias_activity_list`
+    </article>
+
+  </li>
+  <li>
+    <article>
+      <h3>Send from an alias</h3>
+
+    Create or reuse a reverse alias for a recipient, and block forwarding before choosing permanent
+    deletion.
+
+    `contact_create → contact_set_blocked`
+    </article>
+
+  </li>
+  <li>
+    <article>
+      <h3>Maintain account routing</h3>
+
+    Review mailbox verification, inspect custom domains, and review or change supported account-wide
+    alias settings.
+
+    `mailbox_list → custom_domain_list → settings_get → settings_update`
+    </article>
+
+  </li>
+</ul>
+
+<LinkButton href="guides/workflows/" variant="secondary" icon="right-arrow">
+  Follow the workflow guide
+</LinkButton>
+
+## One canonical tool catalog
+
+Names, summaries, groups, and counts come from the same TypeScript catalog used by the MCP server.
+The website cannot quietly drift into a second inventory.
+
+<ToolCatalogPreview />
+
+<LinkButton href="reference/tools/" variant="secondary" icon="right-arrow">
+  Browse all {TOOL_CATALOG.length} tools
+</LinkButton>
+
+## Bring your own account and host
+
+Run locally with stdio, keep HTTP on loopback, or place an authenticated deployment behind
+infrastructure you control. The runtime sends requests only to your configured SimpleLogin API.
+
+[Install and run the server](getting-started/) or [review the security model](guides/security/).

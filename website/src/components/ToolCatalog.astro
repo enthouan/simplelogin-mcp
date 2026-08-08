@@ -1,0 +1,47 @@
+---
+import { TOOL_CATALOG } from '../../../src/tools/catalog.js';
+import { CATEGORY_ENTRIES } from '../data/catalog.js';
+---
+
+<div class="tool-catalog not-content" data-tool-count={TOOL_CATALOG.length}>
+  {
+    CATEGORY_ENTRIES.map(({ category, label, description, tools }) => (
+      <section class="tool-group" aria-labelledby={`tool-group-${category}`}>
+        <header>
+          <div>
+            <h2 id={`tool-group-${category}`}>{label}</h2>
+            <p>{description}</p>
+          </div>
+          <span aria-label={`${tools.length} tools`}>{tools.length}</span>
+        </header>
+        <ul>
+          {tools.map((tool) => (
+            <li data-tool-name={tool.name}>
+              <div class="tool-name">
+                <code>{tool.name}</code>
+                <div class="tool-badges" aria-label="Tool behavior">
+                  <span>{tool.annotations.readOnlyHint ? 'Read only' : 'Writes data'}</span>
+                  <span>{tool.annotations.idempotentHint ? 'Idempotent' : 'Not idempotent'}</span>
+                  {tool.annotations.destructiveHint && <span>Destructive impact</span>}
+                </div>
+              </div>
+              <p>{tool.summary}</p>
+              <dl>
+                <div>
+                  <dt>Bounds</dt>
+                  <dd>{tool.bounds}</dd>
+                </div>
+                <div>
+                  <dt>Output</dt>
+                  <dd>
+                    <code>{tool.output}</code>
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+</div>

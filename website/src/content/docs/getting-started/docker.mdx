@@ -1,0 +1,43 @@
+---
+title: Docker Compose
+description: Run simplelogin-mcp as a loopback-published Compose service.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import InstallMethod from '../../../components/InstallMethod.astro';
+
+Use the operator Compose file to run the published container image. The application listens on
+`0.0.0.0:3000` inside the container so Docker can forward the port, while the host publishes only
+to `127.0.0.1` by default.
+
+<InstallMethod method="docker" />
+
+## Configure the two credentials
+
+<Steps>
+
+1. **Create `.env`.** Copy `.env.example`; Compose reads it for variable interpolation.
+
+2. **Set `SL_API_KEY`.** This authenticates the server to SimpleLogin and grants full account
+   control.
+
+3. **Generate `MCP_AUTH_TOKEN`.** Run `openssl rand -hex 32` and store the result in `.env`.
+
+4. **Start and verify.** Run `docker compose up -d`, inspect `docker compose ps`, then request
+   `http://localhost:3000/health`.
+
+</Steps>
+
+<Aside type="caution" title="The host bind and container bind are different">
+  Compose publishes `127.0.0.1:3000:3000` on the host by default, but the application sees its
+  internal `HOST=0.0.0.0`. Keep `MCP_AUTH_TOKEN` set even for this loopback-only host publication.
+</Aside>
+
+## Change host exposure deliberately
+
+Use `SIMPLELOGIN_MCP_HOST_PORT` for the published host port. Set
+`SIMPLELOGIN_MCP_HOST_BIND_IP=0.0.0.0` or a LAN address only when wider access is intentional,
+`MCP_AUTH_TOKEN` remains set, and a reverse proxy supplies TLS.
+
+The container listener stays on port `3000`; changing the host port does not require changing the
+application `PORT`.

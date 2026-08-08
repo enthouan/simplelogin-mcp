@@ -1,0 +1,20 @@
+---
+title: Tool catalog
+description: The complete catalog-backed SimpleLogin MCP tool reference.
+tableOfContents: false
+---
+
+import { TOOL_CATALOG } from '../../../../../src/tools/catalog.js';
+import ToolCatalog from '../../../components/ToolCatalog.astro';
+
+The server exposes **{TOOL_CATALOG.length} tools across five focused areas**. This page imports the
+canonical catalog used by tool registration, so names, summaries, annotations, bounds, and output
+shapes stay aligned with the runtime.
+
+“Destructive impact” follows the MCP annotation and includes writes that can interrupt mail
+delivery, not only irreversible deletion. Permanent delete tools also require explicit
+confirmation. “Idempotent” identifies tools whose repeated call has the same intended effect;
+retry tools marked “Not idempotent” only after checking the first result. Every tool has
+`openWorldHint: true` because it communicates with the external SimpleLogin API.
+
+<ToolCatalog />

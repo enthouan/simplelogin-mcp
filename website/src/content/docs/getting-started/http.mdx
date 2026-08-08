@@ -1,0 +1,35 @@
+---
+title: Streamable HTTP
+description: Run the Node.js server directly on loopback and connect an HTTP MCP client.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import InstallMethod from '../../../components/InstallMethod.astro';
+
+Direct HTTP defaults to loopback and exposes the MCP endpoint at `POST /mcp` plus a small health
+endpoint at `GET /health`.
+
+<InstallMethod method="http" />
+
+## Connect a client
+
+<Steps>
+1. **Start on loopback.** Keep `HOST=127.0.0.1` for same-machine access.
+2. **Verify health.** Request `http://127.0.0.1:3000/health`.
+3. **Register the endpoint.** Point a Streamable HTTP client at
+   `http://127.0.0.1:3000/mcp`.
+4. **Add authorization when configured.** Send `Authorization: Bearer <token>` whenever
+   `MCP_AUTH_TOKEN` is set.
+</Steps>
+
+<Aside type="danger" title="Wider HTTP needs authentication and TLS">
+  The server refuses an unauthenticated non-loopback bind unless the unsafe override is explicitly
+  enabled. For LAN or public access, set `MCP_AUTH_TOKEN` and terminate TLS at a reverse proxy; the
+  server itself speaks plain HTTP.
+</Aside>
+
+## Browser-origin checks
+
+Browser requests to `POST /mcp` must come from loopback or an exact origin listed in
+`MCP_ALLOWED_ORIGINS`. This allowlist protects the MCP route from hostile browser origins. It does
+not add CORS response headers, handle preflight requests, or replace authentication.

@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 website/dist/
+website/.astro/
 
 # Environment / secrets
 .env

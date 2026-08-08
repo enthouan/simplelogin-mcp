@@ -1,0 +1,63 @@
+---
+title: Security
+description: Understand the two credentials and the network trust boundaries around simplelogin-mcp.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`simplelogin-mcp` brokers full programmatic access to a SimpleLogin account. The SimpleLogin API
+key and the MCP server token protect different boundaries and are not interchangeable.
+
+## Two secrets, two trust boundaries
+
+| Secret           | Authenticates             | Scope of compromise                                                                             |
+| ---------------- | ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `SL_API_KEY`     | this server → SimpleLogin | Full control of the SimpleLogin account, including aliases, routing, mailboxes, and settings.   |
+| `MCP_AUTH_TOKEN` | MCP clients → this server | Ability to call every exposed tool and therefore use the configured SimpleLogin key indirectly. |
+
+Create a dedicated `SL_API_KEY`, keep it out of source and logs, and revoke it in SimpleLogin if it
+leaks. Generate a strong server token with `openssl rand -hex 32`; rotate it by restarting the
+server with a new value.
+
+## Network exposure model
+
+| Bind                       | Reachable from    | Requirement                                                       |
+| -------------------------- | ----------------- | ----------------------------------------------------------------- |
+| `127.0.0.1`                | this machine only | No token required for a direct run.                               |
+| `0.0.0.0` or a LAN address | LAN or internet   | `MCP_AUTH_TOKEN` required unless the unsafe override is explicit. |
+
+The server refuses to start on a non-loopback address without `MCP_AUTH_TOKEN` unless
+`ALLOW_UNAUTHENTICATED_EXPOSURE=true` is deliberately set.
+
+<Aside type="danger" title="Never send a bearer token over public plain HTTP">
+  For LAN or public exposure, keep `MCP_AUTH_TOKEN` set and terminate TLS at a reverse proxy. The
+  server speaks plain HTTP and should not face the public internet directly.
+</Aside>
+
+## Recommended patterns
+
+- **Local direct use:** keep `HOST=127.0.0.1`, or reach it through an SSH tunnel.
+- **Docker:** the app binds `0.0.0.0` inside the container, while Compose publishes to host
+  loopback by default. Keep `MCP_AUTH_TOKEN` set because the app sees the internal non-loopback
+  bind.
+- **LAN or public use:** set the server token, restrict the host bind intentionally, and put the
+  endpoint behind TLS.
+- **stdio:** no HTTP server or `MCP_AUTH_TOKEN` is involved, but the client process environment
+  still contains the full-control `SL_API_KEY`.
+
+## Browser origin validation
+
+`POST /mcp` rejects browser requests with a disallowed `Origin`. Loopback origins are allowed;
+others must be listed exactly in `MCP_ALLOWED_ORIGINS`.
+
+`MCP_ALLOWED_ORIGINS` is an origin allowlist, **not CORS configuration and not authentication**. A
+browser-facing proxy must still handle CORS response headers and preflight requests, and clients
+must still authenticate when `MCP_AUTH_TOKEN` is set.
+
+## Credential handling
+
+- Keep `.env` ignored and use a deployment secret store where available.
+- Never bake either secret into a container image, website, screenshot, or diagnostic output.
+- A leaked `MCP_AUTH_TOKEN` requires rotation; a leaked `SL_API_KEY` requires revocation at
+  SimpleLogin.
+- All server diagnostics go to stderr and omit request headers and credentials.

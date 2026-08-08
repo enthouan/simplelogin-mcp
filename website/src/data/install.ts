@@ -1,0 +1,71 @@
+export type InstallMethodKey = 'docker' | 'http' | 'stdio';
+
+export interface InstallMethod {
+  key: InstallMethodKey;
+  label: string;
+  title: string;
+  language: string;
+  code: string;
+  href: string;
+}
+
+export const INSTALL_METHODS = [
+  {
+    key: 'docker',
+    label: 'Docker',
+    title: 'Docker Compose quick start',
+    language: 'shell',
+    href: 'getting-started/docker/',
+    code: `git clone https://github.com/enthouan/simplelogin-mcp.git
+cd simplelogin-mcp
+cp .env.example .env
+# Set SL_API_KEY and MCP_AUTH_TOKEN in .env
+docker compose up -d
+docker compose ps
+curl http://localhost:3000/health`,
+  },
+  {
+    key: 'http',
+    label: 'HTTP',
+    title: 'Direct Node.js on loopback',
+    language: 'shell',
+    href: 'getting-started/http/',
+    code: `corepack enable
+pnpm install --frozen-lockfile
+cp .env.example .env
+# Keep TRANSPORT=http, HOST=127.0.0.1, and PORT=3000; set SL_API_KEY in .env
+pnpm build
+# Load the file without putting the key in shell history or the parent shell
+(
+  set -a
+  . ./.env
+  set +a
+  pnpm start
+)`,
+  },
+  {
+    key: 'stdio',
+    label: 'stdio',
+    title: 'Desktop client process configuration',
+    language: 'json',
+    href: 'getting-started/stdio/',
+    code: `{
+  "mcpServers": {
+    "simplelogin": {
+      "command": "node",
+      "args": ["/absolute/path/to/simplelogin-mcp/dist/index.js"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "SL_API_KEY": "sl-your-key-here"
+      }
+    }
+  }
+}`,
+  },
+] as const satisfies readonly InstallMethod[];
+
+export function getInstallMethod(key: InstallMethodKey): (typeof INSTALL_METHODS)[number] {
+  const method = INSTALL_METHODS.find((candidate) => candidate.key === key);
+  if (!method) throw new Error(`Unknown install method: ${key}`);
+  return method;
+}

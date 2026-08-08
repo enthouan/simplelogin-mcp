@@ -1,0 +1,13 @@
+---
+const { head, id } = Astro.locals.starlightRoute;
+const resolvedHead =
+  id === '404'
+    ? head.map((entry) =>
+        entry.tag === 'meta' && entry.attrs?.name === 'robots'
+          ? { ...entry, attrs: { ...entry.attrs, content: 'noindex, nofollow' } }
+          : entry,
+      )
+    : head;
+---
+
+{resolvedHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}

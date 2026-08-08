@@ -1,0 +1,38 @@
+---
+import { TOOL_CATALOG } from '../../../src/tools/catalog.js';
+import { CATEGORY_ENTRIES } from '../data/catalog.js';
+---
+
+<figure class="catalog-preview not-content" data-tool-count={TOOL_CATALOG.length}>
+  <div class="catalog-preview__bar" aria-hidden="true">
+    <span></span><span></span><span></span>
+    <strong>MCP request</strong>
+  </div>
+  <div class="catalog-preview__body">
+    <p>MCP method: <code>tools/list</code></p>
+    <p class="catalog-preview__success">
+      <span aria-hidden="true">✓</span>
+      {TOOL_CATALOG.length} tools loaded from the project catalog
+    </p>
+    <dl>
+      {
+        CATEGORY_ENTRIES.map(({ label, tools }) => (
+          <div>
+            <dt>{label}</dt>
+            <dd>
+              <strong>{tools.length}</strong>{' '}
+              {tools
+                .slice(0, 2)
+                .map((tool) => tool.name)
+                .join(', ')}
+              {tools.length > 2 ? ', …' : ''}
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+  <figcaption>
+    Generated from the same catalog as the server. It contains no credentials or account data.
+  </figcaption>
+</figure>
