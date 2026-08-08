@@ -1,14 +1,25 @@
 ---
 import DefaultBanner from '@astrojs/starlight/components/Banner.astro';
 
+const authorUrl = 'https://www.antoinemenard.com';
 const disclaimer =
-  'simplelogin-mcp is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
+  'It is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
 ---
 
 <DefaultBanner />
-<aside class="affiliation-notice" aria-label="Project relationship" data-pagefind-ignore>
+<aside
+  class="affiliation-notice"
+  aria-label="Project attribution and relationship"
+  data-pagefind-ignore
+>
   <strong>Independent project.</strong>
-  <span>{disclaimer}</span>
+  <span>
+    simplelogin-mcp is an open-source project developed by <a
+      href={authorUrl}
+      rel="author external"
+      referrerpolicy="no-referrer">Antoine Ménard</a
+    >. {disclaimer}
+  </span>
 </aside>
 
 <style>
@@ -26,6 +37,13 @@ const disclaimer =
 
     .affiliation-notice strong {
       color: var(--sl-color-accent-high);
+    }
+
+    .affiliation-notice a {
+      color: var(--sl-color-accent-high);
+      font-weight: 650;
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.16em;
     }
   }
 </style>

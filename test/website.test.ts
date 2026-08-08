@@ -152,7 +152,7 @@ describe('Starlight website', () => {
     );
   });
 
-  it('identifies the project as independent and links to its source without inventing stars', async () => {
+  it('credits the developer, identifies the project as independent, and links to its source', async () => {
     const normalPages = await Promise.all([
       readOutputFile('index.html'),
       readOutputFile('getting-started/index.html'),
@@ -164,11 +164,15 @@ describe('Starlight website', () => {
       readOutputFile('reference/tools/index.html'),
     ]);
     const disclaimer =
-      'simplelogin-mcp is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
+      'It is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
 
     for (const page of normalPages) {
       expect(page.split(disclaimer)).toHaveLength(2);
       expect(page).toContain(`href="${REPOSITORY_URL}"`);
+      expect(page).toContain('is an open-source project developed by');
+      expect(page).toMatch(
+        /<a[^>]+href="https:\/\/www\.antoinemenard\.com"[^>]*>Antoine Ménard<\/a>/,
+      );
       expect(page.indexOf(disclaimer)).toBeLessThan(page.indexOf('<h1'));
     }
 
