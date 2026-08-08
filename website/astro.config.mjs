@@ -28,7 +28,6 @@ export default defineConfig({
       credits: false,
       customCss: ['./src/styles/custom.css'],
       components: {
-        Banner: './src/components/Banner.astro',
         Head: './src/components/Head.astro',
       },
       social: repositoryUrl

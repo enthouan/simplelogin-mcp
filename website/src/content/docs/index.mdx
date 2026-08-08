@@ -3,7 +3,7 @@ title: Manage SimpleLogin aliases from your MCP client.
 description: An independent, self-hostable MCP server for SimpleLogin over local stdio or Streamable HTTP.
 template: splash
 hero:
-  tagline: An independent, self-hostable MCP server for existing SimpleLogin users. Not affiliated with or endorsed by SimpleLogin or Proton.
+  tagline: An independent, self-hostable MCP server for existing SimpleLogin users.
   image:
     file: ../../assets/simplelogin-mcp-mark.svg
     alt: simplelogin-mcp
@@ -22,6 +22,16 @@ import { TOOL_CATALOG } from '../../../../src/tools/catalog.js';
 import InstallMethods from '../../components/InstallMethods.astro';
 import RepositoryLink from '../../components/RepositoryLink.astro';
 import ToolCatalogPreview from '../../components/ToolCatalogPreview.astro';
+
+<Aside type="caution" title="Independent project">
+  simplelogin-mcp is an independent, community-maintained project developed by [Antoine
+  Ménard](https://www.antoinemenard.com). It is not an official SimpleLogin or Proton product,
+  service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by
+  SimpleLogin or Proton.
+
+Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
+
+</Aside>
 
 <p className="home-kicker">Independent MCP integration for SimpleLogin</p>
 

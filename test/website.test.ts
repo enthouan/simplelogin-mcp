@@ -161,30 +161,33 @@ describe('Starlight website', () => {
     expect(files.some((path) => /^_astro\/simplelogin-mcp-mark\..+\.svg$/.test(path))).toBe(true);
   });
 
-  it('credits the developer, identifies the project as independent, and links to its source', async () => {
-    const normalPages = await Promise.all([
-      readOutputFile('index.html'),
-      readOutputFile('getting-started/index.html'),
-      readOutputFile('getting-started/docker/index.html'),
-      readOutputFile('getting-started/http/index.html'),
-      readOutputFile('getting-started/stdio/index.html'),
-      readOutputFile('guides/workflows/index.html'),
-      readOutputFile('guides/security/index.html'),
-      readOutputFile('reference/tools/index.html'),
-    ]);
+  it('uses a caution panel to credit the developer and distinguish the official service', async () => {
     const disclaimer =
-      'It is not an official SimpleLogin project and is not affiliated with, endorsed by, or supported by SimpleLogin or Proton.';
+      'It is not an official SimpleLogin or Proton product, service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by SimpleLogin or Proton.';
 
-    for (const page of normalPages) {
-      expect(page.split(disclaimer)).toHaveLength(2);
-      expect(page).toContain(`href="${REPOSITORY_URL}"`);
-      expect(page).toContain('is an open-source project developed by');
-      expect(page).toMatch(
+    for (const page of [homeHtml, installHtml]) {
+      const normalizedPage = page.replace(/\s+/g, ' ');
+
+      expect(normalizedPage.split(disclaimer)).toHaveLength(2);
+      expect(normalizedPage).toContain(
+        'aria-label="Independent project" class="starlight-aside starlight-aside--caution"',
+      );
+      expect(normalizedPage).toContain(
+        'is an independent, community-maintained project developed by',
+      );
+      expect(normalizedPage).toMatch(
         /<a[^>]+href="https:\/\/www\.antoinemenard\.com"[^>]*>Antoine Ménard<\/a>/,
       );
-      expect(page.indexOf(disclaimer)).toBeLessThan(page.indexOf('<h1'));
+      expect(normalizedPage).toMatch(/Looking for SimpleLogin['’]s official service\?/);
+      expect(normalizedPage).toMatch(
+        /<a[^>]+href="https:\/\/simplelogin\.io\/"[^>]*>SimpleLogin<\/a>/,
+      );
+      expect(normalizedPage.indexOf(disclaimer)).toBeGreaterThan(normalizedPage.indexOf('<h1'));
     }
 
+    expect(homeHtml).toContain(`href="${REPOSITORY_URL}"`);
+    expect(homeHtml).not.toContain('affiliation-notice');
+    expect(homeHtml).not.toContain('Not affiliated with or endorsed by SimpleLogin or Proton.');
     expect(homeHtml).toContain('Independent MCP integration for SimpleLogin');
     expect(homeHtml).toContain('>Star on GitHub<');
     expect(homeHtml).toContain('rel="external" referrerpolicy="no-referrer"');
