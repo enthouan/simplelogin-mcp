@@ -152,18 +152,17 @@ describe('Starlight website', () => {
     );
   });
 
-  it('renders the favicon artwork as a local hero asset', async () => {
+  it('renders the open-source Lucide mail icon as a local hero asset', async () => {
     const files = await listFiles(outputRoot);
-    const [favicon, heroMark] = await Promise.all([
-      readRepoFile('website/public/favicon.svg'),
-      readRepoFile('website/src/assets/simplelogin-mcp-mark.svg'),
-    ]);
+    const heroMark = await readRepoFile('website/src/assets/simplelogin-mcp-mark.svg');
 
     expect(homeHtml).toMatch(
       /<img[^>]+src="\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"[^>]+alt="simplelogin-mcp"/,
     );
     expect(files.some((path) => /^_astro\/simplelogin-mcp-mark\..+\.svg$/.test(path))).toBe(true);
-    expect(heroMark).toBe(favicon);
+    expect(heroMark).toContain('https://lucide.dev/icons/mail');
+    expect(heroMark).toContain('ISC License');
+    expect(heroMark).toContain('d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"');
   });
 
   it('uses a caution panel to credit the developer and distinguish the official service', async () => {
