@@ -4,7 +4,17 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'website/.astro/**', 'website/dist/**', 'node_modules/**'] },
+  {
+    // Astro resolves the `astro:content` virtual module during `astro check`, which runs after
+    // root ESLint in CI. Keep that generated-type entrypoint under Astro's dedicated checker.
+    ignores: [
+      'dist/**',
+      'website/.astro/**',
+      'website/dist/**',
+      'website/src/content.config.ts',
+      'node_modules/**',
+    ],
+  },
   eslint.configs.recommended,
   {
     files: ['**/*.ts'],
