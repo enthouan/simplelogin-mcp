@@ -91,8 +91,13 @@ header.header {
 
 html[data-has-hero] .hero {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 54rem;
+  max-width: 64rem;
+  margin-inline: auto;
   padding-block: clamp(1.75rem, 4vw, 3rem);
+}
+
+html[data-has-hero] .hero > img {
+  width: min(48vw, 12rem);
 }
 
 html[data-has-hero] .hero .stack {
@@ -114,6 +119,17 @@ html[data-has-hero] .hero .tagline {
 
 html[data-has-hero] .hero .actions {
   gap: 0.75rem;
+}
+
+@media (min-width: 50rem) {
+  html[data-has-hero] .hero {
+    grid-template-columns: minmax(0, 7fr) minmax(12rem, 4fr);
+    gap: clamp(2rem, 5vw, 4rem);
+  }
+
+  html[data-has-hero] .hero > img {
+    width: min(100%, 17rem);
+  }
 }
 
 .home-kicker {

@@ -152,6 +152,15 @@ describe('Starlight website', () => {
     );
   });
 
+  it('renders the original mailbox mark as a local hero asset', async () => {
+    const files = await listFiles(outputRoot);
+
+    expect(homeHtml).toMatch(
+      /<img[^>]+src="\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"[^>]+alt="simplelogin-mcp"/,
+    );
+    expect(files.some((path) => /^_astro\/simplelogin-mcp-mark\..+\.svg$/.test(path))).toBe(true);
+  });
+
   it('credits the developer, identifies the project as independent, and links to its source', async () => {
     const normalPages = await Promise.all([
       readOutputFile('index.html'),
@@ -419,6 +428,9 @@ describe('Starlight website', () => {
     );
     expect(productionHtml).not.toContain('<link rel="shortcut icon" href="/favicon.svg"');
     expect(productionHtml).toContain('href="/simplelogin-mcp/getting-started/docker/"');
+    expect(productionHtml).toMatch(
+      /src="\/simplelogin-mcp\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"/,
+    );
     expect(productionHtml).not.toMatch(/href="\/(?:getting-started|guides|reference)\//);
     expect(productionHtml).not.toMatch(
       /<a[^>]+href="https:\/\/github\.com\/enthouan\/simplelogin-mcp"/,
