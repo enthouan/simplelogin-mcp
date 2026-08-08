@@ -339,6 +339,10 @@ describe('Starlight website', () => {
     expect(productionHtml).toContain(`<meta property="og:url" content="${canonical}"/>`);
     expect(productionHtml).toContain('<meta name="robots" content="index, follow"/>');
     expect(productionHtml).toContain('href="/simplelogin-mcp/_astro/');
+    expect(productionHtml).toContain(
+      '<link rel="shortcut icon" href="/simplelogin-mcp/favicon.svg"',
+    );
+    expect(productionHtml).not.toContain('<link rel="shortcut icon" href="/favicon.svg"');
     expect(productionHtml).toContain('href="/simplelogin-mcp/getting-started/docker/"');
     expect(productionHtml).not.toMatch(/href="\/(?:getting-started|guides|reference)\//);
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
