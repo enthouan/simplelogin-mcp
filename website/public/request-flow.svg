@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title description">
+  <title id="title">How a simplelogin-mcp tool call travels</title>
+  <desc id="description">An MCP client sends a typed tool call to simplelogin-mcp over stdio or Streamable HTTP. The server applies guardrails, reads the SimpleLogin API key from its environment, authenticates to the configured SimpleLogin API origin, validates the response, and returns a bounded result. simplelogin-mcp never places the API key in MCP requests or results.</desc>
+  <defs>
+    <style>
+      :root { color-scheme: light dark; }
+      text { font-family: Arial, Helvetica, sans-serif; }
+      .title { font-size: 30px; font-weight: 700; fill: #201622; }
+      .subtitle { font-size: 16px; font-weight: 400; fill: #655a68; }
+      .eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
+      .node-title { font-size: 24px; font-weight: 700; fill: #201622; }
+      .node-copy { font-size: 16px; font-weight: 500; fill: #554a58; }
+      .detail-title { font-size: 15px; font-weight: 700; fill: #201622; }
+      .detail-copy { font-size: 14px; font-weight: 500; fill: #655a68; }
+      .arrow-label { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
+      .arrow-label-request { fill: #9d174d; }
+      .arrow-label-result { fill: #554a58; }
+      .flow-arrow-request { fill: #b72570; }
+      .flow-arrow-result { fill: #6b5d70; }
+      .section-label { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; fill: #554a58; }
+      .footer-copy { font-size: 14px; font-weight: 700; fill: #ffffff; }
+
+      @media (prefers-color-scheme: dark) {
+        .canvas { fill: #15121d; }
+        .title, .node-title, .detail-title { fill: #fbf7fc; }
+        .subtitle, .detail-copy, .arrow-label-result, .section-label { fill: #cbc2d2; }
+        .node-copy { fill: #e9e3ed; }
+        .client-panel { fill: #18263a; stroke: #60a5fa; }
+        .client-badge { fill: #203a5b; }
+        .client-eyebrow { fill: #bfdbfe; }
+        .host-panel { fill: #321827; stroke: #f472b6; }
+        .host-badge { fill: #4a1c38; }
+        .host-eyebrow { fill: #ffb4d6; }
+        .api-panel { fill: #132c25; stroke: #34d399; }
+        .api-badge { fill: #174638; }
+        .api-eyebrow { fill: #6ee7b7; }
+        .detail-box, .credential-card { fill: #231c2d; }
+        .client-detail { stroke: #60a5fa; }
+        .host-detail { stroke: #f472b6; }
+        .api-detail { stroke: #34d399; }
+        .credential-card { stroke: #7a7183; }
+        .client-dot { fill: #60a5fa; }
+        .host-dot, .flow-arrow-request { fill: #ff83bf; }
+        .api-dot { fill: #34d399; }
+        .arrow-label-request { fill: #ff93c9; }
+        .flow-arrow-result { fill: #a298aa; }
+        .footer-band { fill: #3a1830; }
+        .footer-copy { fill: #ffd6ea; }
+      }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1200" height="620" rx="10" fill="#fffafd" />
+  <text x="45" y="58" class="title">How a simplelogin-mcp tool call travels</text>
+  <text x="45" y="88" class="subtitle">The client, your server, and SimpleLogin each own a different part of the trust boundary.</text>
+
+  <rect class="client-panel" x="45" y="125" width="300" height="275" rx="12" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <rect class="client-badge" x="69" y="149" width="112" height="30" rx="5" fill="#dbeafe" />
+  <text x="125" y="170" text-anchor="middle" class="eyebrow client-eyebrow" fill="#1d4ed8">CLIENT</text>
+  <text x="69" y="220" class="node-title">MCP client</text>
+  <text x="69" y="255" class="node-copy">Prompt, approvals, and</text>
+  <text x="69" y="281" class="node-copy">presentation of tool results</text>
+  <rect class="detail-box client-detail" x="69" y="316" width="252" height="60" rx="8" fill="#ffffff" stroke="#bfdbfe" />
+  <text x="85" y="341" class="detail-title">Transport</text>
+  <text x="85" y="363" class="detail-copy">stdio · Streamable HTTP</text>
+
+  <rect class="host-panel" x="450" y="125" width="300" height="275" rx="12" fill="#fdf2f8" stroke="#f472b6" stroke-width="2" />
+  <rect class="host-badge" x="474" y="149" width="126" height="30" rx="5" fill="#fce7f3" />
+  <text x="537" y="170" text-anchor="middle" class="eyebrow host-eyebrow" fill="#9d174d">YOUR HOST</text>
+  <text x="474" y="220" class="node-title">simplelogin-mcp</text>
+  <text x="474" y="255" class="node-copy">Typed tools, validation,</text>
+  <text x="474" y="281" class="node-copy">and server-side guardrails</text>
+  <rect class="detail-box host-detail" x="474" y="316" width="252" height="60" rx="8" fill="#ffffff" stroke="#fbcfe8" />
+  <text x="490" y="341" class="detail-title">Process boundary</text>
+  <text x="490" y="363" class="detail-copy">Secrets stay in the environment</text>
+
+  <rect class="api-panel" x="855" y="125" width="300" height="275" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="2" />
+  <rect class="api-badge" x="879" y="149" width="132" height="30" rx="5" fill="#d1fae5" />
+  <text x="945" y="170" text-anchor="middle" class="eyebrow api-eyebrow" fill="#047857">SIMPLELOGIN</text>
+  <text x="879" y="220" class="node-title">SimpleLogin API</text>
+  <text x="879" y="255" class="node-copy">Account state and actual</text>
+  <text x="879" y="281" class="node-copy">email routing behavior</text>
+  <rect class="detail-box api-detail" x="879" y="316" width="252" height="60" rx="8" fill="#ffffff" stroke="#a7f3d0" />
+  <text x="895" y="341" class="detail-title">Source of truth</text>
+  <text x="895" y="363" class="detail-copy">Aliases · routing · activity</text>
+
+  <path d="M356.5,243.5 H432 V239 L444,245 L432,251 V246.5 H356.5 Q353.5,245 356.5,243.5 Z" class="flow-arrow-request" />
+  <text x="397.5" y="224" text-anchor="middle" class="arrow-label arrow-label-request">Tool call</text>
+  <path d="M438.5,293.5 H363 V289 L351,295 L363,301 V296.5 H438.5 Q441.5,295 438.5,293.5 Z" class="flow-arrow-result" />
+  <text x="397.5" y="321" text-anchor="middle" class="arrow-label arrow-label-result">Tool result</text>
+
+  <path d="M761.5,243.5 H837 V239 L849,245 L837,251 V246.5 H761.5 Q758.5,245 761.5,243.5 Z" class="flow-arrow-request" />
+  <text x="802.5" y="224" text-anchor="middle" class="arrow-label arrow-label-request">API request</text>
+  <path d="M843.5,293.5 H768 V289 L756,295 L768,301 V296.5 H843.5 Q846.5,295 843.5,293.5 Z" class="flow-arrow-result" />
+  <text x="802.5" y="321" text-anchor="middle" class="arrow-label arrow-label-result">API response</text>
+
+  <text x="45" y="435" class="section-label">CREDENTIAL BOUNDARIES</text>
+
+  <rect class="credential-card" x="45" y="455" width="300" height="88" rx="9" fill="#ffffff" stroke="#d8d0dc" />
+  <circle class="client-dot" cx="69" cy="480" r="7" fill="#2563eb" />
+  <text x="87" y="485" class="detail-title">HTTP client</text>
+  <text x="69" y="518" class="detail-copy">sends MCP_AUTH_TOKEN when required</text>
+
+  <rect class="credential-card" x="450" y="455" width="300" height="88" rx="9" fill="#ffffff" stroke="#d8d0dc" />
+  <circle class="host-dot" cx="474" cy="480" r="7" fill="#b72570" />
+  <text x="492" y="485" class="detail-title">Server environment</text>
+  <text x="474" y="511" class="detail-copy">checks MCP_AUTH_TOKEN</text>
+  <text x="474" y="531" class="detail-copy">holds SL_API_KEY</text>
+
+  <rect class="credential-card" x="855" y="455" width="300" height="88" rx="9" fill="#ffffff" stroke="#d8d0dc" />
+  <circle class="api-dot" cx="879" cy="480" r="7" fill="#059669" />
+  <text x="897" y="485" class="detail-title">SimpleLogin API</text>
+  <text x="879" y="511" class="detail-copy">receives SL_API_KEY on API calls</text>
+  <text x="879" y="531" class="detail-copy">owns the account data</text>
+
+  <rect class="footer-band" x="230" y="570" width="740" height="34" rx="8" fill="#2f2133" />
+  <text x="600" y="592" text-anchor="middle" class="footer-copy">simplelogin-mcp keeps SL_API_KEY out of MCP requests and results</text>
+</svg>

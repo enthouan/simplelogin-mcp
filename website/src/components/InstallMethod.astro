@@ -1,5 +1,5 @@
 ---
-import CopyableCode from './CopyableCode.astro';
+import { Code } from '@astrojs/starlight/components';
 import { getInstallMethod, type InstallMethodKey } from '../data/install.js';
 
 interface Props {
@@ -13,15 +13,17 @@ const base = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
 const guideHref = `${base}${method.href.replace(/^\//, '')}`;
+const clientGuideHref = `${base}getting-started/clients/`;
 ---
 
 <div class="install-method" data-install-method={method.key}>
-  <CopyableCode code={method.code} label={method.title} language={method.language} />
+  <Code code={method.code} lang={method.language} title={method.title} />
   {
     method.key === 'docker' && (
       <p>
         Compose listens on <code>0.0.0.0:3000</code> inside the container, publishes only to{' '}
-        <code>127.0.0.1</code> by default, and still requires <code>MCP_AUTH_TOKEN</code>.
+        <code>127.0.0.1</code> by default, and the normal startup guard requires{' '}
+        <code>MCP_AUTH_TOKEN</code>. Only the explicit unsafe override bypasses that guard.
       </p>
     )
   }
@@ -29,16 +31,19 @@ const guideHref = `${base}${method.href.replace(/^\//, '')}`;
     method.key === 'http' && (
       <p>
         Connect to <code>POST http://127.0.0.1:3000/mcp</code>. A direct loopback run does not
-        require <code>MCP_AUTH_TOKEN</code>; every wider bind does and belongs behind TLS.
+        require <code>MCP_AUTH_TOKEN</code>. The server refuses a wider bind without it unless the
+        explicit unsafe override is enabled; supported wider deployments use the token and TLS.
       </p>
     )
   }
   {
     method.key === 'stdio' && (
       <p>
-        Run <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code> first. Stdio does not
-        use <code>MCP_AUTH_TOKEN</code>; keep the client config private because it contains your API
-        key.
+        This JSON illustrates Claude Desktop's stdio shape; other clients use different
+        configuration formats. Run <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code>{' '}
+        first. Stdio does not use <code>MCP_AUTH_TOKEN</code>; keep the client config private
+        because it contains your API key.{' '}
+        <a href={clientGuideHref}>Use the recipe for your MCP client</a>.
       </p>
     )
   }

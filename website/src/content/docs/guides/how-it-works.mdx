@@ -1,0 +1,74 @@
+---
+title: How it works
+description: Follow a tool call from your MCP client through simplelogin-mcp to the SimpleLogin API and back.
+---
+
+import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
+import ArchitectureFlow from '../../../components/ArchitectureFlow.astro';
+
+`simplelogin-mcp` is a bridge you run between an MCP client and the SimpleLogin API. It does not
+replace SimpleLogin, host an account, or move alias routing into the MCP client.
+
+<ArchitectureFlow />
+
+## Request lifecycle
+
+<Steps>
+
+1. **The client connects.** It launches the server over stdio or sends MCP requests to `POST /mcp`
+   over Streamable HTTP.
+
+2. **The server checks the boundary.** HTTP requests are checked for an allowed browser origin and,
+   when configured, a matching bearer token.
+
+3. **The tool validates its input.** Schemas reject malformed arguments. Sensitive operations add
+   preconditions such as `confirm: true`, explicit mailbox transfer choices, or non-empty changes.
+
+4. **The server calls SimpleLogin.** `SL_API_KEY` is sent to the configured `SL_API_URL`. Each
+   outbound request has a timeout, and mutations are not retried automatically.
+
+5. **The response is checked and bounded.** Typed response schemas catch unexpected upstream
+   shapes. List tools use documented pages or local bounds to avoid unbounded MCP results.
+
+6. **The client receives the result.** The MCP client decides whether and how that result is sent to
+   a model, displayed, retained, or used in a later tool call.
+
+</Steps>
+
+## Who owns what
+
+<CardGrid>
+  <Card title="MCP client">
+    Receives your request, chooses a tool, supplies its typed arguments, and decides how results are
+    presented to you or a model.
+  </Card>
+  <Card title="simplelogin-mcp">
+    Validates configuration and tool arguments, enforces local guardrails, calls the documented
+    SimpleLogin endpoint, validates its response, and returns a bounded MCP result.
+  </Card>
+  <Card title="SimpleLogin">
+    Owns the account, aliases, mailboxes, domains, contacts, settings, and actual email forwarding
+    behavior.
+  </Card>
+</CardGrid>
+
+## Choose the process boundary
+
+| Shape          | Process and network boundary                                                                       | Best fit                                           |
+| -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Local stdio    | The MCP client launches a child process. No HTTP listener opens.                                   | One local desktop or command-line client.          |
+| Direct HTTP    | A persistent Node.js process listens on loopback by default.                                       | Same-machine clients that support Streamable HTTP. |
+| Docker Compose | A container listens internally on `0.0.0.0:3000`; Docker publishes it on host loopback by default. | Operator-managed or self-hosted deployments.       |
+
+All three expose the same [tool catalog](../../reference/tools/). The choice changes how the client
+reaches the server and where its environment secrets live—not which SimpleLogin actions are
+available.
+
+## HTTP requests are stateless
+
+The Streamable HTTP endpoint creates a fresh MCP server and transport for each `POST /mcp`; it does
+not keep an application session id or a project database. `GET /health` returns only process status
+and version. SimpleLogin remains the source of truth for account state.
+
+Continue with [Security & Data](../security/) for credentials, network exposure, and guardrails, or
+[set up your MCP client](../../getting-started/clients/) to connect over stdio or Streamable HTTP.

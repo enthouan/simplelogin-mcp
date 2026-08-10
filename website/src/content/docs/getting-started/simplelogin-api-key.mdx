@@ -1,0 +1,184 @@
+---
+title: Get a SimpleLogin API key
+description: Create a dedicated SimpleLogin API key, store it as SL_API_KEY, verify it safely, and rotate or revoke it.
+---
+
+import { Aside, LinkButton, Steps } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Independent integration for SimpleLogin">
+  simplelogin-mcp is an independent, open-source project. It is not an official SimpleLogin or
+  Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or
+  sponsored by SimpleLogin or Proton AG.
+
+Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
+
+</Aside>
+
+`simplelogin-mcp` needs one SimpleLogin API key in `SL_API_KEY`. SimpleLogin issues the key, and the
+server sends it in the `Authentication` header when calling the configured SimpleLogin API. This
+project does not create, recover, rotate, or revoke the key for you.
+
+## Before you begin
+
+- Sign in to the SimpleLogin account that the server should manage.
+- Decide whether you are using the hosted service or a self-hosted SimpleLogin instance. Create the
+  key on that same instance.
+- Have an ignored `.env` file, protected MCP client configuration, or deployment secret store
+  ready.
+- Never paste the key into a chat, prompt, command URL, screenshot, issue, pull request, log, or
+  tracked file.
+
+<Aside type="danger" title="Treat the key like a password">
+  SimpleLogin warns that API keys can be used to gain access to your account. The creation screen
+  does not offer a read-only scope or expiry, so treat the key as a broad account credential.
+</Aside>
+
+## Create and configure the key
+
+<LinkButton href="https://app.simplelogin.io/dashboard/api_key" variant="primary" icon="external">
+  Open SimpleLogin API Keys
+</LinkButton>
+
+<Steps>
+
+1. **Open SimpleLogin's API Keys page.**
+
+   Sign in at [app.simplelogin.io/dashboard/api_key](https://app.simplelogin.io/dashboard/api_key).
+   You can use SimpleLogin credentials or **Log in with Proton** when the accounts are linked.
+
+2. **Confirm your identity if prompted.**
+
+   SimpleLogin may show **Entering Sudo Mode** before opening this security-sensitive page. Enter
+   your SimpleLogin password and select **Submit**, or use the offered Proton or SSO authentication
+   option for a linked account.
+
+3. **Name and create the key.**
+
+   Under **New API Key**, enter a recognizable name such as `simplelogin-mcp on my Mac` or
+   `simplelogin-mcp Docker`, then select **Create**.
+
+   Before creating another key, review the existing entries. If an account already exceeds its
+   server's API-key limit, SimpleLogin's [current dashboard
+   logic at the audited upstream revision](https://github.com/simple-login/app/blob/f8ee0eb1c5258d008bf9b162b31febdbbb81d758/app/dashboard/views/api_key.py) removes
+   the oldest unused keys and then the oldest used keys before it creates a new one.
+
+4. **Copy the new key immediately.**
+
+   The creation screen initially masks the value and provides an eye control plus a **Copy** button.
+   SimpleLogin only makes the complete key available on this screen. Existing keys remain masked,
+   so a lost value must be replaced rather than recovered.
+
+5. **Store it as `SL_API_KEY`.**
+
+   Put the value only in the protected configuration used to launch simplelogin-mcp. For an ignored
+   `.env` file:
+
+   ```dotenv
+   SL_API_KEY=replace-with-the-key-you-just-copied
+   ```
+
+   Do not paste the real value into a terminal command, where it may be retained in shell history.
+
+6. **Point self-hosted installations at the same instance.**
+
+   Hosted-service users can keep the default `SL_API_URL`. Self-hosted users must set the web-app
+   origin that issued the key:
+
+   ```dotenv
+   SL_API_URL=https://your-simplelogin-instance.example
+   SL_API_KEY=replace-with-a-key-from-that-instance
+   ```
+
+7. **Restart and verify without changing account data.**
+
+   Restart simplelogin-mcp, reconnect the MCP client, and ask: “Can you show me my SimpleLogin
+   account usage?” Review the proposed read-only `account_get_stats` call before approving it.
+
+</Steps>
+
+## Know which value is which
+
+| Setting          | What it means and how to handle it                                                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SL_API_KEY`     | **Issued by SimpleLogin.** Authenticates simplelogin-mcp to the configured SimpleLogin API through the outbound `Authentication` header. Treat it like a password and never place it in a prompt or shared file.                        |
+| `SL_API_URL`     | **You choose the instance.** Selects the hosted or self-hosted SimpleLogin web-app origin; it is not a credential. Keep it on HTTPS and create the key on this same instance. Hosted users normally keep the default.                   |
+| `MCP_AUTH_TOKEN` | **You create it when needed.** Protects the separate Streamable HTTP `/mcp` endpoint. It is not sent to SimpleLogin and does not replace `SL_API_KEY`. Use a separate strong secret and HTTPS whenever HTTP is exposed beyond loopback. |
+
+## Self-hosted SimpleLogin
+
+Open `https://your-simplelogin-instance.example/dashboard/api_key` and create the key there. A key
+created on `app.simplelogin.io` does not authenticate to a separate self-hosted instance, and a
+self-hosted key does not authenticate to the hosted service.
+
+Self-hosted releases and forks can differ from the hosted dashboard. If the route or labels differ,
+use that instance's account menu to find **API Keys**, and confirm its API behavior before relying on
+the examples in this guide.
+
+## Rotate or revoke a key
+
+If a key is exposed, no longer needed, or tied to the wrong installation:
+
+<Steps>
+
+1. **Create a replacement key** on the same API Keys page. If the current key may be exposed, delete
+   it first and accept the brief service interruption.
+
+2. **Update `SL_API_KEY`** in the private client configuration, ignored `.env`, or deployment secret.
+
+3. **Restart simplelogin-mcp** so the process receives the replacement value.
+
+4. **Verify the replacement** with the read-only account-usage prompt before approving any write.
+
+5. **Delete the old key** from the API Keys page after the replacement works. Select **Delete** for
+   that one integration and confirm **Yes, delete it**. Avoid **Delete All** unless you intend to
+   revoke every API key on the account, including manually created keys and keys used by
+   SimpleLogin mobile apps or browser extensions.
+
+</Steps>
+
+Revoking `SL_API_KEY` does not rotate the separate `MCP_AUTH_TOKEN`. Replace that secret
+independently if the HTTP bearer credential is exposed.
+
+## Troubleshooting
+
+### The API Keys page asks for another password
+
+This is SimpleLogin's **Entering Sudo Mode** confirmation for a security-sensitive setting. Use the
+available SimpleLogin, Proton, or SSO authentication option. The confirmation is operated by
+SimpleLogin, not by simplelogin-mcp.
+
+### The key was not copied
+
+Existing keys are deliberately masked. Return to the API Keys page, delete the unusable entry, and
+create a replacement. Do not try to recover the value from logs, browser storage, or screenshots.
+
+### simplelogin-mcp reports `401`, `403`, or “Invalid API key”
+
+- Remove accidental whitespace or quotation marks from the stored value.
+- Confirm the key came from the same instance configured in `SL_API_URL`.
+- Restart the server after changing its environment.
+- Retry the read-only account-usage prompt before attempting a write.
+
+### The self-hosted page or API behaves differently
+
+Confirm the instance version and its API-key route with that deployment's administrator. Older or
+forked instances can differ from the hosted SimpleLogin UI and from the response schemas validated
+by this server.
+
+## Official SimpleLogin references
+
+- [SimpleLogin API Keys](https://app.simplelogin.io/dashboard/api_key) is the hosted credential
+  management page.
+- [SimpleLogin API documentation](https://github.com/simple-login/app/blob/master/docs/api.md)
+  documents the `Authentication` header, invalid-key responses, and account endpoints.
+- [SimpleLogin documentation](https://simplelogin.io/docs/) covers account registration, Proton
+  sign-in, aliases, mailboxes, and other official product workflows.
+- [SimpleLogin source repository](https://github.com/simple-login/app) is the authoritative source
+  for self-hosted routes and dashboard behavior.
+
+## Continue setup
+
+- [Install and run simplelogin-mcp](../).
+- [Connect an MCP client](../clients/).
+- [Review every configuration setting](../../reference/configuration/).
+- [Understand the security boundaries](../../guides/security/).

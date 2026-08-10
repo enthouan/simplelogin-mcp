@@ -20,6 +20,9 @@ export const INSTALL_METHODS = [
 cd simplelogin-mcp
 cp .env.example .env
 # Set SL_API_KEY and MCP_AUTH_TOKEN in .env
+\${EDITOR:-vi} .env
+grep -Eq '^SL_API_KEY=.+$' .env || { echo 'Set SL_API_KEY in .env before starting.' >&2; exit 1; }
+grep -Eq '^MCP_AUTH_TOKEN=.+$' .env || { echo 'Set MCP_AUTH_TOKEN in .env before starting.' >&2; exit 1; }
 docker compose up -d
 docker compose ps
 curl http://localhost:3000/health`,
@@ -30,10 +33,14 @@ curl http://localhost:3000/health`,
     title: 'Direct Node.js on loopback',
     language: 'shell',
     href: 'getting-started/http/',
-    code: `corepack enable
+    code: `git clone https://github.com/enthouan/simplelogin-mcp.git
+cd simplelogin-mcp
+corepack enable
 pnpm install --frozen-lockfile
 cp .env.example .env
 # Keep TRANSPORT=http, HOST=127.0.0.1, and PORT=3000; set SL_API_KEY in .env
+\${EDITOR:-vi} .env
+grep -Eq '^SL_API_KEY=.+$' .env || { echo 'Set SL_API_KEY in .env before starting.' >&2; exit 1; }
 pnpm build
 # Load the file without putting the key in shell history or the parent shell
 (
@@ -46,7 +53,7 @@ pnpm build
   {
     key: 'stdio',
     label: 'stdio',
-    title: 'Desktop client process configuration',
+    title: 'Claude Desktop-compatible stdio configuration',
     language: 'json',
     href: 'getting-started/stdio/',
     code: `{

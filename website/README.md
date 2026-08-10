@@ -6,7 +6,13 @@ MDX structure, responsive layouts, themes, and accessibility behavior as the ins
 content grows. Its dependencies live in the private `website` workspace so the MCP server build and
 runtime do not install them. Tool names, summaries, groups, and counts are generated from
 `src/tools/catalog.ts`; install and security copy is covered by drift tests against the repository
-documentation and configuration.
+documentation and configuration. The Lucide-derived mail geometry used by the logo and social card
+is covered by the distributed `public/third-party-notices.txt`.
+
+The sidebar is organized into **Get started**, **Guides**, and **Reference**. The API coverage page
+renders `docs/api-coverage.md` directly so endpoint-scope claims have one canonical source. When a
+page moves between sections, keep a static redirect in `astro.config.mjs` so published links and
+bookmarks continue to resolve.
 
 ## Build and check
 
@@ -33,34 +39,27 @@ pnpm website:preview
 
 ## Publication metadata
 
-Local builds have no canonical URL or sitemap, use `noindex`, and emit a `robots.txt` that disallows
-crawling. Once a real HTTPS production URL is approved, pass it at build time:
+The approved canonical origin is `https://simplelogin-mcp.com/`. Ordinary production builds default
+to that URL, emit canonical and Open Graph URLs, use `index, follow`, and let Starlight create the
+sitemap:
 
 ```bash
-WEBSITE_BASE_URL=https://example.com/simplelogin-mcp/ pnpm website:build
-WEBSITE_BASE_URL=https://example.com/simplelogin-mcp/ pnpm website:preview
+pnpm website:build
+pnpm website:preview
 ```
 
-That value must be HTTPS and cannot contain credentials, percent-encoded path segments, repeated or
-unsafe path separators, a query string, or a fragment. Use the same value for build and preview so a
-subpath deployment is served at its real base path. A production build adds canonical and Open Graph
-URLs, emits an indexable `robots.txt`, and lets Starlight create its sitemap. Do not set a placeholder
-URL or link the site from the project README until the public deployment responds successfully.
+The development server has no canonical URL and remains non-indexable. Tests and alternate preview
+deployments can override `WEBSITE_BASE_URL`; an explicit empty value produces a noindex build with no
+canonical URL or sitemap. A non-empty override must use HTTPS and cannot contain credentials,
+percent-encoded path segments, repeated or unsafe path separators, a query string, or a fragment.
+The public deployment must remain at the approved canonical origin; do not publish a production
+override as the canonical site.
 
-Local builds show the source-repository link for review. Production builds deliberately omit that
-link while the repository is private. Once anonymous access to the repository has been verified,
-enable the header link and the homepage “Star on GitHub” action in the production build:
+Repository links and GitHub actions are always rendered. Builds do not call the GitHub API; the
+repository cards contain only static project facts such as the MIT license, supported Node version,
+and self-hosting model.
 
-```bash
-WEBSITE_BASE_URL=https://example.com/simplelogin-mcp/ \
-  WEBSITE_REPOSITORY_PUBLIC=true \
-  pnpm website:build
-```
-
-Do not set `WEBSITE_REPOSITORY_PUBLIC=true` before the repository is actually public; the resulting
-link would otherwise send signed-out visitors to a login or not-found page.
-
-For a subpath deployment, crawlers still request the origin-root `/robots.txt`; they do not use the
-copy served below `/simplelogin-mcp/robots.txt`. Configure the hosting layer’s root robots file to
-allow the site path and reference the generated subpath sitemap, or publish on a dedicated origin.
-The per-page robots meta remains effective either way.
+The canonical site is hosted at the origin root, so its generated `/robots.txt` is authoritative.
+For a test-only subpath override, crawlers still request the origin-root `/robots.txt`; configure the
+hosting layer’s root robots file if that preview must be crawlable. Per-page robots metadata remains
+effective either way.

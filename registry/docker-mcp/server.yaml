@@ -10,9 +10,9 @@ meta:
     - simplelogin
     - mcp
 about:
-  title: SimpleLogin MCP
-  description: Manage SimpleLogin aliases, mailboxes, domains, settings, and account utilities.
-  icon: https://www.google.com/s2/favicons?domain=simplelogin.io&sz=64
+  title: simplelogin-mcp
+  description: Independent MCP server for SimpleLogin alias and account workflows.
+  icon: https://simplelogin-mcp.com/favicon.svg
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main

@@ -1,3 +1,5 @@
+export const CANONICAL_WEBSITE_URL = 'https://simplelogin-mcp.com/';
+
 export function normalizePublicationUrl(value: string | undefined): URL | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
@@ -30,4 +32,13 @@ export function normalizePublicationUrl(value: string | undefined): URL | undefi
   }
   if (!url.pathname.endsWith('/')) url.pathname += '/';
   return url;
+}
+
+export function resolvePublicationUrl(
+  value: string | undefined,
+  useCanonicalDefault = false,
+): URL | undefined {
+  return normalizePublicationUrl(
+    value === undefined && useCanonicalDefault ? CANONICAL_WEBSITE_URL : value,
+  );
 }

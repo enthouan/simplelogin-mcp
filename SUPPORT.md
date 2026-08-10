@@ -36,7 +36,8 @@ leftover SimpleLogin artifacts before rerunning.
 
 Do not open a public issue for vulnerabilities, credential leaks, authentication bypasses, or
 exposure problems. Follow [SECURITY.md](SECURITY.md) and use GitHub private vulnerability reporting
-from the repository's Security tab.
+from the repository's Security tab when that action is available. If it is not visible, do not
+publish sensitive details in an issue or discussion.
 
 ## Support Boundaries
 

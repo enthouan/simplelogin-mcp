@@ -5,6 +5,7 @@ description: Run simplelogin-mcp as a loopback-published Compose service.
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 import InstallMethod from '../../../components/InstallMethod.astro';
+import VerifySetup from '../../../components/VerifySetup.astro';
 
 Use the operator Compose file to run the published container image. The application listens on
 `0.0.0.0:3000` inside the container so Docker can forward the port, while the host publishes only
@@ -18,8 +19,8 @@ to `127.0.0.1` by default.
 
 1. **Create `.env`.** Copy `.env.example`; Compose reads it for variable interpolation.
 
-2. **Set `SL_API_KEY`.** This authenticates the server to SimpleLogin and grants full account
-   control.
+2. **Set `SL_API_KEY`.** [Create a dedicated key](../simplelogin-api-key/), then store it in `.env`. This
+   authenticates the server to SimpleLogin and grants full account control.
 
 3. **Generate `MCP_AUTH_TOKEN`.** Run `openssl rand -hex 32` and store the result in `.env`.
 
@@ -41,3 +42,10 @@ Use `SIMPLELOGIN_MCP_HOST_PORT` for the published host port. Set
 
 The container listener stays on port `3000`; changing the host port does not require changing the
 application `PORT`.
+
+## Verify through MCP
+
+Health only proves that the process is running. Connect an MCP client to `http://127.0.0.1:3000/mcp`
+with the configured bearer token, then verify discovery and a read-only tool call.
+
+<VerifySetup />

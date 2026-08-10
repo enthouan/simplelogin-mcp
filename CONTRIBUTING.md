@@ -6,6 +6,7 @@ without explicit documentation and tests.
 
 ## Requirements
 
+- Git.
 - Node.js 24.x.
 - pnpm, preferably through Corepack (`corepack enable`).
 - Docker and Docker Compose when changing container behavior.
@@ -33,6 +34,7 @@ pnpm typecheck      # TypeScript without emit
 pnpm lint           # ESLint
 pnpm build          # compile TypeScript to dist/
 pnpm test           # Vitest unit tests, no live network required
+pnpm website:check  # Astro diagnostics, production build, and website drift tests
 pnpm format         # Prettier write
 pnpm format:check   # Prettier check
 pnpm smoke:live     # manual live SimpleLogin smoke test; opt-in only
@@ -45,6 +47,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm test
+pnpm website:check
 pnpm format:check
 ```
 

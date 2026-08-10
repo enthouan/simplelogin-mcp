@@ -1,0 +1,23 @@
+---
+import { Aside, Code } from '@astrojs/starlight/components';
+import { VERIFY_EXPECTED, VERIFY_PROMPT } from '../data/clients.js';
+
+interface Props {
+  headingId?: string;
+  hideHeading?: boolean;
+}
+
+const { headingId = 'verify-setup', hideHeading = false } = Astro.props;
+---
+
+<section
+  aria-labelledby={hideHeading ? undefined : headingId}
+  aria-label={hideHeading ? 'Connection verification' : undefined}
+>
+  {!hideHeading && <h3 id={headingId}>Verify it works</h3>}
+  <p>After the client discovers the server, review and approve only this named read-only call:</p>
+  <Code code={VERIFY_PROMPT} lang="text" meta='title="Read-only verification prompt"' />
+  <Aside type="tip" title="Expected result">
+    <p>{VERIFY_EXPECTED}</p>
+  </Aside>
+</section>

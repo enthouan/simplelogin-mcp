@@ -1,0 +1,84 @@
+---
+title: Client compatibility
+description: Compatibility routes and the evidence currently available for each MCP client setup.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+
+Compatibility claims are separated from setup instructions here. The named local stdio recipes
+below have been exercised end to end, but a point-in-time test does not guarantee compatibility
+with every past or future client release.
+
+## Review levels
+
+| Level                      | Meaning                                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Protocol implemented**   | The server implements the transport with the official MCP SDK and the repository contains transport, configuration, authentication, and origin checks. This is not a named-client certification. |
+| **Configuration reviewed** | The setup shape was checked against the client's published configuration documentation and this server's runtime requirements. It has not been represented as a live interoperability test.      |
+| **Client tested**          | The documented route connected to simplelogin-mcp, discovered the expected tool catalog, and completed the standard read-only account-usage check. This is point-in-time evidence.               |
+
+## Named-client matrix
+
+<div className="compatibility-matrix">
+
+| MCP client     | Tested route             | Current evidence                                                                                                                                         | Test scope                                                                                                           |
+| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Codex          | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The shared-TOML recipe connected, discovered all 27 tools, and completed the read-only account-usage check.          |
+| Claude Code    | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The project-scoped recipe connected, discovered all 27 tools, and completed the read-only account-usage check.       |
+| Claude Desktop | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The local Node.js recipe connected, discovered all 27 tools, and completed the read-only account-usage check.        |
+| VS Code        | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The user-profile recipe connected, discovered all 27 tools, and completed the read-only account-usage check.         |
+| OpenCode       | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The environment-backed recipe connected, discovered all 27 tools, and completed the read-only account-usage check.   |
+| Generic MCP    | stdio or Streamable HTTP | <Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} /> | Compatibility depends on the host supporting the selected transport and, for protected HTTP, a custom bearer header. |
+
+</div>
+
+These results were confirmed by the maintainer for the documented local stdio routes. Exact client
+and platform versions were not retained, so treat them as point-in-time interoperability checks,
+not version support guarantees. The Streamable HTTP examples remain documentation-reviewed routes.
+
+Use [Client setup](../clients/) for the tested recipes. If a client's configuration format changes,
+its current documentation remains authoritative.
+
+## Transport requirements
+
+### stdio clients
+
+A compatible stdio host must be able to:
+
+- launch a long-running child process;
+- keep stdin and stdout attached to that process;
+- pass `TRANSPORT=stdio` and `SL_API_KEY` as environment variables; and
+- use an absolute path when launching a locally built `dist/index.js`.
+
+The server writes diagnostics to stderr because stdout is reserved for MCP protocol messages.
+
+### Streamable HTTP clients
+
+A compatible HTTP host must support the current Streamable HTTP transport and connect to
+`POST /mcp`. When `MCP_AUTH_TOKEN` is configured, it must also send:
+
+```http
+Authorization: Bearer YOUR_MCP_AUTH_TOKEN
+```
+
+`GET /health` verifies that the HTTP process is running. It does not verify MCP tool discovery or
+the SimpleLogin API key.
+
+### Browser-based clients
+
+Browser clients have an additional deployment requirement. The server checks `Origin` on
+`POST /mcp`, but it does not implement general CORS headers or `OPTIONS` preflights. Use a
+same-origin deployment or a reverse proxy that handles CORS, then add the exact browser origin to
+`MCP_ALLOWED_ORIGINS` when it is not loopback.
+
+## What the client tests covered
+
+The maintainer confirmed that each named local stdio recipe:
+
+1. launched the current simplelogin-mcp development build;
+2. established an MCP connection over local stdio;
+3. discovered the complete 27-tool catalog; and
+4. completed a read-only `account_get_stats` call without changing the SimpleLogin account.
+
+Future refreshes should also record the exact client version, simplelogin-mcp release or commit,
+platform, and test date. Never include credentials or account data in the evidence.

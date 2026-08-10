@@ -1,47 +1,506 @@
 ---
+import { Badge } from '@astrojs/starlight/components';
 import { TOOL_CATALOG } from '../../../src/tools/catalog.js';
 import { CATEGORY_ENTRIES } from '../data/catalog.js';
 ---
 
-<div class="tool-catalog not-content" data-tool-count={TOOL_CATALOG.length}>
+<div class="tool-catalog not-content" data-tool-catalog data-tool-count={TOOL_CATALOG.length}>
+  <form class="catalog-controls" data-catalog-controls hidden>
+    <label>
+      <span>Search tools</span>
+      <input
+        type="search"
+        name="query"
+        placeholder="Name, purpose, or input"
+        autocomplete="off"
+        data-catalog-search
+      />
+    </label>
+    <label>
+      <span>Category</span>
+      <select name="category" data-catalog-category>
+        <option value="all">All categories</option>
+        {CATEGORY_ENTRIES.map(({ category, label }) => <option value={category}>{label}</option>)}
+      </select>
+    </label>
+    <label>
+      <span>Behavior</span>
+      <select name="behavior" data-catalog-behavior>
+        <option value="all">All behaviors</option>
+        <option value="read-only">Read only</option>
+        <option value="writes">Writes data</option>
+        <option value="destructive">Destructive</option>
+      </select>
+    </label>
+    <button type="reset">Reset</button>
+    <p class="catalog-status" role="status" aria-live="polite" data-catalog-status>
+      {TOOL_CATALOG.length} tools shown
+    </p>
+  </form>
+
+  <p class="catalog-empty" data-catalog-empty hidden>
+    No tools match those filters. Try a different search, category, or behavior.
+  </p>
+
   {
-    CATEGORY_ENTRIES.map(({ category, label, description, tools }) => (
-      <section class="tool-group" aria-labelledby={`tool-group-${category}`}>
+    CATEGORY_ENTRIES.map(({ category, label, description, example, tools }) => (
+      <section class="tool-group" aria-labelledby={`tool-group-${category}`} data-tool-group>
         <header>
           <div>
             <h2 id={`tool-group-${category}`}>{label}</h2>
             <p>{description}</p>
+            <p class="category-example">
+              <strong>Example prompt:</strong> “{example}”
+            </p>
           </div>
-          <span aria-label={`${tools.length} tools`}>{tools.length}</span>
+          <div class="category-count">
+            <Badge
+              text={`${tools.length} tools`}
+              size="small"
+              aria-label={`${tools.length} tools`}
+            />
+          </div>
         </header>
         <ul>
-          {tools.map((tool) => (
-            <li data-tool-name={tool.name}>
-              <div class="tool-name">
-                <code>{tool.name}</code>
-                <div class="tool-badges" aria-label="Tool behavior">
-                  <span>{tool.annotations.readOnlyHint ? 'Read only' : 'Writes data'}</span>
-                  <span>{tool.annotations.idempotentHint ? 'Idempotent' : 'Not idempotent'}</span>
-                  {tool.annotations.destructiveHint && <span>Destructive impact</span>}
+          {tools.map((tool) => {
+            const requiredCount = tool.inputs.filter((input) => input.required).length;
+            const optionalCount = tool.inputs.length - requiredCount;
+            const searchText = [
+              tool.name,
+              tool.summary,
+              tool.description,
+              tool.bounds,
+              tool.output,
+              ...tool.inputs.flatMap((input) => [input.name, input.description]),
+            ]
+              .join(' ')
+              .toLocaleLowerCase();
+
+            return (
+              <li
+                id={tool.name}
+                data-tool-card
+                data-tool-name={tool.name}
+                data-category={tool.category}
+                data-read-only={String(tool.annotations.readOnlyHint)}
+                data-destructive={String(tool.annotations.destructiveHint)}
+                data-search={searchText}
+              >
+                <div class="tool-heading">
+                  <h3>
+                    <a href={`#${tool.name}`} aria-label={`Link to ${tool.name}`}>
+                      <code>{tool.name}</code>
+                      <span aria-hidden="true">#</span>
+                    </a>
+                  </h3>
+                  <div class="tool-behaviors" aria-label="Tool behavior">
+                    <Badge
+                      text={tool.annotations.readOnlyHint ? 'Read only' : 'Writes data'}
+                      variant={tool.annotations.readOnlyHint ? 'success' : 'caution'}
+                      size="small"
+                    />
+                    <Badge
+                      text={tool.annotations.idempotentHint ? 'Idempotent' : 'Not idempotent'}
+                      variant="note"
+                      size="small"
+                    />
+                    {tool.annotations.destructiveHint && (
+                      <Badge text="Destructive" variant="danger" size="small" />
+                    )}
+                  </div>
                 </div>
-              </div>
-              <p>{tool.summary}</p>
-              <dl>
-                <div>
-                  <dt>Bounds</dt>
-                  <dd>{tool.bounds}</dd>
-                </div>
-                <div>
-                  <dt>Output</dt>
-                  <dd>
-                    <code>{tool.output}</code>
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          ))}
+                <p>{tool.summary}</p>
+                <p class="tool-usage">
+                  <strong>Usage and constraints:</strong> {tool.description}
+                </p>
+                <details class="tool-inputs">
+                  <summary>
+                    Inputs
+                    <span>
+                      {tool.inputs.length === 0
+                        ? 'none'
+                        : [
+                            requiredCount > 0 ? `${requiredCount} required` : undefined,
+                            optionalCount > 0 ? `${optionalCount} optional` : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(', ')}
+                    </span>
+                  </summary>
+                  {tool.inputs.length === 0 ? (
+                    <p>This tool takes no input arguments.</p>
+                  ) : (
+                    <dl>
+                      {tool.inputs.map((input) => (
+                        <div>
+                          <dt>
+                            <code>{input.name}</code>
+                            <Badge
+                              text={input.required ? 'Required field' : 'Optional field'}
+                              variant={input.required ? 'default' : 'note'}
+                              size="small"
+                            />
+                          </dt>
+                          <dd>{input.description}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </details>
+                <dl class="tool-meta">
+                  <div>
+                    <dt>Bounds</dt>
+                    <dd>{tool.bounds}</dd>
+                  </div>
+                  <div>
+                    <dt>Output</dt>
+                    <dd>
+                      <code>{tool.output}</code>
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            );
+          })}
         </ul>
       </section>
     ))
   }
 </div>
+
+<script>
+  function initializeToolCatalog(root: HTMLElement) {
+    if (root.dataset.enhanced === 'true') return;
+    root.dataset.enhanced = 'true';
+
+    const controls = root.querySelector<HTMLElement>('[data-catalog-controls]');
+    const search = root.querySelector<HTMLInputElement>('[data-catalog-search]');
+    const category = root.querySelector<HTMLSelectElement>('[data-catalog-category]');
+    const behavior = root.querySelector<HTMLSelectElement>('[data-catalog-behavior]');
+    const status = root.querySelector<HTMLElement>('[data-catalog-status]');
+    const empty = root.querySelector<HTMLElement>('[data-catalog-empty]');
+    const cards = [...root.querySelectorAll<HTMLElement>('[data-tool-card]')];
+    const groups = [...root.querySelectorAll<HTMLElement>('[data-tool-group]')];
+
+    if (!controls || !search || !category || !behavior || !status || !empty) return;
+    controls.hidden = false;
+
+    controls.addEventListener('submit', (event) => event.preventDefault());
+
+    const update = () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+
+      for (const card of cards) {
+        const matchesSearch = !query || card.dataset.search?.includes(query);
+        const matchesCategory =
+          category.value === 'all' || card.dataset.category === category.value;
+        const matchesBehavior =
+          behavior.value === 'all' ||
+          (behavior.value === 'read-only' && card.dataset.readOnly === 'true') ||
+          (behavior.value === 'writes' && card.dataset.readOnly === 'false') ||
+          (behavior.value === 'destructive' && card.dataset.destructive === 'true');
+        const visible = Boolean(matchesSearch && matchesCategory && matchesBehavior);
+        card.hidden = !visible;
+        if (visible) visibleCount += 1;
+      }
+
+      for (const group of groups) {
+        group.hidden = !group.querySelector('[data-tool-card]:not([hidden])');
+      }
+
+      status.textContent = `${visibleCount} of ${cards.length} tools shown`;
+      empty.hidden = visibleCount !== 0;
+    };
+
+    controls.addEventListener('input', update);
+    controls.addEventListener('change', update);
+    controls.addEventListener('reset', () => window.setTimeout(update));
+  }
+
+  function initializeToolCatalogs() {
+    document.querySelectorAll<HTMLElement>('[data-tool-catalog]').forEach(initializeToolCatalog);
+  }
+
+  initializeToolCatalogs();
+  document.addEventListener('astro:page-load', initializeToolCatalogs);
+</script>
+
+<style>
+  .tool-catalog {
+    display: grid;
+    gap: 1.5rem;
+    margin-block: 2rem;
+  }
+
+  .tool-group {
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5);
+  }
+
+  .tool-group > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: clamp(1rem, 2vw, 1.4rem);
+    background: var(--sl-color-gray-7);
+  }
+
+  .tool-group > header h2 {
+    margin: 0;
+    font-size: var(--sl-text-h2);
+  }
+
+  .tool-group > header p {
+    margin: 0.35rem 0 0;
+    color: var(--sl-color-gray-3);
+  }
+
+  .tool-group > ul {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tool-group > ul > li {
+    min-width: 0;
+    padding: clamp(1rem, 2vw, 1.35rem);
+    border-top: 1px solid var(--sl-color-gray-6);
+  }
+
+  .tool-group li > p {
+    margin: 0.7rem 0;
+    color: var(--sl-color-gray-2);
+  }
+
+  .tool-group li > .tool-usage {
+    padding: 0.75rem;
+    border-inline-start: 3px solid var(--sl-color-accent);
+    background: var(--sl-color-gray-7);
+    font-size: var(--sl-text-sm);
+  }
+
+  .tool-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem 1.25rem;
+    margin: 0;
+  }
+
+  .tool-meta > div {
+    min-width: 0;
+  }
+
+  .tool-meta dt {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .tool-meta dd {
+    margin: 0.15rem 0 0;
+    overflow-wrap: anywhere;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  .catalog-controls {
+    display: grid;
+    grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(9rem, 1fr)) auto;
+    align-items: end;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-gray-7);
+  }
+
+  .catalog-controls label {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .catalog-controls label > span {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+  }
+
+  .catalog-controls :is(input, select, button) {
+    min-height: 2.5rem;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.25rem;
+    color: var(--sl-color-white);
+    background: var(--sl-color-black);
+    font: inherit;
+  }
+
+  .catalog-controls :is(input, select) {
+    width: 100%;
+    padding-inline: 0.65rem;
+  }
+
+  .catalog-controls button {
+    padding-inline: 0.9rem;
+    cursor: pointer;
+  }
+
+  .catalog-controls :is(input, select, button):focus-visible {
+    outline: 2px solid var(--sl-color-accent-high);
+    outline-offset: 2px;
+  }
+
+  .catalog-status {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+
+  .catalog-empty {
+    margin: 1rem 0 0;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+  }
+
+  .category-example {
+    font-size: var(--sl-text-sm);
+  }
+
+  .category-count {
+    flex: 0 0 auto;
+  }
+
+  .tool-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .tool-heading h3 {
+    min-width: 0;
+    flex: 1 1 10rem;
+    margin: 0;
+    font-size: var(--sl-text-base);
+  }
+
+  .tool-heading h3 a {
+    display: inline-flex;
+    gap: 0.35rem;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+
+  .tool-heading h3 a > span {
+    color: var(--sl-color-gray-4);
+    opacity: 0;
+  }
+
+  .tool-heading h3 a:is(:hover, :focus-visible) > span {
+    opacity: 1;
+  }
+
+  .tool-behaviors {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.35rem;
+  }
+
+  .tool-inputs {
+    margin-block: 0.8rem;
+    border-block: 1px solid var(--sl-color-gray-6);
+    padding-block: 0.65rem;
+  }
+
+  .tool-inputs summary {
+    color: var(--sl-color-gray-2);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .tool-inputs summary span {
+    margin-inline-start: 0.35rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+  }
+
+  .tool-inputs dl {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.8rem 0 0;
+  }
+
+  .tool-inputs dl > div {
+    min-width: 0;
+  }
+
+  .tool-inputs dt {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tool-inputs dd,
+  .tool-inputs > p {
+    margin: 0.2rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+
+  [data-tool-card] {
+    scroll-margin-top: 5rem;
+  }
+
+  [data-tool-card]:target {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: -2px;
+  }
+
+  @media (min-width: 54rem) {
+    .tool-group > ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tool-group > ul > li:nth-child(even) {
+      border-inline-start: 1px solid var(--sl-color-gray-6);
+    }
+  }
+
+  @media (max-width: 58rem) {
+    .catalog-controls {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .catalog-controls label:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 42rem) {
+    .catalog-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .catalog-controls label:first-child,
+    .catalog-status {
+      grid-column: auto;
+    }
+
+    .tool-heading {
+      flex-direction: column;
+    }
+
+    .tool-meta {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

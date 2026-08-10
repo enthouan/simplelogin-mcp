@@ -12,8 +12,8 @@ secrets unless that publication step is explicitly approved.
 - Glama API lookup for `enthouan/simplelogin-mcp`: `404` / server not found.
 - Current committed package version: `0.8.1`; registry metadata intentionally points at
   `ghcr.io/enthouan/simplelogin-mcp:0.8.1`, not `latest`.
-- Official MCP Registry publication is deferred until the `0.8.1` semver image has been published
-  with the `io.modelcontextprotocol.server.name` annotation.
+- The `0.8.1` and `latest` OCI manifests are anonymously pullable from GHCR. Repository visibility,
+  signed-out package-page access, and registry submission remain separate launch gates.
 - Registry server name: `io.github.enthouan/simplelogin-mcp`.
 - Local readiness drift checks are covered by `test/registry.test.ts`.
 
@@ -31,9 +31,13 @@ Readiness checklist:
       range.
 - [x] Represent stdio execution with `transport.type=stdio` and `TRANSPORT=stdio`.
 - [x] Mark `SL_API_KEY` required and secret without a committed value.
-- [ ] Make the repository and the GHCR image publicly accessible before publication.
-- [ ] Publish a semver GHCR image for the target release before publishing matching registry
-      metadata.
+- [ ] Make the repository publicly accessible and verify the GitHub package page as a signed-out
+      visitor before publication.
+- [ ] Verify that `https://simplelogin-mcp.com/` and
+      `https://simplelogin-mcp.com/favicon.svg` both return `200` over HTTPS to a signed-out visitor
+      before publishing registry metadata that links to them.
+- [x] Publish an anonymously pullable semver GHCR image for the target release before publishing
+      matching registry metadata.
 - [ ] Authenticate with `mcp-publisher` using GitHub auth or GitHub OIDC.
 - [ ] Run `mcp-publisher publish` only after the publication step is explicitly approved.
 

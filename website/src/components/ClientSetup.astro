@@ -1,0 +1,123 @@
+---
+import { Aside, Code, TabItem, Tabs } from '@astrojs/starlight/components';
+import { CLIENT_SETUPS } from '../data/clients.js';
+import VerifySetup from './VerifySetup.astro';
+---
+
+<div data-client-setups>
+  <div class="client-anchor-targets" aria-hidden="true">
+    {
+      CLIENT_SETUPS.map((client) => (
+        <span
+          id={client.key}
+          data-client-anchor
+          data-client-key={client.key}
+          data-client-icon={client.icon}
+        />
+      ))
+    }
+  </div>
+
+  <Tabs syncKey="mcp-client">
+    {
+      CLIENT_SETUPS.map((client) => (
+        <TabItem label={client.label}>
+          <p>{client.description}</p>
+          <p>
+            <strong>Where to configure it:</strong> {client.configLocation}
+          </p>
+          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+          <Aside type="caution" title="Protect the SimpleLogin API key">
+            <p>{client.secretNote}</p>
+          </Aside>
+          <p>
+            <strong>Reload the client:</strong> {client.reload}
+          </p>
+          <p>
+            Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
+          </p>
+          <VerifySetup headingId={`verify-${client.key}`} />
+        </TabItem>
+      ))
+    }
+  </Tabs>
+
+  <noscript>
+    <style>
+      [data-client-setups] > starlight-tabs {
+        display: none !important;
+      }
+    </style>
+    <p>
+      JavaScript is disabled. All client recipes are expanded below; copy configuration values
+      manually.
+    </p>
+    {
+      CLIENT_SETUPS.map((client) => (
+        <section aria-labelledby={`no-script-${client.key}`}>
+          <h3 id={`no-script-${client.key}`}>{client.label}</h3>
+          <p>{client.description}</p>
+          <p>
+            <strong>Where to configure it:</strong> {client.configLocation}
+          </p>
+          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+          <p>
+            <strong>Protect the SimpleLogin API key:</strong> {client.secretNote}
+          </p>
+          <p>
+            <strong>Reload the client:</strong> {client.reload}
+          </p>
+          <p>
+            Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
+          </p>
+        </section>
+      ))
+    }
+  </noscript>
+</div>
+
+<script>
+  async function selectLinkedClient(root: HTMLElement) {
+    const anchors = [...root.querySelectorAll<HTMLElement>('[data-client-anchor]')];
+    await customElements.whenDefined('starlight-tabs');
+    const tabs = [...root.querySelectorAll<HTMLAnchorElement>('[role="tab"]')];
+
+    tabs.forEach((tab, index) => {
+      const icon = anchors[index]?.dataset.clientIcon;
+      if (icon) tab.dataset.clientIcon = icon;
+    });
+
+    const key = decodeURIComponent(window.location.hash.slice(1));
+    if (!key) return;
+
+    const clientIndex = anchors.findIndex((anchor) => anchor.dataset.clientKey === key);
+    if (clientIndex === -1) return;
+
+    tabs[clientIndex]?.click();
+    window.requestAnimationFrame(() => anchors[clientIndex]?.scrollIntoView({ block: 'start' }));
+  }
+
+  function initializeClientDeepLinks() {
+    document
+      .querySelectorAll<HTMLElement>('[data-client-setups]')
+      .forEach((root) => void selectLinkedClient(root));
+  }
+
+  initializeClientDeepLinks();
+  document.addEventListener('astro:page-load', initializeClientDeepLinks);
+  window.addEventListener('hashchange', initializeClientDeepLinks);
+</script>
+
+<style>
+  .client-anchor-targets {
+    position: relative;
+    height: 0;
+  }
+
+  [data-client-anchor] {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    scroll-margin-block-start: 5rem;
+  }
+</style>

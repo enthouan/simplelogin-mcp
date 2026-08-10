@@ -1,140 +1,236 @@
 ---
-title: Manage SimpleLogin aliases from your MCP client.
-description: An independent, self-hostable MCP server for SimpleLogin over local stdio or Streamable HTTP.
+title: Manage SimpleLogin from your MCP client.
+description: An independent MCP server for existing SimpleLogin users to create aliases, inspect mail activity, manage routing, and use reverse aliases.
 template: splash
 hero:
-  tagline: An independent, self-hostable MCP server for existing SimpleLogin users.
+  tagline: A self-hosted Model Context Protocol (MCP) server for existing SimpleLogin users. Create aliases, inspect mail activity, manage routing, and use reverse aliases from a server you run.
   image:
     file: ../../assets/simplelogin-mcp-mark.svg
-    alt: simplelogin-mcp
+    alt: simplelogin-mcp mailbox mark
   actions:
-    - text: Choose an install
-      link: '#install'
+    - text: Get started
+      link: getting-started/
       icon: right-arrow
-    - text: Explore the tools
-      link: reference/tools/
-      icon: open-book
-      variant: minimal
+    - text: View on GitHub
+      link: https://github.com/enthouan/simplelogin-mcp
+      icon: github
+      variant: secondary
+      attrs:
+        data-github-action: true
+        data-repository-action: true
+        iconPlacement: start
+        rel: external
+        referrerpolicy: no-referrer
 ---
 
-import { Aside, LinkButton } from '@astrojs/starlight/components';
+import {
+  Aside,
+  Card,
+  CardGrid,
+  Code,
+  LinkButton,
+  LinkCard,
+  Steps,
+} from '@astrojs/starlight/components';
 import { TOOL_CATALOG } from '../../../../src/tools/catalog.js';
-import InstallMethods from '../../components/InstallMethods.astro';
-import RepositoryLink from '../../components/RepositoryLink.astro';
+import ArchitectureFlow from '../../components/ArchitectureFlow.astro';
 import ToolCatalogPreview from '../../components/ToolCatalogPreview.astro';
 
-<Aside type="caution" title="Independent project">
-  simplelogin-mcp is an independent, community-maintained project developed by [Antoine
-  Ménard](https://www.antoinemenard.com). It is not an official SimpleLogin or Proton product,
-  service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by
-  [SimpleLogin](https://simplelogin.io/) or [Proton](https://proton.me/).
+<Aside type="note" title="Independent integration for SimpleLogin">
+  simplelogin-mcp is an independent, open-source project. It is not an official SimpleLogin or
+  Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or
+  sponsored by SimpleLogin or Proton AG.
 
 Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
 
 </Aside>
 
-<p className="home-kicker">Independent MCP integration for SimpleLogin</p>
+<CardGrid>
+  <Card title={`${TOOL_CATALOG.length} catalog-backed tools`} icon="puzzle">
+    Aliases, contacts, mailboxes, custom domains, and account settings are documented from the same
+    source as the server.
 
-<RepositoryLink />
+    <a href="reference/tools/">See all {TOOL_CATALOG.length} tools</a>
 
-<h2 id="install">Choose how it runs</h2>
+  </Card>
+  <Card title="Local by default" icon="laptop">
+    stdio opens no listener. Streamable HTTP binds to loopback unless you deliberately configure a
+    wider boundary.
+  </Card>
+  <Card title="API keys stay out of MCP messages" icon="padlock">
+    The server reads `SL_API_KEY` from its environment and never includes it in MCP requests or
+    results. Do not put the key in prompts. When HTTP authentication is enabled, the client sends a
+    separate server token only to simplelogin-mcp.
+  </Card>
+  <Card title="Guarded permanent changes" icon="approve-check-circle">
+    Tools that can stop delivery or delete data are labeled <strong>Destructive</strong>. Permanent
+    deletion requires <code>confirm: true</code>; mailbox deletion also requires an explicit
+    transfer-or-delete decision for its aliases.
+  </Card>
+</CardGrid>
 
-Use the project-provided Compose setup for a self-hosted service, run Streamable HTTP directly on
-loopback, or let a desktop MCP client launch the server over stdio.
+<h2 id="see-it-work">Let your MCP client create an alias for you</h2>
 
-<InstallMethods />
+This example creates one real random alias in your connected SimpleLogin account. It uses your
+account's default alias style, so you do not need to choose an address or configure any inputs.
+
+<Code
+  code="Can you create a new random SimpleLogin alias for me?"
+  lang="text"
+  meta='title="Alias creation example prompt"'
+/>
+
+<Steps>
+
+1. **Review the proposed call.** Confirm that the client proposes `alias_create_random`. It is a
+   write action that creates one persistent alias; this prompt requires no inputs.
+
+2. **Create the alias.** simplelogin-mcp asks SimpleLogin to generate one address using your
+   account's default alias style and routing.
+
+3. **Use the new address.** The client shows the created alias so you can copy it into a signup. The
+   address also appears in your SimpleLogin account.
+
+</Steps>
+
+<h2 id="get-started">Pick your MCP client</h2>
+
+Each tested label means the documented local stdio recipe connected, discovered all 27 tools, and
+completed the read-only account-usage check. See the current [compatibility
+evidence](getting-started/compatibility/) for scope and limitations.
+
+First time connecting? [Create a dedicated SimpleLogin API key](getting-started/simplelogin-api-key/) before
+configuring your client.
+
+<CardGrid>
+  <LinkCard
+    title="Codex"
+    description="Client tested — the shared-TOML stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    href="getting-started/clients/#codex"
+    data-client-icon="openai"
+  />
+  <LinkCard
+    title="Claude Code"
+    description="Client tested — the project-scoped stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    href="getting-started/clients/#claude-code"
+    data-client-icon="claude"
+  />
+  <LinkCard
+    title="Claude Desktop"
+    description="Client tested — the user-local stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    href="getting-started/clients/#claude-desktop"
+    data-client-icon="claude"
+  />
+  <LinkCard
+    title="VS Code"
+    description="Client tested — the user-profile stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    href="getting-started/clients/#vs-code"
+    data-client-icon="vscode"
+  />
+  <LinkCard
+    title="OpenCode"
+    description="Client tested — the environment-backed stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    href="getting-started/clients/#opencode"
+    data-client-icon="opencode"
+  />
+  <LinkCard
+    title="All compatibility evidence"
+    description="See the review levels, tested routes, transport requirements, and current limitations."
+    href="getting-started/compatibility/"
+    data-client-icon="evidence"
+  />
+</CardGrid>
+
+Need another client or deployment route? Open the [complete client setup
+guide](getting-started/clients/), use the [generic transport
+requirements](getting-started/compatibility/#transport-requirements), or choose a [different
+deployment shape](getting-started/).
 
 <Aside type="danger" title="Protect both credentials">
   **`SL_API_KEY` grants full control of your SimpleLogin account.** `MCP_AUTH_TOKEN` is a separate
-  credential that protects access to this server. Docker and every non-loopback HTTP bind require
-  the server token; public or LAN HTTP belongs behind TLS. [Read the complete security
-  model](guides/security/).
+  credential that protects HTTP access to this server. The startup guard normally requires it for
+  Docker and every non-loopback bind; bypassing that guard requires the explicit unsafe override.
+  Supported public or LAN HTTP deployments keep the token and belong behind TLS. [Read the complete
+  security model](guides/security/).
 </Aside>
-
-<dl className="home-facts not-content" aria-label="Project facts">
-  <div>
-    <dt>catalog-backed tools</dt>
-    <dd>{TOOL_CATALOG.length}</dd>
-  </div>
-  <div>
-    <dt>transport modes</dt>
-    <dd>2</dd>
-  </div>
-  <div>
-    <dt>keeps credentials</dt>
-    <dd>Your host</dd>
-  </div>
-</dl>
 
 ## Useful by design
 
-The server focuses on repeatable SimpleLogin workflows that fit an MCP conversation, with bounded
-reads and explicit guards around permanent changes.
-
-<ul className="workflow-list not-content">
-  <li>
-    <article>
-      <h3>Create and tune aliases</h3>
-
+<CardGrid>
+  <Card title="Create and tune aliases" icon="random">
     Find an alias, create a random or custom one, update its routing, then explicitly enable or
     disable it.
 
     `alias_list → alias_create_random → alias_update → alias_set_enabled`
-    </article>
 
-  </li>
-  <li>
-    <article>
-      <h3>Investigate recent mail</h3>
-
-    Inspect one alias, then walk bounded activity pages for forwards, replies, blocks, and bounces.
+  </Card>
+  <Card title="Investigate recent mail" icon="magnifier">
+    Inspect one alias, then page through recent forwards, replies, blocks, and bounces.
 
     `alias_get → alias_activity_list`
-    </article>
 
-  </li>
-  <li>
-    <article>
-      <h3>Send from an alias</h3>
-
+  </Card>
+  <Card title="Send from an alias" icon="email">
     Create or reuse a reverse alias for a recipient, and block forwarding before choosing permanent
     deletion.
 
     `contact_create → contact_set_blocked`
-    </article>
 
-  </li>
-  <li>
-    <article>
-      <h3>Maintain account routing</h3>
-
+  </Card>
+  <Card title="Maintain account routing" icon="setting">
     Review mailbox verification, inspect custom domains, and review or change supported account-wide
     alias settings.
 
     `mailbox_list → custom_domain_list → settings_get → settings_update`
-    </article>
 
-  </li>
-</ul>
+  </Card>
+</CardGrid>
 
-<LinkButton href="guides/workflows/" variant="secondary" icon="right-arrow">
+<LinkButton href="guides/workflows/" variant="primary" icon="right-arrow">
   Follow the workflow guide
 </LinkButton>
 
-## One canonical tool catalog
+## Your host remains the control point
 
-Names, summaries, groups, and counts come from the same TypeScript catalog used by the MCP server.
-The website cannot quietly drift into a second inventory.
+<ArchitectureFlow />
+
+## One canonical, searchable tool catalog
+
+Names, summaries, groups, inputs, annotations, bounds, and counts come from the same TypeScript
+catalog and registered schemas used by the MCP server. Filter the full reference by text, category,
+or behavior, and link directly to any tool.
 
 <ToolCatalogPreview />
 
-<LinkButton href="reference/tools/" variant="secondary" icon="right-arrow">
+<LinkButton href="reference/tools/" variant="primary" icon="right-arrow">
   Browse all {TOOL_CATALOG.length} tools
 </LinkButton>
 
-## Bring your own account and host
+## Know when to use it
 
-Run locally with stdio, keep HTTP on loopback, or place an authenticated deployment behind
-infrastructure you control. The runtime sends requests only to your configured SimpleLogin API.
+Use simplelogin-mcp for reviewable alias workflows from a compatible MCP client. Use SimpleLogin
+directly for sign-in, MFA, billing, account security, API-key creation, DNS verification, or any
+action you prefer to inspect and complete in the official interface.
 
-[Install and run the server](getting-started/) or [review the security model](guides/security/).
+<CardGrid>
+  <LinkCard
+    title="Security & Data"
+    description="Follow requests, credentials, and account data across every trust boundary."
+    href="guides/security/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="Review every environment setting and its safe default."
+    href="reference/configuration/"
+  />
+  <LinkCard
+    title="Troubleshooting"
+    description="Diagnose startup, stdio, HTTP, Docker, and upstream API failures."
+    href="guides/troubleshooting/"
+  />
+  <LinkCard
+    title="FAQ"
+    description="Understand project scope, privacy, plans, and when to use SimpleLogin directly."
+    href="guides/faq/"
+  />
+</CardGrid>

@@ -2,12 +2,61 @@
 const { head, id } = Astro.locals.starlightRoute;
 const resolvedHead =
   id === '404'
-    ? head.map((entry) =>
-        entry.tag === 'meta' && entry.attrs?.name === 'robots'
-          ? { ...entry, attrs: { ...entry.attrs, content: 'noindex, nofollow' } }
-          : entry,
-      )
+    ? head.flatMap((entry) => {
+        if (entry.tag === 'link' && entry.attrs?.rel === 'canonical') return [];
+        if (entry.tag === 'meta' && entry.attrs?.property === 'og:url') return [];
+        if (entry.tag === 'meta' && entry.attrs?.name === 'robots') {
+          return [{ ...entry, attrs: { ...entry.attrs, content: 'noindex, nofollow' } }];
+        }
+        return [entry];
+      })
     : head;
 ---
 
 {resolvedHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
+
+<script>
+  const copyFailureRoot = document.documentElement;
+
+  if (copyFailureRoot.dataset.copyFailureFeedback !== 'true') {
+    copyFailureRoot.dataset.copyFailureFeedback = 'true';
+    let copyAttemptSequence = 0;
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!(event.target instanceof Element)) return;
+
+        const button = event.target.closest<HTMLButtonElement>(
+          '.expressive-code .copy button[data-code]',
+        );
+        const liveRegion = button?.parentElement?.querySelector<HTMLElement>('[aria-live]');
+        if (!button || !liveRegion) return;
+
+        const attempt = String(++copyAttemptSequence);
+        button.dataset.copyAttempt = attempt;
+        delete button.dataset.copyError;
+        liveRegion.querySelectorAll('.feedback').forEach((feedback) => feedback.remove());
+
+        window.setTimeout(() => {
+          if (button.dataset.copyAttempt !== attempt || liveRegion.querySelector('.feedback')) {
+            return;
+          }
+
+          const feedback = document.createElement('div');
+          feedback.className = 'feedback copy-error show';
+          feedback.textContent = 'Copy failed. Select the code and copy it manually.';
+          liveRegion.replaceChildren(feedback);
+          button.dataset.copyError = 'true';
+
+          window.setTimeout(() => {
+            if (button.dataset.copyAttempt !== attempt) return;
+            feedback.remove();
+            delete button.dataset.copyError;
+          }, 4_000);
+        }, 1_000);
+      },
+      { capture: true },
+    );
+  }
+</script>

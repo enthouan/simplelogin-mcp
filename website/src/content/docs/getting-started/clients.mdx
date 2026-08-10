@@ -1,0 +1,111 @@
+---
+title: Set up your MCP client
+description: Connect Codex, Claude, VS Code, or OpenCode over local stdio or Streamable HTTP.
+---
+
+import { Aside, Code, Steps } from '@astrojs/starlight/components';
+import ClientRecipe from '../../../components/ClientRecipe.astro';
+import VerifySetup from '../../../components/VerifySetup.astro';
+
+This is the detailed client setup guide. Choose one transport, keep credentials out of source
+control, and then follow the complete section for the client you already use.
+
+<Aside type="note" title="Client-tested stdio recipes">
+  Each local stdio configuration below has been maintainer-tested for connection, complete tool
+  discovery, and the read-only account-usage check. The Streamable HTTP examples are
+  documentation-reviewed but are not included in these named-client test claims. See the
+  [compatibility matrix](../compatibility/) for the exact scope.
+</Aside>
+
+## Choose a transport
+
+| Choose          | When it fits                                                                                 | Where `SL_API_KEY` lives                  | Client configuration                               |
+| --------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| Local `stdio`   | The client and a built `simplelogin-mcp` checkout are on the same machine.                   | In the environment or private client file | A command, arguments, and environment variables    |
+| Streamable HTTP | The server already runs continuously in Node.js, Docker, behind a proxy, or on another host. | On the server only                        | An `/mcp` URL and, when configured, a bearer token |
+
+Use `stdio` for the shortest local path. Use Streamable HTTP when you already operate the server as
+a service. A cloud client cannot reach `127.0.0.1` on your laptop; give it a deliberately reachable
+HTTPS endpoint instead.
+
+<Aside type="caution" title="Keep the two credentials separate">
+  `SL_API_KEY` grants SimpleLogin account access and stays with `simplelogin-mcp`. `MCP_AUTH_TOKEN`
+  protects the HTTP server boundary. The HTTP examples refer to the same server-token value through
+  a client-side name, `SIMPLELOGIN_MCP_BEARER_TOKEN`; they never send `SL_API_KEY` to the client.
+</Aside>
+
+## Prepare the server once
+
+<Steps>
+
+1. **[Create a dedicated SimpleLogin API key](../simplelogin-api-key/).** Treat it as full account
+   access. Keep the real value out of source control, screenshots, prompts, and support requests.
+
+2. **For local stdio, get and build the server.** If you do not already have a checkout, clone it
+   first:
+
+   <Code
+     code={`git clone https://github.com/enthouan/simplelogin-mcp.git
+cd simplelogin-mcp
+corepack enable
+pnpm install --frozen-lockfile
+pnpm build`}
+     lang="shell"
+     meta='title="Build simplelogin-mcp"'
+   />
+
+   Copy the absolute path to `dist/index.js`. If a desktop client cannot find `node`, use the
+   absolute executable path reported by `which node`.
+
+3. **For Streamable HTTP, start the service first.** Follow the [Streamable HTTP
+   guide](../http/). The default local endpoint is `http://127.0.0.1:3000/mcp`.
+
+4. **Prepare the appropriate private credential source.** For stdio, follow the client section's
+   API-key instructions. For authenticated HTTP, enter a client-side alias with the same value as
+   the server's `MCP_AUTH_TOKEN` without echoing it or putting its value in shell history:
+
+   <Code
+     code={`printf "simplelogin-mcp bearer token: " >&2
+IFS= read -rs SIMPLELOGIN_MCP_BEARER_TOKEN
+printf "\\n" >&2
+export SIMPLELOGIN_MCP_BEARER_TOKEN`}
+     lang="shell"
+     meta='title="Client-side HTTP bearer token"'
+   />
+
+</Steps>
+
+## Codex
+
+<ClientRecipe clientKey="codex" />
+
+## Claude Code
+
+<ClientRecipe clientKey="claude-code" />
+
+## Claude Desktop
+
+<ClientRecipe clientKey="claude-desktop" />
+
+## VS Code
+
+<ClientRecipe clientKey="vs-code" />
+
+## OpenCode
+
+<ClientRecipe clientKey="opencode" />
+
+## Verify the connection safely
+
+After the selected client reports that `simplelogin` is connected and has discovered its tools,
+use the same low-data, read-only check for either transport.
+
+<VerifySetup hideHeading />
+
+## Troubleshooting
+
+- Use [Troubleshooting](../../guides/troubleshooting/) for startup, configuration, authentication, and
+  upstream API failures.
+- Use [Client compatibility](../compatibility/) to review the tested routes, evidence scope, and
+  transport requirements.
+- Review [Security & Data](../../guides/security/) before widening the HTTP network boundary.

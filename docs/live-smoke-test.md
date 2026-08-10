@@ -32,15 +32,20 @@ Optional:
 Stdio mode is self-contained: `pnpm smoke:live` builds the server, spawns `node dist/index.js` with
 `TRANSPORT=stdio`, runs the smoke sequence, and closes the child process.
 
+Put `SL_API_KEY` in the ignored `.env` file, then load it only for the smoke process:
+
 ```bash
-SL_API_KEY=sl-your-key pnpm smoke:live -- --transport stdio
+(
+  set -a
+  . ./.env
+  set +a
+  pnpm smoke:live -- --transport stdio
+)
 ```
 
 For a self-hosted SimpleLogin instance:
 
-```bash
-SL_API_URL=https://app.example.com SL_API_KEY=sl-your-key pnpm smoke:live -- --transport stdio
-```
+Set `SL_API_URL` in the same ignored `.env` file, then use the command above.
 
 ## HTTP
 
@@ -49,16 +54,26 @@ HTTP mode connects to an already running MCP HTTP server at `/mcp`.
 Start the server in one terminal:
 
 ```bash
-TRANSPORT=http HOST=127.0.0.1 PORT=3000 SL_API_KEY=sl-your-key pnpm dev
+(
+  set -a
+  . ./.env
+  set +a
+  TRANSPORT=http HOST=127.0.0.1 PORT=3000 pnpm dev
+)
 ```
 
 Run the smoke test in another:
 
 ```bash
-pnpm smoke:live -- --transport http --http-url http://127.0.0.1:3000/mcp
+(
+  set -a
+  . ./.env
+  set +a
+  pnpm smoke:live -- --transport http --http-url http://127.0.0.1:3000/mcp
+)
 ```
 
-If the HTTP server has `MCP_AUTH_TOKEN` set, set the same value for the smoke process. The runner
+If the HTTP server has `MCP_AUTH_TOKEN` set, keep the same value in the ignored `.env`. The runner
 sends it as `Authorization: Bearer ...` and redacts it from all output.
 
 ## What It Does

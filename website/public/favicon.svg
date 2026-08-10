@@ -1,18 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="8" fill="#1b1340" />
-  <path d="M13 18h38v28H13z" fill="#fffafd" />
-  <path
-    d="m14 20 18 14 18-14"
+  <!--
+    Mail icon geometry from Lucide: https://lucide.dev/icons/mail
+
+    ISC License
+    Copyright (c) 2026 Lucide Icons and Contributors
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+    IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  -->
+  <rect width="64" height="64" rx="14" fill="#b72570" />
+  <g
+    transform="translate(8 8) scale(2)"
     fill="none"
-    stroke="#ea319f"
-    stroke-width="5"
-    stroke-linejoin="round"
-  />
-  <path
-    d="m14 44 13-12m23 12L37 32"
-    fill="none"
-    stroke="#22c0e8"
-    stroke-width="4"
+    stroke="#fffafd"
+    stroke-width="2"
     stroke-linecap="round"
-  />
+    stroke-linejoin="round"
+  >
+    <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+  </g>
 </svg>

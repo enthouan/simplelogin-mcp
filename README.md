@@ -7,22 +7,28 @@ management and account utilities (info, stats, notifications, settings), as MCP 
 and other MCP clients can call. It runs as a stdio server for local desktop clients or as a
 stateless Streamable HTTP server you can drop into a container and self-host.
 
+> **Independent project:** simplelogin-mcp is an independent, open-source project. It is not an
+> official SimpleLogin or Proton AG product, service, or MCP implementation, and it is not
+> affiliated with, endorsed by, or sponsored by SimpleLogin or Proton AG.
+
 ## At a Glance
 
 - **Transports:** `http` by default, serving MCP at `POST /mcp` and health at `GET /health`; set
   `TRANSPORT=stdio` for local desktop clients.
-- **Fast path:** create a SimpleLogin API key, set `SL_API_KEY`, set `MCP_AUTH_TOKEN` for Docker
-  Compose or any exposed HTTP bind, run the server, then point your client at
-  `http://localhost:3000/mcp`.
+- **Fast path:** use stdio when a local MCP client should launch the server. Use HTTP or Docker
+  Compose for a persistent service; set `MCP_AUTH_TOKEN` for Compose or any exposed HTTP bind unless
+  another layer authenticates access and you deliberately enable the unsafe override.
 - **Safety model:** `SL_API_KEY` grants control of your SimpleLogin account. HTTP binds to
-  `127.0.0.1` by default, refuses unauthenticated non-loopback binds, and accepts browser origins
-  only from loopback unless you configure `MCP_ALLOWED_ORIGINS`.
+  `127.0.0.1` by default, refuses unauthenticated non-loopback binds unless the explicit unsafe
+  override is enabled, and accepts browser origins only from loopback unless you configure
+  `MCP_ALLOWED_ORIGINS`.
 - **Scope:** the supported, deferred, and intentionally excluded SimpleLogin API areas are tracked
   in [docs/api-coverage.md](docs/api-coverage.md). Tool names and annotations are tracked in
   [TOOL_CATALOG.md](TOOL_CATALOG.md).
 
 ## Documentation
 
+- [Website and setup guide](https://simplelogin-mcp.com/)
 - [API coverage and non-goals](docs/api-coverage.md)
 - [Live smoke-test runbook](docs/live-smoke-test.md)
 - [Registry readiness](docs/registry-readiness.md)
@@ -92,9 +98,10 @@ come from the alias; the recipient only ever sees the alias.
 1. Find the `alias_id` (via `alias_list` or `alias_get`).
 2. Call `contact_create` with that `alias_id` and the recipient as `contact`, e.g.
    `"Acme Support <support@acme.com>"` (a bare `support@acme.com` works too).
-3. Read `reverse_alias_address` from the result, e.g. `reply+abc123@simplelogin.io`. Send your email
-   to that address from the alias; the recipient sees it as coming from the alias. An `existed: true`
-   result means the contact already existed and the same reverse alias is reused.
+3. Read `reverse_alias_address` from the result, e.g. `reply+abc123@simplelogin.io`. From a real
+   mailbox that owns the alias, send your message to that reverse-alias address. SimpleLogin rewrites
+   the sender so the recipient sees the alias, not the real mailbox. An `existed: true` result means
+   the contact already existed and the same reverse alias is reused.
 4. To stop a noisy sender, call `contact_set_blocked` with `blocked: true` (it is idempotent, so
    re-blocking is a no-op); set `blocked: false` to allow forwarding again.
 5. To remove a reverse alias for good, call `contact_delete` with `confirm: true`. This is permanent
@@ -203,7 +210,9 @@ SimpleLogin web UI.
 ### Prerequisites
 
 - A SimpleLogin account with an API key from **Settings -> API Keys**.
-- Either Docker with Docker Compose, or Node.js 24.x with [pnpm](https://pnpm.io).
+- Git, which the installation commands use to clone the repository.
+- Either Docker with Docker Compose, or Node.js 24.x with Corepack and
+  [pnpm 11.5.1](https://pnpm.io).
 - An MCP client that supports Streamable HTTP or stdio.
 
 ### Docker Compose
@@ -292,32 +301,51 @@ uses Node's built-in `fetch`, so the image does not need distribution-specific t
 
 ### Local pnpm
 
-Local runs do not automatically read `.env`; export the variables in your shell or source the file
-before starting:
+Local runs do not automatically read `.env`. Load the ignored file in a subshell so credentials do
+not remain in the parent shell:
 
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
 cp .env.example .env
 # edit .env, then:
-set -a
-. ./.env
-set +a
 pnpm build
-pnpm start
+(
+  set -a
+  . ./.env
+  set +a
+  pnpm start
+)
 ```
 
 For source-mode development over HTTP:
 
+In one terminal, start the foreground development server:
+
 ```bash
-TRANSPORT=http HOST=127.0.0.1 PORT=3000 SL_API_KEY=sl-your-key pnpm dev
+(
+  set -a
+  . ./.env
+  set +a
+  TRANSPORT=http HOST=127.0.0.1 PORT=3000 pnpm dev
+)
+```
+
+While it is running, check health from a second terminal:
+
+```bash
 curl http://localhost:3000/health
 ```
 
 For stdio after a local build:
 
 ```bash
-TRANSPORT=stdio SL_API_KEY=sl-your-key node dist/index.js
+(
+  set -a
+  . ./.env
+  set +a
+  TRANSPORT=stdio node dist/index.js
+)
 ```
 
 ## Configuration
@@ -326,34 +354,35 @@ Configuration is via environment variables (see [`.env.example`](.env.example)).
 validates its application settings at startup and exits with a readable message if anything
 required is missing; Node handles the documented CA and proxy runtime variables.
 
-| Variable                         | Required | Default                      | Description                                                                                          |
-| -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                     |
-| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients). Compose fixes this to `http`.                 |
-| `HOST`                           | No       | `127.0.0.1`                  | Interface for direct runs. Compose fixes this to `0.0.0.0` internally for port forwarding.           |
-| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode; Compose keeps the container listener on `3000`.     |
-| `SIMPLELOGIN_MCP_HOST_BIND_IP`   | No       | `127.0.0.1`                  | Docker Compose host interface bind address. Keep loopback unless intentionally exposing the service. |
-| `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                   |
-| `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.             |
-| `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                       |
-| `NODE_EXTRA_CA_CERTS`            | No       | _(none)_                     | Path to an additional PEM CA file. Compose users must mount the file at the same container path.     |
-| `NODE_USE_ENV_PROXY`             | No       | _(none)_                     | Set to `1` to enable Node's built-in environment-proxy support.                                      |
-| `NODE_OPTIONS`                   | No       | _(none)_                     | Trusted Node runtime options; forwarded for compatibility with `--use-env-proxy`.                    |
-| `HTTP_PROXY` / `http_proxy`      | No       | _(none)_                     | Proxy URL for outbound HTTP requests; lowercase takes precedence when both are set.                  |
-| `HTTPS_PROXY` / `https_proxy`    | No       | _(none)_                     | Proxy URL for outbound HTTPS requests; lowercase takes precedence when both are set.                 |
-| `NO_PROXY` / `no_proxy`          | No       | _(none)_                     | Comma-separated hosts that bypass the proxy; lowercase takes precedence when both are set.           |
-| `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for any non-loopback `HOST`.  |
-| `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed). |
-| `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.               |
-| `SL_REQUEST_TIMEOUT_MS`          | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                                         |
+| Variable                         | Required | Default                      | Description                                                                                                                                    |
+| -------------------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SL_API_KEY`                     | **Yes**  | —                            | Your SimpleLogin API key. Sent as the `Authentication` header on every API call.                                                               |
+| `TRANSPORT`                      | No       | `http`                       | `http` (self-host) or `stdio` (local desktop clients). Compose fixes this to `http`.                                                           |
+| `HOST`                           | No       | `127.0.0.1`                  | Interface for direct runs. Compose fixes this to `0.0.0.0` internally for port forwarding.                                                     |
+| `PORT`                           | No       | `3000`                       | Port for the HTTP server. Ignored in stdio mode; Compose keeps the container listener on `3000`.                                               |
+| `SIMPLELOGIN_MCP_HOST_BIND_IP`   | No       | `127.0.0.1`                  | Docker Compose host interface bind address. Keep loopback unless intentionally exposing the service.                                           |
+| `SIMPLELOGIN_MCP_HOST_PORT`      | No       | `3000`                       | Docker Compose host port mapped to the container's fixed internal `3000` listener.                                                             |
+| `SIMPLELOGIN_MCP_IMAGE_TAG`      | No       | `latest`                     | Published image tag used by `docker-compose.yml`; ignored by `docker-compose.local.yml`.                                                       |
+| `SL_API_URL`                     | No       | `https://app.simplelogin.io` | SimpleLogin API base URL. Override for a self-hosted instance.                                                                                 |
+| `NODE_EXTRA_CA_CERTS`            | No       | _(none)_                     | Path to an additional PEM CA file. Compose users must mount the file at the same container path.                                               |
+| `NODE_USE_ENV_PROXY`             | No       | _(none)_                     | Set to `1` to enable Node's built-in environment-proxy support.                                                                                |
+| `NODE_OPTIONS`                   | No       | _(none)_                     | Trusted Node runtime options; forwarded for compatibility with `--use-env-proxy`.                                                              |
+| `HTTP_PROXY` / `http_proxy`      | No       | _(none)_                     | Proxy URL for outbound HTTP requests; lowercase takes precedence when both are set.                                                            |
+| `HTTPS_PROXY` / `https_proxy`    | No       | _(none)_                     | Proxy URL for outbound HTTPS requests; lowercase takes precedence when both are set.                                                           |
+| `NO_PROXY` / `no_proxy`          | No       | _(none)_                     | Comma-separated hosts that bypass the proxy; lowercase takes precedence when both are set.                                                     |
+| `MCP_AUTH_TOKEN`                 | No       | _(none)_                     | If set, `POST /mcp` requires `Authorization: Bearer <token>`. Required for non-loopback `HOST` unless the explicit unsafe override is enabled. |
+| `MCP_ALLOWED_ORIGINS`            | No       | _(none)_                     | Comma-separated extra browser origins allowed to call `POST /mcp` (loopback origins always allowed).                                           |
+| `ALLOW_UNAUTHENTICATED_EXPOSURE` | No       | `false`                      | Permit a non-loopback bind without a token. Only when exposure is contained elsewhere.                                                         |
+| `SL_REQUEST_TIMEOUT_MS`          | No       | `15000`                      | Per-request timeout to the SimpleLogin API, in milliseconds.                                                                                   |
 
 > **Two distinct secrets:** `SL_API_KEY` authenticates the server **to SimpleLogin** (the
 > `Authentication` header on outbound calls). `MCP_AUTH_TOKEN` authenticates clients **to this
 > server** (the standard `Authorization: Bearer` header on `POST /mcp`). They are unrelated.
 
 > **Safe by default:** the HTTP server binds `127.0.0.1` and is reachable only from the local
-> machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup, so exposing
-> the endpoint is always an explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
+> machine. Binding `0.0.0.0` (or a LAN IP) without `MCP_AUTH_TOKEN` is refused at startup unless you
+> deliberately set `ALLOW_UNAUTHENTICATED_EXPOSURE=true`, so exposing the endpoint is always an
+> explicit choice. See [SECURITY.md](SECURITY.md) for the full model.
 > Docker Compose sets `HOST=0.0.0.0` inside the container for port forwarding, so its quick start
 > requires `MCP_AUTH_TOKEN` even though the host port is published on loopback. Use
 > `SIMPLELOGIN_MCP_HOST_PORT` for Compose host-port changes; leave `PORT` at `3000` unless you are
@@ -369,11 +398,16 @@ required is missing; Node handles the documented CA and proxy runtime variables.
 
 ### Claude Code (HTTP)
 
-With the HTTP server running, register it with the token from `.env`:
+With the HTTP server running, enter the token without echoing it or storing its value in shell
+history, then register the server with an environment reference:
 
 ```bash
+printf "simplelogin-mcp bearer token: " >&2
+IFS= read -rs MCP_AUTH_TOKEN
+printf "\n" >&2
+export MCP_AUTH_TOKEN
 claude mcp add --transport http simplelogin http://localhost:3000/mcp \
-  --header "Authorization: Bearer YOUR_MCP_AUTH_TOKEN"
+  --header 'Authorization: Bearer ${MCP_AUTH_TOKEN}'
 ```
 
 For loopback-only, non-container use with no `MCP_AUTH_TOKEN`, omit the header:
@@ -413,8 +447,8 @@ stdio in a one-shot container:
         "--rm",
         "-e",
         "TRANSPORT=stdio",
-        "-e",
-        "SL_API_KEY=sl-your-key-here",
+        "--env-file",
+        "/absolute/path/to/simplelogin-mcp/.env",
         "ghcr.io/enthouan/simplelogin-mcp:0.8.1"
       ]
     }
@@ -493,7 +527,7 @@ their uppercase counterparts. Existing deployments using `NODE_OPTIONS=--use-env
 supported. Treat proxy URLs containing credentials as secrets.
 
 Compatibility depends on the self-hosted SimpleLogin version exposing the same API paths and
-response shapes documented upstream. Start with `account_get_info` as a credential sanity check,
+response shapes documented upstream. Start with `account_get_stats` as a low-data credential check,
 then use [docs/live-smoke-test.md](docs/live-smoke-test.md) only when you intentionally want a live
 write test. If a self-hosted fork or older deployment returns different payloads, this server may
 surface a validation or SimpleLogin API error rather than guessing.
@@ -508,7 +542,7 @@ The server itself speaks plain HTTP.
 | Symptom                                                         | What to check                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Compose says `SL_API_KEY` must be set                           | Set a non-empty `SL_API_KEY` in `.env`; Compose validates it before creating the container. Local `pnpm` runs need the variable exported in the shell or sourced from `.env`.                                                                                                  |
-| Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_info` after fixing the key.                                                                                      |
+| Tools return SimpleLogin `401`, `403`, or "Invalid API key"     | The SimpleLogin key may be wrong, revoked, copied with whitespace, or created on a different SimpleLogin instance than `SL_API_URL`. Verify with `account_get_stats` after fixing the key.                                                                                     |
 | SimpleLogin API timeouts or network errors                      | Confirm `SL_API_URL` is reachable from the server, check proxy/TLS/firewall rules, and increase `SL_REQUEST_TIMEOUT_MS` only if the instance is expected to be slow. Mutating requests are not retried automatically.                                                          |
 | HTTP client gets `401 {"error":"Unauthorized"}`                 | `MCP_AUTH_TOKEN` is set on the server but the client did not send `Authorization: Bearer <token>`, sent the wrong token, or included extra whitespace. Rotate the token if it may have leaked.                                                                                 |
 | Browser client gets `403 {"error":"Forbidden origin"}`          | Add the exact browser origin, including scheme and port, to `MCP_ALLOWED_ORIGINS`. Loopback origins are allowed by default; non-browser MCP clients normally send no `Origin` and are unaffected.                                                                              |
@@ -544,8 +578,20 @@ environment variables, cleanup guarantees, and failure summary format.
 
 Run locally over HTTP:
 
+In one terminal, start the foreground development server:
+
 ```bash
-TRANSPORT=http SL_API_KEY=sl-your-key pnpm dev
+(
+  set -a
+  . ./.env
+  set +a
+  TRANSPORT=http pnpm dev
+)
+```
+
+While it is running, check health from a second terminal:
+
+```bash
 curl http://localhost:3000/health
 ```
 
@@ -564,15 +610,16 @@ abort, network, and rate-limit failures), and Zod validation, so each method sta
 429 responses are reported with status, endpoint, and `Retry-After` when SimpleLogin provides it;
 the server does not retry automatically, so mutating tools are never repeated implicitly.
 
-The API surface follows the in-app SimpleLogin reference
-([`docs/api.md`](https://github.com/simple-login/app/blob/master/docs/api.md)), which is the source
-of truth for request/response shapes.
+The API surface follows the in-app SimpleLogin reference at the
+[audited upstream revision](https://github.com/simple-login/app/blob/f8ee0eb1c5258d008bf9b162b31febdbbb81d758/docs/api.md),
+which is the source of truth for the request and response shapes covered here.
 
 ## Security
 
 The `SL_API_KEY` grants full control of your SimpleLogin account, so treat it like a password.
-The HTTP server is safe by default (loopback bind) and refuses to start exposed without a token.
-For the credential risk model, network exposure patterns, and how to report a vulnerability, see
+The HTTP server is safe by default (loopback bind) and refuses to start exposed without a token
+unless the operator deliberately enables `ALLOW_UNAUTHENTICATED_EXPOSURE=true`. For the credential
+risk model, network exposure patterns, and how to report a vulnerability, see
 [SECURITY.md](SECURITY.md).
 
 For questions and non-security bug reports, see [SUPPORT.md](SUPPORT.md). Maintainer release steps

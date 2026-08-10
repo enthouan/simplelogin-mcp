@@ -1,0 +1,74 @@
+---
+const diagramUrl = `${import.meta.env.BASE_URL}request-flow.svg`;
+---
+
+<figure class="request-flow not-content" data-request-flow>
+  <div
+    class="request-flow__viewport"
+    role="region"
+    aria-label="SimpleLogin request flow diagram"
+    tabindex="0"
+  >
+    <img
+      src={diagramUrl}
+      alt="An MCP client sends a typed tool call to simplelogin-mcp over stdio or Streamable HTTP. The server reads SL_API_KEY from its environment, authenticates to the configured SimpleLogin API origin, validates the response, and returns a bounded result."
+      width="1200"
+      height="620"
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+  <p class="request-flow__note">
+    <strong>simplelogin-mcp never places <code>SL_API_KEY</code> in MCP requests or results.</strong
+    > Do not put the key in prompts. HTTP clients send the separate <code>MCP_AUTH_TOKEN</code> when configured
+    or required; stdio does not use it. Permanent deletion tools also require an explicit{' '}
+    <code>confirm=true</code> argument.
+  </p>
+</figure>
+
+<style>
+  .request-flow {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-block: 1.5rem;
+    margin-inline: 0;
+  }
+
+  .request-flow__viewport {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 8px;
+    background: var(--sl-color-black);
+  }
+
+  .request-flow__viewport:focus-visible {
+    outline: 3px solid var(--sl-color-accent);
+    outline-offset: 3px;
+  }
+
+  .request-flow__viewport img {
+    display: block;
+    width: max(100%, 52rem);
+    min-width: 52rem;
+    max-width: none;
+    height: auto;
+    margin: 0;
+  }
+
+  .request-flow__note {
+    margin-block: 0.75rem 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 8px;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  .request-flow__note strong {
+    color: var(--sl-color-white);
+  }
+</style>

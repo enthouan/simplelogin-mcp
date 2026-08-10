@@ -7,8 +7,8 @@ maintainers deciding whether future milestones should add, defer, or reject endp
 Sources checked:
 
 - Upstream SimpleLogin API reference:
-  [`simple-login/app/docs/api.md`](https://github.com/simple-login/app/blob/master/docs/api.md) on
-  `master` commit `f8ee0eb1c5258d008bf9b162b31febdbbb81d758`.
+  [`simple-login/app/docs/api.md`](https://github.com/simple-login/app/blob/f8ee0eb1c5258d008bf9b162b31febdbbb81d758/docs/api.md)
+  at commit `f8ee0eb1c5258d008bf9b162b31febdbbb81d758`.
 - Implemented MCP surface:
   [`TOOL_CATALOG.md`](../TOOL_CATALOG.md), [`src/constants.ts`](../src/constants.ts),
   [`src/client/simplelogin.ts`](../src/client/simplelogin.ts), [`src/tools/`](../src/tools), and
@@ -27,9 +27,8 @@ Sources checked:
   account-sensitive, billing-related, or outside alias management.
 
 No SimpleLogin API endpoint group currently has a separate implementation issue in **Planned**
-status. The open 0.7 public documentation issue,
-[#14](https://github.com/enthouan/simplelogin-mcp/issues/14), should use this matrix when describing
-scope, but it does not add new API coverage.
+status. Future coverage proposals should use this matrix to distinguish accepted work from deferred
+areas and non-goals.
 
 ## Coverage Matrix
 

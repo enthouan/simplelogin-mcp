@@ -1,15 +1,15 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.enthouan/simplelogin-mcp",
-  "title": "SimpleLogin MCP",
-  "description": "Manage SimpleLogin aliases, mailboxes, domains, settings, and account utilities.",
+  "title": "simplelogin-mcp",
+  "description": "Independent MCP server for managing SimpleLogin aliases, mailboxes, domains, settings, and account utilities.",
   "version": "0.8.1",
   "repository": {
     "url": "https://github.com/enthouan/simplelogin-mcp",
     "source": "github",
     "id": "1256322108"
   },
-  "websiteUrl": "https://github.com/enthouan/simplelogin-mcp#readme",
+  "websiteUrl": "https://simplelogin-mcp.com/",
   "packages": [
     {
       "registryType": "oci",

@@ -1,0 +1,98 @@
+---
+title: Troubleshooting
+description: Diagnose startup, transport, authentication, Docker, and SimpleLogin API failures safely.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Start with the boundary that failed: process startup, MCP transport, server authentication, or the
+outbound SimpleLogin API call. A healthy process does not necessarily mean the client is connected
+or the SimpleLogin key is valid.
+
+<Aside type="danger" title="Sanitize before sharing">
+  Never paste `SL_API_KEY`, `MCP_AUTH_TOKEN`, an `Authorization` header, proxy credentials, alias
+  addresses, mailbox addresses, or account details into an issue. Replace secret values with
+  placeholders and describe only which settings are present.
+</Aside>
+
+## First checks
+
+<Steps>
+
+1. **Identify the run shape.** Record Docker Compose, direct HTTP, or stdio and the
+   simplelogin-mcp version or commit.
+
+2. **Read the process diagnostics.** Direct and stdio runs write logs to stderr. For Compose, run
+   `docker compose logs simplelogin-mcp`.
+
+3. **Check only the relevant boundary.** For HTTP, request `GET /health`. For stdio, confirm the
+   client can launch the configured absolute command and reload its configuration.
+
+4. **Verify credentials with a read-only call.** After the client discovers tools, review and
+   approve only `account_get_stats` as the SimpleLogin API-key sanity check. Its aggregate counts
+   still pass through the client and its configured model.
+
+</Steps>
+
+## Startup and configuration
+
+| Symptom                                        | Check                                                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SL_API_KEY is required`                       | Set a non-empty key. Compose reads `.env`; direct Node.js runs require the file to be sourced or the variable to be passed by the client process environment.                              |
+| `Invalid configuration` names another variable | Compare the setting with the [configuration reference](../../reference/configuration/). `PORT` and `SL_REQUEST_TIMEOUT_MS` must be valid positive integers within their documented ranges. |
+| Startup refuses a non-loopback `HOST`          | Set `MCP_AUTH_TOKEN`, return to `HOST=127.0.0.1`, or use `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when another layer already authenticates or isolates the endpoint.                     |
+| `EADDRINUSE` or port `3000` is unavailable     | For direct HTTP, choose a free `PORT`. For Compose, change `SIMPLELOGIN_MCP_HOST_PORT` and leave the internal `PORT=3000`.                                                                 |
+| A direct run ignores `.env`                    | This is expected: the application does not load it automatically. Source it for the process or configure the variables in the MCP client.                                                  |
+
+## stdio connection problems
+
+| Symptom                                                | Check                                                                                                                                                             |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client reports that the server exited                  | Confirm Node.js 24.x is available, the project was built, the `dist/index.js` path is absolute and correct, and `SL_API_KEY` is in the child-process environment. |
+| Client cannot find the server after editing config     | Fully restart or reload the client so it rereads its MCP configuration. Validate the client-specific JSON or TOML syntax.                                         |
+| Protocol parsing fails or output is corrupted          | Ensure no wrapper writes banners or diagnostics to stdout. simplelogin-mcp itself reserves stdout for MCP and logs to stderr.                                     |
+| A relative path works in a terminal but not the client | Desktop clients often launch with a different working directory. Use an absolute path to `dist/index.js`.                                                         |
+| `MCP_AUTH_TOKEN` seems to have no effect               | That token protects only `POST /mcp`; stdio has no HTTP endpoint. Protect the client configuration that contains `SL_API_KEY`.                                    |
+
+## HTTP connection problems
+
+| Symptom                                     | Check                                                                                                                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connection refused                          | Confirm the process is running, `HOST` and `PORT` match the client URL, and a container host port is actually published.                                          |
+| `GET /mcp` returns `405 Method Not Allowed` | This is expected. MCP clients use `POST /mcp`; use `GET /health` for a process health check.                                                                      |
+| `401 {"error":"Unauthorized"}`              | The server has `MCP_AUTH_TOKEN`, but the client omitted or mismatched `Authorization: Bearer <token>`. Do not add quotes or extra whitespace to the header value. |
+| `403 {"error":"Forbidden origin"}`          | Add the exact browser origin, including scheme and port, to `MCP_ALLOWED_ORIGINS`. Non-browser clients normally send no `Origin`.                                 |
+| Browser reports a CORS or preflight failure | The origin allowlist is not a CORS implementation. Put the endpoint behind a proxy that answers preflights and supplies the required CORS headers.                |
+| Health passes but MCP setup fails           | `/health` checks only the HTTP process. Recheck the `/mcp` URL, transport support, bearer header, and the client's own MCP diagnostics.                           |
+
+<Aside type="caution" title="Do not weaken security to debug a client">
+  Keep the endpoint on loopback while diagnosing it. Do not expose `0.0.0.0`, disable
+  authentication, or send a bearer token over public plain HTTP merely to make a connection test
+  easier.
+</Aside>
+
+## Docker Compose problems
+
+| Symptom                                                     | Check                                                                                                                                                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compose says `SL_API_KEY` must be set                       | Put a non-empty value in the checkout's `.env`; Compose validates it before creating the container.                                                                                    |
+| Container exits before becoming healthy                     | Inspect `docker compose logs simplelogin-mcp`. Startup validation runs before the health check can pass.                                                                               |
+| Container is healthy but the client cannot connect          | Request `http://localhost:3000/health` from the host, or use the configured `SIMPLELOGIN_MCP_HOST_PORT`. Confirm the client uses the host port rather than the container-only address. |
+| Compose requires `MCP_AUTH_TOKEN` on a loopback publication | This is expected. The app binds `0.0.0.0` inside the container for Docker forwarding even though the host publishes `127.0.0.1` by default.                                            |
+| Changing `PORT` did not change the published port           | The bundled container listener stays on `3000`. Change `SIMPLELOGIN_MCP_HOST_PORT` instead.                                                                                            |
+
+## SimpleLogin API failures
+
+| Symptom                                                     | Check                                                                                                                                                                                                             |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SimpleLogin `401`, `403`, or “Invalid API key”              | The key may be wrong, revoked, copied with whitespace, or created on a different instance than `SL_API_URL`. Fix the key, then try `account_get_stats`.                                                           |
+| Timeout or network error                                    | Confirm `SL_API_URL` is reachable from the server process or container and inspect DNS, firewall, proxy, and private-CA settings. Increase `SL_REQUEST_TIMEOUT_MS` only when the instance is expected to be slow. |
+| `429` or a rate-limit error                                 | Respect the surfaced `Retry-After` hint when present. The server does not automatically retry mutations, preventing an ambiguous write from being repeated.                                                       |
+| Response validation error on a self-hosted instance         | Use the web-app origin without `/api` and confirm that the deployment exposes upstream-compatible paths and response shapes. Older versions and forks can differ.                                                 |
+| Contact, mailbox, or domain operation reports a plan limit  | Some SimpleLogin capabilities depend on account plan or upstream API support. Confirm access in SimpleLogin; the MCP server cannot bypass those limits.                                                           |
+| A deletion or routing update is rejected before an API call | Review the tool's confirmation and precondition requirements in the [tool catalog](../../reference/tools/). These local guardrails are deliberate.                                                                |
+
+## Report a reproducible issue
+
+Follow [Reporting issues and support](../../reference/reporting-issues/) for the complete sanitized
+reproduction checklist and the boundary between public support and private security reporting.

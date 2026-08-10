@@ -1,0 +1,92 @@
+---
+title: Contributing
+description: Set up simplelogin-mcp locally, make focused changes, and validate them without exposing credentials.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import RepositoryLink from '../../../components/RepositoryLink.astro';
+
+Thanks for helping improve `simplelogin-mcp`. The project is pre-1.0, but tool names, bounds,
+annotations, and safety behavior are treated carefully and should not drift without matching
+documentation and tests.
+
+<Aside type="caution" title="Keep live credentials out of contribution artifacts">
+  Never put `SL_API_KEY`, `MCP_AUTH_TOKEN`, authorization headers, or SimpleLogin account data in
+  tests, fixtures, logs, screenshots, commits, issues, or pull requests. Keep `.env` untracked.
+</Aside>
+
+## Requirements
+
+- Node.js 24.x.
+- pnpm, preferably enabled through Corepack.
+- Docker and Docker Compose when changing container behavior.
+- A SimpleLogin API key only for an intentional, manual live smoke test.
+
+## Set up a checkout
+
+From the repository root:
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+```
+
+Local pnpm commands do not automatically load `.env`. Export the variables you need in your shell
+or source an ignored `.env` before starting the server locally.
+
+## Contribution workflow
+
+<Steps>
+
+1. **Start from current `main`.** Keep the change scoped to one issue or one coherent outcome. Do
+   not rename existing MCP tools or alter runtime behavior in a documentation-only change.
+
+2. **Update the canonical source first.** For tool work, update the API path, Zod schemas, typed
+   client method, tool implementation, and `src/tools/catalog.ts` as applicable. Add focused tests
+   that use stubs and fixtures rather than live credentials.
+
+3. **Keep generated documentation aligned.** When the tool surface changes, update the README, API
+   coverage, and catalog source together. `TOOL_CATALOG.md` is generated from the catalog and should
+   not drift from registered-tool order or annotations.
+
+4. **Run the complete local validation set.** Include the commands and results in the pull request
+   description. Use the opt-in live smoke test only when a change genuinely needs SimpleLogin
+   verification.
+
+5. **Open a focused pull request.** Use a short, direct title and exclude secrets, private account
+   details, machine-local tokens, and unrelated changes. The protected `main` branch is updated
+   through pull requests.
+
+</Steps>
+
+## Validate your change
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm test
+pnpm website:check
+pnpm format:check
+```
+
+These normal checks do not require a live network or SimpleLogin credential. `pnpm smoke:live` is
+manual and opt-in; follow the repository's live smoke-test runbook before using it.
+
+When changing Docker behavior, validate both Compose paths. The default Compose file is the
+published-image operator path, while `docker-compose.local.yml` builds the current checkout.
+
+## Safety expectations for tools
+
+- Prefer read-only or locally guarded behavior first.
+- Require explicit confirmation for permanent deletion.
+- Mark routing changes that can stop future delivery as destructive.
+- Keep authentication, timeout, error parsing, redaction, and response validation in the shared
+  SimpleLogin client rather than duplicating them in individual tools.
+- Update focused client, registration, guardrail, and error-handling tests with every API surface
+  change.
+
+Security issues should never be filed publicly. Follow the [security policy](../security-policy/)
+for private reporting.
+
+<RepositoryLink />

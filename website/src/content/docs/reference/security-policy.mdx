@@ -1,0 +1,59 @@
+---
+title: Security policy
+description: Supported versions, private vulnerability reporting, and the information to include in a report.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+`simplelogin-mcp` brokers programmatic access to a SimpleLogin account. Security reports involving
+credentials, authentication, network exposure, or unintended account access must be handled
+privately.
+
+<Aside type="danger" title="Do not open a public vulnerability report">
+  Do not publish exploitable details, live credentials, authorization headers, private account data,
+  or an unredacted proof of concept in an issue or discussion.
+</Aside>
+
+## Report a vulnerability
+
+<Steps>
+
+1. **Use the private channel when available.** Open the repository's **Security → Report a
+   vulnerability** flow using GitHub private vulnerability reporting. If that action is not visible,
+   do not publish the report or its details in an issue or discussion.
+
+2. **Describe the affected environment.** Include the simplelogin-mcp version or commit,
+   transport, `HOST` setting, whether `MCP_AUTH_TOKEN` is configured, and relevant deployment
+   boundaries.
+
+3. **Provide a sanitized reproduction.** Include minimal steps, expected and actual behavior, and
+   sanitized output. State which environment variables are set, but never include their values.
+
+4. **Allow time for a response.** Give the maintainers a reasonable window to investigate and
+   coordinate a fix before public disclosure.
+
+</Steps>
+
+## Supported versions
+
+The project is pre-1.0. Security fixes land on the latest release, so reproduce against a current
+version when practical and review the changelog before reporting an issue against an older build.
+
+## Credential incidents
+
+`SL_API_KEY` and `MCP_AUTH_TOKEN` protect different boundaries:
+
+- If `SL_API_KEY` leaks, revoke it in SimpleLogin and create a replacement. Anyone holding it can
+  call the SimpleLogin API directly.
+- If `MCP_AUTH_TOKEN` leaks, restart simplelogin-mcp with a new strong token. Anyone holding it can
+  call this server's tools and use the configured SimpleLogin access indirectly.
+
+Never paste either credential into a report. See [Security & Data](../../guides/security/) for the full
+credential, request-flow, deployment, origin-validation, and logging model.
+
+## Scope of a useful report
+
+Useful reports include authentication bypasses, secret exposure, unsafe network defaults,
+origin-validation failures, missing destructive-operation guards, and cases where sensitive values
+appear in logs or tool errors. Ordinary setup problems and feature requests belong in the public
+[support route](../reporting-issues/).

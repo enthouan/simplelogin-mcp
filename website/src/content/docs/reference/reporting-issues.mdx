@@ -1,0 +1,56 @@
+---
+title: Reporting issues and support
+description: Choose the right support channel and prepare a safe, reproducible simplelogin-mcp report.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import RepositoryLink from '../../../components/RepositoryLink.astro';
+
+Use this page for simplelogin-mcp usage questions, documentation problems, reproducible bugs, and
+focused coverage requests. Account, billing, and email-delivery questions belong with SimpleLogin;
+vulnerabilities require the private channel in the security policy.
+
+<Aside type="caution" title="Sanitize every report">
+  Never include `SL_API_KEY`, `MCP_AUTH_TOKEN`, authorization headers, private account data, real
+  alias addresses, or an unredacted configuration file in an issue, discussion, screenshot, log, or
+  reproduction.
+</Aside>
+
+## Choose the right channel
+
+| Question or problem                                                                       | Where it belongs                                                                                          |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| simplelogin-mcp setup, documentation, tool behavior, or a reproducible server bug         | The project's public issue tracker.                                                                       |
+| A missing or unsupported SimpleLogin API area                                             | A focused coverage request after checking [API coverage](../api-coverage/).                               |
+| A credential leak, authentication bypass, unsafe exposure, or other vulnerability         | The private process in the [security policy](../security-policy/).                                        |
+| SimpleLogin sign-in, billing, plans, account recovery, DNS verification, or mail delivery | [SimpleLogin support](https://simplelogin.io/contact/) and [documentation](https://simplelogin.io/docs/). |
+
+## Prepare a reproducible issue
+
+<Steps>
+
+1. **Identify the build.** Include the simplelogin-mcp version or commit you are running.
+
+2. **Describe the environment.** Include the install path, transport, MCP client and version,
+   operating system, and Node.js or Docker version.
+
+3. **Describe configuration without values.** List which relevant environment variables are set,
+   but never include their values. State whether you use hosted SimpleLogin or a self-hosted
+   instance.
+
+4. **Provide the smallest safe reproduction.** Include the tool name, sanitized arguments, expected
+   behavior, actual behavior, and exact sanitized error text.
+
+5. **Separate each boundary.** State whether process health, MCP connection, tool discovery, and a
+   safe read-only account call succeed independently. This helps locate the failing layer.
+
+6. **Check for sensitive data again.** Remove credentials, authorization headers, account details,
+   real email addresses, and unrelated logs before submitting.
+
+</Steps>
+
+Start with [Troubleshooting](../../guides/troubleshooting/) and the [FAQ](../../guides/faq/). If the
+problem may affect confidentiality, authentication, or network exposure, stop and follow the
+[security policy](../security-policy/) instead of opening a public issue.
+
+<RepositoryLink showIssueLink />

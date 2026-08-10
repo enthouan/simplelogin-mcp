@@ -1,28 +1,30 @@
 ---
 title: Install and run
-description: Choose Docker Compose, direct Streamable HTTP, or a local stdio process.
+description: Connect your MCP client first, then choose a deployment shape when you need one.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import ClientSetup from '../../../components/ClientSetup.astro';
 import InstallMethods from '../../../components/InstallMethods.astro';
 
-<Aside type="caution" title="Independent project">
-  simplelogin-mcp is an independent, community-maintained project developed by [Antoine
-  Ménard](https://www.antoinemenard.com). It is not an official SimpleLogin or Proton product,
-  service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by
-  [SimpleLogin](https://simplelogin.io/) or [Proton](https://proton.me/).
+<Aside type="note" title="Independent integration for SimpleLogin">
+  simplelogin-mcp is an independent, open-source project. It is not an official SimpleLogin or
+  Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or
+  sponsored by SimpleLogin or Proton AG.
 
 Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
 
 </Aside>
 
-`simplelogin-mcp` runs in three practical shapes. All use the same server and the same SimpleLogin
-tool catalog; choose based on where your MCP client and server should live.
+Start with the MCP client you already use. For a client and server on the same machine, local stdio
+is the smallest trust boundary and does not open a network listener. Docker Compose and direct
+Streamable HTTP remain available when you need a persistent service.
 
 ## Prerequisites
 
-- A SimpleLogin account with an API key from **Settings → API Keys**.
-- Docker with Docker Compose, or Node.js 24.x with pnpm.
+- A SimpleLogin account with a [dedicated API key](simplelogin-api-key/).
+- Git, which the installation commands use to clone the repository.
+- Docker with Docker Compose, or Node.js 24.x with Corepack and pnpm 11.5.1.
 - An MCP client that supports Streamable HTTP or stdio.
 
 <Aside type="caution" title="Treat the API key like a password">
@@ -30,7 +32,21 @@ tool catalog; choose based on where your MCP client and server should live.
   revoke it at SimpleLogin if it leaks.
 </Aside>
 
-## Choose a setup
+## Start with your client
+
+The recipes below configure Codex, Claude Code, Claude Desktop, VS Code, or OpenCode. Each includes
+the same low-data, read-only verification prompt.
+
+<ClientSetup />
+
+The local stdio recipes are maintainer-tested for connection, complete tool discovery, and the
+read-only account-usage check. The Streamable HTTP examples remain documentation-reviewed. See the
+[compatibility matrix](compatibility/) for the exact scope.
+
+## Choose a deployment shape
+
+All three shapes expose the same catalog. Choose based on where the client and server should live,
+not on which tools you need.
 
 <InstallMethods />
 
@@ -38,15 +54,21 @@ tool catalog; choose based on where your MCP client and server should live.
 
 <Steps>
 
-1. **Choose the trust boundary.** Use stdio for a client-launched local process, direct HTTP for a
+1. **Choose the client.** Prefer its private user-level configuration or secret store.
+
+2. **Choose the trust boundary.** Use stdio for a client-launched local process, direct HTTP for a
    loopback service, or Compose for an operator-managed service.
 
-2. **Set `SL_API_KEY`.** Keep it in an ignored `.env`, client secret store, or deployment secret.
+3. **Set `SL_API_KEY`.** [Create a dedicated key](simplelogin-api-key/), then keep it in an ignored `.env`,
+   client secret store, or deployment secret.
 
-3. **Protect HTTP when required.** Compose and every non-loopback bind need `MCP_AUTH_TOKEN`.
+4. **Protect HTTP when required.** The startup guard refuses Compose and non-loopback binds without
+   `MCP_AUTH_TOKEN` unless the explicit unsafe override is enabled. Supported deployments keep the
+   token rather than bypassing the guard.
 
-4. **Verify before connecting.** For HTTP, check `GET /health`; for stdio, keep stdout reserved for
-   the MCP protocol.
+5. **Verify discovery and one read.** Health is only a process check; approve only the supplied
+   `account_get_stats` call to verify the complete MCP and SimpleLogin path without changing the
+   account.
 
 </Steps>
 
@@ -55,4 +77,6 @@ tool catalog; choose based on where your MCP client and server should live.
 - [Docker Compose](docker/) for the published-image operator path.
 - [Streamable HTTP](http/) for a direct Node.js process.
 - [stdio](stdio/) for desktop and local MCP clients.
-- [Security](../guides/security/) before widening network access.
+- [Get a SimpleLogin API key](simplelogin-api-key/) before configuring any installation.
+- [Client setup](clients/) for the full recipes and official documentation links.
+- [Security & Data](../guides/security/) before widening network access.

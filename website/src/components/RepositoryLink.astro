@@ -1,56 +1,74 @@
 ---
-import { LinkButton } from '@astrojs/starlight/components';
-import { env } from 'node:process';
-import { REPOSITORY_VISIBILITY_ENV, resolveRepositoryUrl } from '../data/repository.js';
+import { Badge, Card, LinkButton } from '@astrojs/starlight/components';
+import packageJson from '../../../package.json';
+import { REPOSITORY_URL } from '../data/repository.js';
 
-const repositoryUrl = resolveRepositoryUrl(Astro.site, env[REPOSITORY_VISIBILITY_ENV]);
+interface Props {
+  showIssueLink?: boolean;
+}
+
+const { showIssueLink = false } = Astro.props;
+const minimumNode = /^>=(\d+)/.exec(packageJson.engines.node)?.[1];
 ---
 
-{
-  repositoryUrl && (
-    <aside class="repository-link not-content" aria-label="Project repository">
+<div class="repository-link not-content">
+  <Card title="Open source and independently maintained" icon="github">
+    <p>Browse the source, report an issue, or follow the project on GitHub.</p>
+    <div class="repository-link__actions">
       <LinkButton
-        href={repositoryUrl}
+        href={REPOSITORY_URL}
         icon="github"
         iconPlacement="start"
         variant="secondary"
+        data-github-action
         rel="external"
         referrerpolicy="no-referrer"
       >
         Star on GitHub
       </LinkButton>
-      <p>Browse the source, report an issue, or follow the project.</p>
-    </aside>
-  )
-}
+      {
+        showIssueLink && (
+          <LinkButton
+            href={`${REPOSITORY_URL}/issues/new/choose`}
+            icon="github"
+            iconPlacement="start"
+            variant="secondary"
+            rel="external"
+            referrerpolicy="no-referrer"
+          >
+            Open an issue
+          </LinkButton>
+        )
+      }
+      <Badge text="MIT licensed" variant="success" size="small" />
+      <Badge text="Self-hostable" size="small" />
+      {minimumNode && <Badge text={`Node ${minimumNode}`} size="small" />}
+    </div>
+  </Card>
+</div>
 
 <style>
   .repository-link {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem 1rem;
     margin-block: 1.25rem 2rem;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--sl-color-gray-5);
-    border-radius: 6px;
-    background: var(--sl-color-gray-7);
-  }
-
-  .repository-link :global(.sl-link-button) {
-    min-height: 44px;
-    flex: 0 0 auto;
   }
 
   .repository-link p {
-    margin: 0;
-    color: var(--sl-color-gray-2);
-    font-size: var(--sl-text-sm);
+    margin-block: 0 0.85rem;
   }
 
-  @media (max-width: 30rem) {
-    .repository-link {
-      align-items: flex-start;
-      flex-direction: column;
-    }
+  .repository-link :global(.card) {
+    --sl-card-border: var(--sl-color-gray-5);
+    --sl-card-bg: var(--sl-color-gray-6);
+  }
+
+  .repository-link__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .repository-link__actions :global(.sl-link-button) {
+    margin-inline-end: 0.25rem;
   }
 </style>

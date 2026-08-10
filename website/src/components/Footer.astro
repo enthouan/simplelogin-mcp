@@ -1,0 +1,97 @@
+---
+import Pagination from '@astrojs/starlight/components/Pagination.astro';
+import { REPOSITORY_URL } from '../data/repository.js';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<footer class="site-footer sl-flex">
+  <Pagination />
+
+  <div class="project-footer">
+    <div class="project-footer__bar">
+      <a class="project-footer__name" href={base}>simplelogin-mcp</a>
+
+      <nav aria-label="Documentation links">
+        <a href={`${base}reference/`}>Reference</a>
+        <a href={`${base}reference/reporting-issues/`}>Help</a>
+        <a href={`${base}guides/security/`}>Security &amp; Data</a>
+        <a href={REPOSITORY_URL} rel="external">GitHub</a>
+      </nav>
+    </div>
+
+    <div class="project-footer__about">
+      <p>
+        simplelogin-mcp is an open-source project released under the MIT License and maintained by{
+          ' '
+        }
+        <a href="https://www.antoinemenard.com" rel="external">Antoine Ménard</a>.
+      </p>
+      <p>
+        It is not an official <a href="https://simplelogin.io/" rel="external">SimpleLogin</a> or
+        {' '}
+        <a href="https://proton.me/" rel="external">Proton AG</a> product and is not affiliated with or
+        endorsed by either company.
+      </p>
+      <p>
+        Generated with <a href="https://astro.build/" rel="external">Astro</a> using the{' '}
+        <a href="https://starlight.astro.build/" rel="external">Starlight</a> documentation theme.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  @layer starlight.core {
+    .site-footer {
+      flex-direction: column;
+      gap: 1.5rem;
+      padding-block-start: 4.5rem;
+    }
+
+    .project-footer {
+      display: grid;
+      gap: 1.25rem;
+      padding-block: 1.5rem;
+      border-top: 1px solid var(--sl-color-gray-5);
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+    }
+
+    .project-footer__bar {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+    }
+
+    .project-footer__about {
+      display: grid;
+      gap: 0.4rem;
+    }
+
+    .project-footer__about p {
+      margin: 0;
+    }
+
+    .project-footer__name {
+      width: fit-content;
+      color: var(--sl-color-white);
+      font-family: var(--sl-font-mono);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .project-footer a:not(.project-footer__name) {
+      color: var(--sl-color-text-accent);
+    }
+
+    .project-footer nav {
+      display: flex;
+      align-items: start;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+    }
+  }
+</style>

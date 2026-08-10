@@ -5,6 +5,7 @@ description: Run the Node.js server directly on loopback and connect an HTTP MCP
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 import InstallMethod from '../../../components/InstallMethod.astro';
+import VerifySetup from '../../../components/VerifySetup.astro';
 
 Direct HTTP defaults to loopback and exposes the MCP endpoint at `POST /mcp` plus a small health
 endpoint at `GET /health`.
@@ -33,3 +34,10 @@ endpoint at `GET /health`.
 Browser requests to `POST /mcp` must come from loopback or an exact origin listed in
 `MCP_ALLOWED_ORIGINS`. This allowlist protects the MCP route from hostile browser origins. It does
 not add CORS response headers, handle preflight requests, or replace authentication.
+
+## Verify through MCP
+
+The health endpoint does not exercise MCP discovery or the SimpleLogin API. After registering the
+endpoint in a client, verify the complete read-only path.
+
+<VerifySetup />
