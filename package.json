@@ -18,8 +18,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "pnpm website:sync && eslint .",
+    "lint:fix": "pnpm website:sync && eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -30,6 +30,7 @@
     "website:og": "tsx website/scripts/render-og-image.ts",
     "website:og:check": "tsx website/scripts/render-og-image.ts --check",
     "website:preview": "pnpm --dir website preview",
+    "website:sync": "pnpm --dir website sync",
     "website:typecheck": "pnpm --dir website typecheck",
     "website:test:built": "WEBSITE_TEST_USE_DIST=1 vitest run test/website.test.ts",
     "website:test": "pnpm website:build && pnpm website:test:built",
