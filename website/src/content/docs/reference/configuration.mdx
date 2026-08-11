@@ -32,13 +32,13 @@ self-hosted SimpleLogin instance must be used with that same instance's `SL_API_
 
 ## Server runtime
 
-| Variable                | Default                      | Applies to  | Purpose                                                                                                      |
-| ----------------------- | ---------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
-| `TRANSPORT`             | `http`                       | Direct runs | Selects `http` or `stdio`. The bundled Compose files always use HTTP.                                        |
-| `HOST`                  | `127.0.0.1`                  | Direct HTTP | Interface the Node.js HTTP server binds. Ignored for stdio; fixed to `0.0.0.0` inside the bundled container. |
-| `PORT`                  | `3000`                       | Direct HTTP | HTTP listener port. Ignored for stdio; fixed to `3000` inside the bundled container.                         |
-| `SL_API_URL`            | `https://app.simplelogin.io` | All modes   | SimpleLogin web-app origin. Do not add `/api`; the server appends API paths.                                 |
-| `SL_REQUEST_TIMEOUT_MS` | `15000`                      | All modes   | Per-request timeout to SimpleLogin, from `1` to `2147483647` milliseconds.                                   |
+| Variable                | Default                      | Applies to                       | Purpose                                                                                                      |
+| ----------------------- | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `TRANSPORT`             | `http`                       | Direct runs                      | Selects literal `http` or `stdio`. The bundled Compose files always use `http`.                              |
+| `HOST`                  | `127.0.0.1`                  | Direct Node.js — Streamable HTTP | Interface the Node.js HTTP server binds. Ignored for stdio; fixed to `0.0.0.0` inside the bundled container. |
+| `PORT`                  | `3000`                       | Direct Node.js — Streamable HTTP | HTTP listener port. Ignored for stdio; fixed to `3000` inside the bundled container.                         |
+| `SL_API_URL`            | `https://app.simplelogin.io` | All modes                        | SimpleLogin web-app origin. Do not add `/api`; the server appends API paths.                                 |
+| `SL_REQUEST_TIMEOUT_MS` | `15000`                      | All modes                        | Per-request timeout to SimpleLogin, from `1` to `2147483647` milliseconds.                                   |
 
 The HTTP server exposes `POST /mcp` for Streamable HTTP and `GET /health` for process health. A
 `GET` request to `/mcp` returns `405 Method Not Allowed` by design.
@@ -127,15 +127,15 @@ For Compose, mount a private CA file read-only and set `NODE_EXTRA_CA_CERTS` to 
 
 ## Which variables matter in each mode?
 
-| Setting group            |  stdio   |                 Direct HTTP                 |               Docker Compose               |
-| ------------------------ | :------: | :-----------------------------------------: | :----------------------------------------: |
-| `SL_API_KEY`             |   Yes    |                     Yes                     |                    Yes                     |
-| `TRANSPORT`              |   Yes    |                  Optional                   |               Fixed to HTTP                |
-| `HOST` / `PORT`          |    No    |                  Optional                   |              Fixed internally              |
-| `MCP_AUTH_TOKEN`         |    No    | Optional on loopback; required off loopback | Required by the internal non-loopback bind |
-| `MCP_ALLOWED_ORIGINS`    |    No    |            Browser clients only             |            Browser clients only            |
-| `SIMPLELOGIN_MCP_HOST_*` |    No    |                     No                      |                  Optional                  |
-| CA and proxy variables   | Optional |                  Optional                   |                  Optional                  |
+| Setting group            | Local stdio |      Direct Node.js — Streamable HTTP       |    Docker Compose — Streamable HTTP    |
+| ------------------------ | :---------: | :-----------------------------------------: | :------------------------------------: |
+| `SL_API_KEY`             |     Yes     |                     Yes                     |                  Yes                   |
+| `TRANSPORT`              |     Yes     |                  Optional                   |            Fixed to `http`             |
+| `HOST` / `PORT`          |     No      |                  Optional                   |            Fixed internally            |
+| `MCP_AUTH_TOKEN`         |     No      | Optional on loopback; required off loopback | Required by internal non-loopback bind |
+| `MCP_ALLOWED_ORIGINS`    |     No      |            Browser clients only             |          Browser clients only          |
+| `SIMPLELOGIN_MCP_HOST_*` |     No      |                     No                      |                Optional                |
+| CA and proxy variables   |  Optional   |                  Optional                   |                Optional                |
 
 Continue with [Security & Data](../../guides/security/) before changing network exposure, or use
 [Troubleshooting](../../guides/troubleshooting/) when startup or client connection fails.

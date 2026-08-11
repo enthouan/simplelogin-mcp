@@ -19,11 +19,11 @@ transport shapes. This page covers credentials, account data, guardrails, and de
 The SimpleLogin API key and the optional MCP server token protect different boundaries and are not
 interchangeable.
 
-| Boundary                           | Credential               | Where it is used                                                                                 |
-| ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
-| simplelogin-mcp → SimpleLogin      | `SL_API_KEY`             | Held in the server process environment and sent on outbound SimpleLogin API calls.               |
-| HTTP MCP client → simplelogin-mcp  | `MCP_AUTH_TOKEN`         | Held by both the HTTP client and server; checked on `POST /mcp`.                                 |
-| stdio MCP client → simplelogin-mcp | No separate server token | Process launch and local configuration form the boundary; the child still receives `SL_API_KEY`. |
+| Boundary                                 | Credential               | Where it is used                                                                                 |
+| ---------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| simplelogin-mcp → SimpleLogin            | `SL_API_KEY`             | Held in the server process environment and sent on outbound SimpleLogin API calls.               |
+| HTTP MCP client → simplelogin-mcp        | `MCP_AUTH_TOKEN`         | Held by both the HTTP client and server; checked on `POST /mcp`.                                 |
+| Local stdio MCP client → simplelogin-mcp | No separate server token | Process launch and local configuration form the boundary; the child still receives `SL_API_KEY`. |
 
 [Create a dedicated `SL_API_KEY`](../../getting-started/simplelogin-api-key/), keep it out of source and logs, and
 revoke it in SimpleLogin if it leaks. Generate a strong server token with `openssl rand -hex 32`;
@@ -87,13 +87,14 @@ must still authenticate when `MCP_AUTH_TOKEN` is set.
 
 ## Recommended deployment patterns
 
-- **Local direct use:** keep `HOST=127.0.0.1`, or reach it through an SSH tunnel.
-- **Docker:** the app binds `0.0.0.0` inside the container, while Compose publishes to host loopback
-  by default. Keep `MCP_AUTH_TOKEN` set because the app sees the internal non-loopback bind.
+- **Direct Node.js — Streamable HTTP:** keep `HOST=127.0.0.1`, or reach it through an SSH tunnel.
+- **Docker Compose — Streamable HTTP:** the app binds `0.0.0.0` inside the container, while Compose
+  publishes to host loopback by default. Keep `MCP_AUTH_TOKEN` set because the app sees the
+  internal non-loopback bind.
 - **LAN or public use:** set the server token, restrict the host bind intentionally, and put the
   endpoint behind TLS.
-- **stdio:** no HTTP server or `MCP_AUTH_TOKEN` is involved, but the client process environment still
-  contains the full-control `SL_API_KEY`.
+- **Local stdio:** no HTTP server or `MCP_AUTH_TOKEN` is involved, but the client process
+  environment still contains the full-control `SL_API_KEY`.
 
 ## Credential handling
 
@@ -104,5 +105,5 @@ must still authenticate when `MCP_AUTH_TOKEN` is set.
 - All server diagnostics go to stderr and omit request headers and credentials.
 
 See [Configuration](../../reference/configuration/) for every environment setting and
-[Troubleshooting](../troubleshooting/) for connection, TLS, proxy, and certificate
-problems.
+[Operations](../operations/#rotate-credentials) for safe credential rotation. Use
+[Troubleshooting](../troubleshooting/) for connection, TLS, proxy, and certificate problems.

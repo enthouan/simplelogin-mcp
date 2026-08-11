@@ -15,7 +15,7 @@ const { headingId = 'verify-setup', hideHeading = false } = Astro.props;
   aria-label={hideHeading ? 'Connection verification' : undefined}
 >
   {!hideHeading && <h3 id={headingId}>Verify it works</h3>}
-  <p>After the client discovers the server, review and approve only this named read-only call:</p>
+  <p>After the client discovers the server, use this low-data, read-only check:</p>
   <Code code={VERIFY_PROMPT} lang="text" meta='title="Read-only verification prompt"' />
   <Aside type="tip" title="Expected result">
     <p>{VERIFY_EXPECTED}</p>

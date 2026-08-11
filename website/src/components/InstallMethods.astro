@@ -10,13 +10,13 @@ const guideRoot = `${base}getting-started/`;
 
 <div class="install-methods" data-install-methods>
   <Tabs syncKey="install-method">
-    <TabItem label="Docker">
+    <TabItem label="Docker Compose">
       <InstallMethod method="docker" showGuideLink />
     </TabItem>
-    <TabItem label="HTTP">
+    <TabItem label="Direct Node.js">
       <InstallMethod method="http" showGuideLink />
     </TabItem>
-    <TabItem label="stdio">
+    <TabItem label="Local stdio">
       <InstallMethod method="stdio" showGuideLink />
     </TabItem>
   </Tabs>
@@ -27,9 +27,9 @@ const guideRoot = `${base}getting-started/`;
       }
     </style>
     <nav aria-label="Installation guides without JavaScript">
-      JavaScript is disabled. Open the <a href={`${guideRoot}docker/`}>Docker</a>,{' '}
-      <a href={`${guideRoot}http/`}>HTTP</a>, or <a href={`${guideRoot}stdio/`}>stdio</a> guide to read
-      every setup method.
+      JavaScript is disabled. Open the <a href={`${guideRoot}docker/`}>Docker Compose</a>,{' '}
+      <a href={`${guideRoot}http/`}>Direct Node.js</a>, or{' '}
+      <a href={`${guideRoot}stdio/`}>Local stdio</a> guide to read every setup method.
     </nav>
   </noscript>
 </div>

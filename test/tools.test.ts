@@ -71,11 +71,6 @@ function readRepoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
-function extractReadmeToolNames(markdown: string): string[] {
-  const table = markdown.split('## Tools')[1]?.split('## Common workflows')[0] ?? '';
-  return [...table.matchAll(/\| `([^`]+)`\s+\|/g)].map((match) => match[1]!);
-}
-
 describe('registered tool surface', () => {
   it('registers every expected stable tool name in order and no unexpected names', () => {
     const tools = captureRegisteredTools();
@@ -307,8 +302,11 @@ describe('paginated and bounded reads', () => {
 });
 
 describe('public docs coverage', () => {
-  it('keeps the README tool table in registered-tool order', () => {
-    expect(extractReadmeToolNames(readRepoFile('README.md'))).toEqual(TOOL_NAMES);
+  it('keeps the README concise and points to the generated tool catalog', () => {
+    const readme = readRepoFile('README.md');
+
+    expect(readme).toContain('[TOOL_CATALOG.md](TOOL_CATALOG.md)');
+    expect(readme).not.toMatch(/\| `alias_[^`]+`\s+\|/);
   });
 
   it('keeps the generated tool catalog deterministic and in sync', async () => {

@@ -1,9 +1,9 @@
 ---
 title: Manage SimpleLogin from your MCP client.
-description: An independent MCP server for existing SimpleLogin users to create aliases, inspect mail activity, manage routing, and use reverse aliases.
+description: An independent MCP server for existing SimpleLogin users to create aliases, inspect alias activity metadata, manage routing, and use reverse aliases.
 template: splash
 hero:
-  tagline: A self-hosted Model Context Protocol (MCP) server for existing SimpleLogin users. Create aliases, inspect mail activity, manage routing, and use reverse aliases from a server you run.
+  tagline: A self-hosted Model Context Protocol (MCP) server for existing SimpleLogin users. Create aliases, inspect alias activity metadata, manage routing, and use reverse aliases from a server you run.
   image:
     file: ../../assets/simplelogin-mcp-mark.svg
     alt: simplelogin-mcp mailbox mark
@@ -33,7 +33,6 @@ import {
   Steps,
 } from '@astrojs/starlight/components';
 import { TOOL_CATALOG } from '../../../../src/tools/catalog.js';
-import ArchitectureFlow from '../../components/ArchitectureFlow.astro';
 import ToolCatalogPreview from '../../components/ToolCatalogPreview.astro';
 
 <Aside type="note" title="Independent integration for SimpleLogin">
@@ -50,12 +49,15 @@ Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelo
     Aliases, contacts, mailboxes, custom domains, and account settings are documented from the same
     source as the server.
 
+    Some reverse-alias, additional-mailbox, and custom-domain capabilities [depend on your
+    SimpleLogin plan](guides/faq/#do-all-tools-work-on-every-simplelogin-plan).
+
     <a href="reference/tools/">See all {TOOL_CATALOG.length} tools</a>
 
   </Card>
   <Card title="Local by default" icon="laptop">
-    stdio opens no listener. Streamable HTTP binds to loopback unless you deliberately configure a
-    wider boundary.
+    Local stdio opens no listener. Direct Node.js — Streamable HTTP binds to loopback unless you
+    deliberately configure a wider boundary.
   </Card>
   <Card title="API keys stay out of MCP messages" icon="padlock">
     The server reads `SL_API_KEY` from its environment and never includes it in MCP requests or
@@ -71,8 +73,9 @@ Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelo
 
 <h2 id="see-it-work">Let your MCP client create an alias for you</h2>
 
-This example creates one real random alias in your connected SimpleLogin account. It uses your
-account's default alias style, so you do not need to choose an address or configure any inputs.
+Once simplelogin-mcp is connected, this example creates one real random alias in your SimpleLogin
+account. It uses your account's default alias style, so you do not need to choose an address or
+configure any inputs.
 
 <Code
   code="Can you create a new random SimpleLogin alias for me?"
@@ -95,9 +98,9 @@ account's default alias style, so you do not need to choose an address or config
 
 <h2 id="get-started">Pick your MCP client</h2>
 
-Each tested label means the documented local stdio recipe connected, discovered all 27 tools, and
-completed the read-only account-usage check. See the current [compatibility
-evidence](getting-started/compatibility/) for scope and limitations.
+The documented local stdio recipes connected, discovered all 27 tools, and completed the read-only
+account-usage check. See the current [compatibility evidence](getting-started/compatibility/) for
+scope and limitations.
 
 First time connecting? [Create a dedicated SimpleLogin API key](getting-started/simplelogin-api-key/) before
 configuring your client.
@@ -105,31 +108,31 @@ configuring your client.
 <CardGrid>
   <LinkCard
     title="Codex"
-    description="Client tested — the shared-TOML stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    description="Tested local stdio through the shared TOML configuration."
     href="getting-started/clients/#codex"
     data-client-icon="openai"
   />
   <LinkCard
     title="Claude Code"
-    description="Client tested — the project-scoped stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    description="Tested local stdio through a project-scoped configuration."
     href="getting-started/clients/#claude-code"
     data-client-icon="claude"
   />
   <LinkCard
     title="Claude Desktop"
-    description="Client tested — the user-local stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    description="Tested local stdio through the desktop client configuration."
     href="getting-started/clients/#claude-desktop"
     data-client-icon="claude"
   />
   <LinkCard
     title="VS Code"
-    description="Client tested — the user-profile stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    description="Tested local stdio through the user-profile configuration."
     href="getting-started/clients/#vs-code"
     data-client-icon="vscode"
   />
   <LinkCard
     title="OpenCode"
-    description="Client tested — the environment-backed stdio recipe connected, discovered all 27 tools, and completed the read-only account-usage check."
+    description="Tested local stdio through an environment-backed configuration."
     href="getting-started/clients/#opencode"
     data-client-icon="opencode"
   />
@@ -164,17 +167,18 @@ deployment shape](getting-started/).
     `alias_list → alias_create_random → alias_update → alias_set_enabled`
 
   </Card>
-  <Card title="Investigate recent mail" icon="magnifier">
-    Inspect one alias, then page through recent forwards, replies, blocks, and bounces.
+  <Card title="Review recent alias activity" icon="magnifier">
+    Inspect one alias, then page through activity metadata for recent forwards, replies, blocks,
+    and bounces. Message bodies are not read.
 
     `alias_get → alias_activity_list`
 
   </Card>
-  <Card title="Send from an alias" icon="email">
-    Create or reuse a reverse alias for a recipient, and block forwarding before choosing permanent
-    deletion.
+  <Card title="Create a reverse alias for sending" icon="email">
+    Create or reuse a reverse alias for a recipient. Send the actual message from a mailbox that
+    owns the alias; simplelogin-mcp does not compose or send email.
 
-    `contact_create → contact_set_blocked`
+    `contact_list → contact_create`
 
   </Card>
   <Card title="Maintain account routing" icon="setting">
@@ -190,15 +194,11 @@ deployment shape](getting-started/).
   Follow the workflow guide
 </LinkButton>
 
-## Your host remains the control point
-
-<ArchitectureFlow />
-
 ## One canonical, searchable tool catalog
 
-Names, summaries, groups, inputs, annotations, bounds, and counts come from the same TypeScript
-catalog and registered schemas used by the MCP server. Filter the full reference by text, category,
-or behavior, and link directly to any tool.
+Search every supported tool by name, purpose, input, category, or behavior. Each result explains
+what the tool does, what it needs, whether it changes account state, and what it returns. The
+reference stays current because it reads from the same catalog and schemas used by the server.
 
 <ToolCatalogPreview />
 
@@ -225,7 +225,7 @@ action you prefer to inspect and complete in the official interface.
   />
   <LinkCard
     title="Troubleshooting"
-    description="Diagnose startup, stdio, HTTP, Docker, and upstream API failures."
+    description="Diagnose Local stdio, Streamable HTTP, Docker Compose, and upstream API failures."
     href="guides/troubleshooting/"
   />
   <LinkCard

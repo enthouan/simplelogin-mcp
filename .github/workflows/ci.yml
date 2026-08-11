@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install website test browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -41,8 +44,19 @@ jobs:
       - name: Check website
         run: pnpm website:check
 
+      - name: Upload website test artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: website-test-artifacts-${{ github.run_attempt }}
+          path: |
+            test-results/playwright/
+            test-results/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Test
-        run: pnpm test
+        run: pnpm test:runtime
 
       - name: Check formatting
         run: pnpm format:check

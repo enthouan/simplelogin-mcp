@@ -81,6 +81,16 @@ html[data-has-hero] .card-grid:first-of-type > .card:first-child {
   --client-card-icon: url('../assets/client-icons/evidence.svg');
 }
 
+[data-client-setups] [role='tab'] {
+  gap: 0.375rem;
+  padding-inline: 0.75rem;
+  white-space: nowrap;
+}
+
+[data-install-methods] [role='tab'] {
+  white-space: nowrap;
+}
+
 .sl-link-card a[data-client-icon] .title {
   display: inline-flex;
   align-items: center;

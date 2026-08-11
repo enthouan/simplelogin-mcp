@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, posix, relative, sep } from 'node:path';
@@ -6,11 +7,7 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TOOL_CATALOG, TOOL_NAMES } from '../src/tools/catalog.js';
 import { CLIENT_SETUPS, VERIFY_PROMPT } from '../website/src/data/clients.js';
-import {
-  CANONICAL_WEBSITE_URL,
-  normalizePublicationUrl,
-  resolvePublicationUrl,
-} from '../website/src/data/publication.js';
+import { CANONICAL_WEBSITE_URL } from '../website/src/data/publication.js';
 import { REPOSITORY_URL } from '../website/src/data/repository.js';
 
 interface PackageJson {
@@ -37,13 +34,12 @@ const LEGACY_REDIRECTS = {
 } as const;
 
 let outputRoot = '';
-let productionRoot = '';
-let canonicalDefaultRoot = '';
 let homeHtml = '';
 let installHtml = '';
 let apiKeyHtml = '';
 let howItWorksHtml = '';
 let securityHtml = '';
+let operationsHtml = '';
 let toolsHtml = '';
 let apiCoverageHtml = '';
 let workflowsHtml = '';
@@ -56,7 +52,9 @@ let referenceHtml = '';
 let contributingHtml = '';
 let reportingIssuesHtml = '';
 let securityPolicyHtml = '';
+let removeOutputRootAfterTests = false;
 const execFileAsync = promisify(execFile);
+const useBuiltWebsite = process.env['WEBSITE_TEST_USE_DIST'] === '1';
 
 async function readRepoFile(path: string): Promise<string> {
   return readFile(join(process.cwd(), path), 'utf8');
@@ -78,23 +76,16 @@ async function listFiles(root: string, directory = root): Promise<string[]> {
   return files.flat().sort();
 }
 
-async function buildWebsiteInFreshProcess(
-  outputDir: string,
-  baseUrl: string | undefined,
-): Promise<void> {
+async function buildWebsiteInFreshProcess(outputDir: string): Promise<void> {
   const websiteRoot = join(process.cwd(), 'website');
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: 'production',
   };
-  if (baseUrl === undefined) delete childEnv['WEBSITE_BASE_URL'];
-  else childEnv['WEBSITE_BASE_URL'] = baseUrl;
   delete childEnv['VITEST'];
   delete childEnv['VITEST_POOL_ID'];
   delete childEnv['VITEST_WORKER_ID'];
   delete childEnv['TEST'];
-  // Exercise the config guard against ambient values injected by Vitest, shells, or CI runners.
-  childEnv['BASE_URL'] = '/ambient-base-that-must-not-leak/';
 
   await execFileAsync(
     process.execPath,
@@ -130,6 +121,26 @@ function stepItemCounts(html: string): number[] {
   );
 }
 
+function sha256(value: Uint8Array | string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function ogSourceDigest(template: Uint8Array, renderer: Uint8Array): string {
+  const hash = createHash('sha256');
+  hash.update('simplelogin-mcp-og-image-v1\0');
+  hash.update(template);
+  hash.update('\0renderer\0');
+  hash.update(renderer);
+  return hash.digest('hex');
+}
+
+function pngDimensions(image: Buffer): { height: number; width: number } {
+  return {
+    width: image.readUInt32BE(16),
+    height: image.readUInt32BE(20),
+  };
+}
+
 function decodeHtmlAttribute(value: string): string {
   return value
     .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) =>
@@ -155,20 +166,25 @@ function installCopyPayload(html: string, method: 'docker' | 'http' | 'stdio'): 
 }
 
 beforeAll(async () => {
-  productionRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-production-'));
-  canonicalDefaultRoot = await mkdtemp(
-    join(tmpdir(), 'simplelogin-mcp-starlight-canonical-default-'),
-  );
-  outputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-'));
-  await buildWebsiteInFreshProcess(productionRoot, 'https://docs.example.test/simplelogin-mcp');
-  await buildWebsiteInFreshProcess(canonicalDefaultRoot, undefined);
-  await buildWebsiteInFreshProcess(outputRoot, '');
+  if (useBuiltWebsite) {
+    outputRoot = join(process.cwd(), 'website', 'dist');
+    await stat(join(outputRoot, 'index.html')).catch(() => {
+      throw new Error(
+        'WEBSITE_TEST_USE_DIST=1 requires a completed `pnpm website:build` in website/dist.',
+      );
+    });
+  } else {
+    outputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-'));
+    removeOutputRootAfterTests = true;
+    await buildWebsiteInFreshProcess(outputRoot);
+  }
   [
     homeHtml,
     installHtml,
     apiKeyHtml,
     howItWorksHtml,
     securityHtml,
+    operationsHtml,
     toolsHtml,
     apiCoverageHtml,
     workflowsHtml,
@@ -187,6 +203,7 @@ beforeAll(async () => {
     readOutputFile('getting-started/simplelogin-api-key/index.html'),
     readOutputFile('guides/how-it-works/index.html'),
     readOutputFile('guides/security/index.html'),
+    readOutputFile('guides/operations/index.html'),
     readOutputFile('reference/tools/index.html'),
     readOutputFile('reference/api-coverage/index.html'),
     readOutputFile('guides/workflows/index.html'),
@@ -203,9 +220,9 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  if (outputRoot) await rm(outputRoot, { recursive: true, force: true });
-  if (productionRoot) await rm(productionRoot, { recursive: true, force: true });
-  if (canonicalDefaultRoot) await rm(canonicalDefaultRoot, { recursive: true, force: true });
+  if (removeOutputRootAfterTests && outputRoot) {
+    await rm(outputRoot, { recursive: true, force: true });
+  }
 });
 
 describe('Starlight website', () => {
@@ -220,6 +237,8 @@ describe('Starlight website', () => {
     expect(files).toContain('pagefind/pagefind.js');
     expect(files).toEqual(
       expect.arrayContaining([
+        '_headers',
+        '_redirects',
         'index.html',
         '404.html',
         'llms.txt',
@@ -236,6 +255,7 @@ describe('Starlight website', () => {
         'getting-started/stdio/index.html',
         'guides/how-it-works/index.html',
         'guides/faq/index.html',
+        'guides/operations/index.html',
         'guides/troubleshooting/index.html',
         'guides/workflows/index.html',
         'guides/security/index.html',
@@ -283,6 +303,7 @@ describe('Starlight website', () => {
       ['How it works', 'guides/how-it-works/'],
       ['Workflows', 'guides/workflows/'],
       ['Security &amp; Data', 'guides/security/'],
+      ['Operations', 'guides/operations/'],
       ['Troubleshooting', 'guides/troubleshooting/'],
       ['FAQ', 'guides/faq/'],
       ['Overview', 'reference/'],
@@ -303,7 +324,7 @@ describe('Starlight website', () => {
     const files = await listFiles(outputRoot);
     const heroMark = await readRepoFile('website/src/assets/simplelogin-mcp-mark.svg');
     const favicon = await readRepoFile('website/public/favicon.svg');
-    const socialCard = await readRepoFile('website/public/og-card.svg');
+    const socialCard = await readRepoFile('website/og-image.html');
     const notices = await readOutputFile('third-party-notices.txt');
 
     expect(homeHtml).toMatch(
@@ -315,54 +336,61 @@ describe('Starlight website', () => {
     expect(heroMark).toContain('fill="#b72570"');
     expect(heroMark).toContain('d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"');
     expect(favicon).toBe(heroMark);
-    expect(socialCard).toContain('Full license: /third-party-notices.txt');
-    expect(notices).toContain('https://lucide.dev/icons/hammer');
+    expect(socialCard).toContain('data-social-card');
+    expect(socialCard).toContain('Full license: public/third-party-notices.txt');
+    expect(socialCard).toContain('Manage aliases from');
+    expect(socialCard).toContain('Self-hosted, auditable alias automation.');
+    expect(socialCard).toContain('27 tools');
+    expect(socialCard).toContain('Independent');
+    expect(socialCard).toContain('community project');
+    expect(socialCard).toContain('--og-canvas: #fff4f9');
+    expect(notices).toContain('https://lucide.dev/icons/clipboard-check');
     expect(notices).toContain('Copyright (c) 2026 Lucide Icons and Contributors');
     expect(notices).toContain('Permission to use, copy, modify, and/or distribute this software');
   });
 
-  it('keeps the published social image synchronized with its SVG source', async () => {
-    const websiteRoot = join(process.cwd(), 'website');
-    const generatedPng = join(outputRoot, 'expected-og-card.png');
+  it('keeps the browser-rendered social image synchronized with its sources', async () => {
+    const [template, renderer, manifestSource, image] = await Promise.all([
+      readFile(join(process.cwd(), 'website/og-image.html')),
+      readFile(join(process.cwd(), 'website/scripts/render-og-image.ts')),
+      readRepoFile('website/og-image.manifest.json'),
+      readFile(join(process.cwd(), 'website/public/og-card.png')),
+    ]);
+    const manifest = JSON.parse(manifestSource) as {
+      height: number;
+      imageSha256: string;
+      schemaVersion: number;
+      sourceSha256: string;
+      width: number;
+    };
 
-    try {
-      await execFileAsync(
-        process.execPath,
-        [
-          '--input-type=module',
-          '--eval',
-          `import sharp from 'sharp'; await sharp('public/og-card.svg').png().toFile(${JSON.stringify(generatedPng)});`,
-        ],
-        { cwd: websiteRoot },
-      );
-
-      expect(await readFile(join(websiteRoot, 'public/og-card.png'))).toEqual(
-        await readFile(generatedPng),
-      );
-    } finally {
-      await rm(generatedPng, { force: true });
-    }
+    expect(image.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    expect(manifest).toEqual({
+      schemaVersion: 1,
+      width: 1_200,
+      height: 630,
+      sourceSha256: ogSourceDigest(template, renderer),
+      imageSha256: sha256(image),
+    });
+    expect(pngDimensions(image)).toEqual({ width: 1_200, height: 630 });
   });
 
   it('replaces the text-only architecture sketch with an accessible request-flow diagram', async () => {
-    const [diagram, componentSource, productionHowItWorksHtml] = await Promise.all([
+    const [diagram, componentSource] = await Promise.all([
       readOutputFile('request-flow.svg'),
       readRepoFile('website/src/components/ArchitectureFlow.astro'),
-      readOutputFile('guides/how-it-works/index.html', productionRoot),
     ]);
 
     expect(howItWorksHtml).not.toContain('MCP client  ── stdio or Streamable HTTP');
-    for (const page of [homeHtml, howItWorksHtml]) {
-      expect(page).toContain('data-request-flow');
-      expect(page).toContain('role="region" aria-label="SimpleLogin request flow diagram"');
-      expect(page).toContain('src="/request-flow.svg"');
-      expect(page).not.toContain('Where requests and credentials travel');
-      expect(page).not.toContain('open the full-size diagram');
-    }
+    expect(homeHtml).not.toContain('data-request-flow');
+    expect(howItWorksHtml).toContain('data-request-flow');
+    expect(howItWorksHtml).toContain('role="region" aria-label="SimpleLogin request flow diagram"');
+    expect(howItWorksHtml).toContain('src="/request-flow.svg"');
+    expect(howItWorksHtml).not.toContain('Where requests and credentials travel');
+    expect(howItWorksHtml).not.toContain('open the full-size diagram');
     expect(securityHtml).not.toContain('data-request-flow');
     expect(securityHtml).toContain('href="../how-it-works/"');
 
-    expect(productionHowItWorksHtml).toContain('src="/simplelogin-mcp/request-flow.svg"');
     expect(diagram).toContain('role="img" aria-labelledby="title description"');
     expect(diagram).toContain('<title id="title">How a simplelogin-mcp tool call travels</title>');
     expect(diagram).toContain('>How a simplelogin-mcp tool call travels</text>');
@@ -388,26 +416,13 @@ describe('Starlight website', () => {
     expect(componentSource).toContain('min-width: 52rem');
   });
 
-  it('uses the mailbox mark and site title as the home link', async () => {
-    const productionApiKeyHtml = await readOutputFile(
-      'getting-started/simplelogin-api-key/index.html',
-      productionRoot,
-    );
-
-    for (const [page, expectedHref, expectedAssetBase] of [
-      [homeHtml, '/', '/'],
-      [apiKeyHtml, '/', '/'],
-      [productionApiKeyHtml, '/simplelogin-mcp/', '/simplelogin-mcp/'],
-    ] as const) {
+  it('uses the mailbox mark and site title as the home link', () => {
+    for (const page of [homeHtml, apiKeyHtml]) {
       const siteTitle = /<a href="([^"]+)" class="site-title[^>]*>([\s\S]*?)<\/a>/.exec(page);
 
-      expect(siteTitle?.[1]).toBe(expectedHref);
+      expect(siteTitle?.[1]).toBe('/');
       expect(siteTitle?.[2]).toMatch(/<img\b[^>]*\balt(?:=""|(?=\s|>))[^>]*>/);
-      expect(siteTitle?.[2]).toMatch(
-        new RegExp(
-          `src="${expectedAssetBase.replaceAll('/', '\\/')}_astro\\/simplelogin-mcp-mark\\.[^"]+\\.svg"`,
-        ),
-      );
+      expect(siteTitle?.[2]).toMatch(/src="\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"/);
       expect(siteTitle?.[2]).toContain('simplelogin-mcp');
     }
   });
@@ -415,9 +430,8 @@ describe('Starlight website', () => {
   it('uses a branded information panel to distinguish the official service', async () => {
     const disclaimer =
       'It is not an official SimpleLogin or Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or sponsored by SimpleLogin or Proton AG.';
-    const productionHomeHtml = await readOutputFile('index.html', productionRoot);
 
-    for (const page of [homeHtml, installHtml, productionHomeHtml]) {
+    for (const page of [homeHtml, installHtml]) {
       const normalizedPage = page.replace(/\s+/g, ' ');
       const normalizedText = normalizedPage.replace(/<[^>]+>/g, '');
 
@@ -539,12 +553,56 @@ describe('Starlight website', () => {
       readOutputFile('getting-started/stdio/index.html'),
     ]);
 
-    expect(stepItemCounts(installHtml)).toEqual([5]);
+    expect(stepItemCounts(installHtml)).toEqual([4]);
     expect(stepItemCounts(homeHtml)).toEqual([3]);
     expect(stepItemCounts(dockerHtml)).toEqual([4]);
     expect(stepItemCounts(httpHtml)).toEqual([4]);
     expect(stepItemCounts(stdioHtml)).toEqual([4]);
-    expect(stepItemCounts(workflowsHtml)).toEqual([4, 3, 3, 3]);
+    expect(stepItemCounts(workflowsHtml)).toEqual([4, 3, 4, 3]);
+    expect(dockerHtml).toContain('Pin long-lived deployments');
+    expect(dockerHtml).toContain('The quick start uses the moving');
+    expect(dockerHtml).toContain('>latest</code> image tag');
+    expect(dockerHtml).toContain('SIMPLELOGIN_MCP_IMAGE_TAG');
+    expect(dockerHtml).toContain('href="../../guides/operations/"');
+  });
+
+  it('publishes an accurate operations runbook for every supported deployment shape', () => {
+    expect(operationsHtml).toMatch(/<h1 id="_top"[^>]*>Operate simplelogin-mcp<\/h1>/);
+    for (const [slug, heading] of [
+      ['before-a-change', 'Before a change'],
+      ['inspect-a-running-service', 'Inspect a running service'],
+      ['upgrade-the-published-image', 'Upgrade the published image'],
+      ['roll-back', 'Roll back'],
+      ['rotate-credentials', 'Rotate credentials'],
+      ['stop-or-remove-the-service', 'Stop or remove the service'],
+      ['state-backup-and-retention', 'State, backup, and retention'],
+      ['upgrade-a-source-or-stdio-installation', 'Upgrade a source or stdio installation'],
+    ] as const) {
+      expect(operationsHtml).toContain(`<h2 id="${slug}">${heading}</h2>`);
+      expect(operationsHtml).toContain(`href="#${slug}"`);
+    }
+
+    for (const boundary of [
+      'SIMPLELOGIN_MCP_IMAGE_TAG',
+      'SL_API_KEY',
+      'MCP_AUTH_TOKEN',
+      'docker compose images simplelogin-mcp',
+      'docker compose pull simplelogin-mcp',
+      'docker compose up -d --force-recreate simplelogin-mcp',
+      'docker compose stop simplelogin-mcp',
+      'docker compose down',
+      'curl http://127.0.0.1:3000/health',
+      'account_get_stats',
+      'docker-compose.local.yml',
+      'git clone --branch vX.Y.Z --depth 1',
+    ]) {
+      expect(operationsHtml).toContain(boundary);
+    }
+
+    expect(operationsHtml).toContain('stateless and creates a fresh MCP server and transport');
+    expect(operationsHtml).toContain('does not undo SimpleLogin mutations');
+    expect(operationsHtml).toContain('does not reload changed');
+    expect(operationsHtml).not.toMatch(/\/healthz|\/readyz|auth_whoami|auth_token_info|TRELLO_/);
   });
 
   it('renders the canonical tool catalog exactly once in the full reference', () => {
@@ -555,7 +613,7 @@ describe('Starlight website', () => {
     expect(renderedNames).toEqual(TOOL_NAMES);
     expect(new Set(renderedNames).size).toBe(TOOL_CATALOG.length);
     expect(toolsHtml).toContain(`data-tool-count="${TOOL_CATALOG.length}"`);
-    expect(toolsHtml).toContain(`${TOOL_CATALOG.length} tools across five focused areas`);
+    expect(toolsHtml).toContain(`${TOOL_CATALOG.length} supported tools across five focused areas`);
 
     for (const category of new Set(TOOL_CATALOG.map((tool) => tool.category))) {
       const expectedCount = TOOL_CATALOG.filter((tool) => tool.category === category).length;
@@ -585,13 +643,10 @@ describe('Starlight website', () => {
   });
 
   it('renders API coverage from the canonical repository document', async () => {
-    const [componentSource, canonicalSource, productionApiCoverageHtml, canonicalApiCoverageHtml] =
-      await Promise.all([
-        readRepoFile('website/src/components/ApiCoverage.astro'),
-        readRepoFile('docs/api-coverage.md'),
-        readOutputFile('reference/api-coverage/index.html', productionRoot),
-        readOutputFile('reference/api-coverage/index.html', canonicalDefaultRoot),
-      ]);
+    const [componentSource, canonicalSource] = await Promise.all([
+      readRepoFile('website/src/components/ApiCoverage.astro'),
+      readRepoFile('docs/api-coverage.md'),
+    ]);
 
     expect(componentSource).toContain(
       "import { compiledContent } from '../../../docs/api-coverage.md'",
@@ -617,33 +672,20 @@ describe('Starlight website', () => {
     expect(apiCoverageHtml).toContain('id="starlight__on-this-page--mobile"');
     expect(canonicalSource).toContain('# SimpleLogin API Coverage and Scope');
     expect(canonicalSource).toContain('| **Supported** |');
-    for (const page of [productionApiCoverageHtml, canonicalApiCoverageHtml]) {
-      expect(page).toContain(`href="${REPOSITORY_URL}/blob/main/TOOL_CATALOG.md"`);
-      expect(page).toContain(`href="${REPOSITORY_URL}/tree/main/src/tools"`);
-    }
+    expect(apiCoverageHtml).toContain(`href="${REPOSITORY_URL}/blob/main/TOOL_CATALOG.md"`);
+    expect(apiCoverageHtml).toContain(`href="${REPOSITORY_URL}/tree/main/src/tools"`);
   });
 
-  it('publishes reference, contribution, issue-reporting, and private security guidance', async () => {
-    const [
-      productionReferenceHtml,
-      productionContributingHtml,
-      productionReportingIssuesHtml,
-      productionSecurityPolicyHtml,
-      canonicalReferenceHtml,
-      canonicalContributingHtml,
-      canonicalReportingIssuesHtml,
-      canonicalSecurityPolicyHtml,
-    ] = await Promise.all([
-      readOutputFile('reference/index.html', productionRoot),
-      readOutputFile('reference/contributing/index.html', productionRoot),
-      readOutputFile('reference/reporting-issues/index.html', productionRoot),
-      readOutputFile('reference/security-policy/index.html', productionRoot),
-      readOutputFile('reference/index.html', canonicalDefaultRoot),
-      readOutputFile('reference/contributing/index.html', canonicalDefaultRoot),
-      readOutputFile('reference/reporting-issues/index.html', canonicalDefaultRoot),
-      readOutputFile('reference/security-policy/index.html', canonicalDefaultRoot),
-    ]);
+  it('makes wide documentation tables keyboard focusable', () => {
+    for (const page of [compatibilityHtml, configurationHtml, securityHtml, securityPolicyHtml]) {
+      expect(page).toContain('<table tabindex="0">');
+    }
 
+    expect(apiCoverageHtml.match(/class="api-coverage-table" tabindex="0"/g)).toHaveLength(2);
+    expect(apiCoverageHtml).not.toContain('<table tabindex="0">');
+  });
+
+  it('publishes reference, contribution, issue-reporting, and private security guidance', () => {
     expect(referenceHtml).toContain('self-hostable, MIT-licensed open source project');
     expect(referenceHtml).toContain('Technical reference');
     expect(referenceHtml).toContain('Repository policies');
@@ -654,52 +696,57 @@ describe('Starlight website', () => {
     expect(contributingHtml).toContain('pnpm install --frozen-lockfile');
     expect(contributingHtml).toContain('pnpm website:check');
     expect(contributingHtml).toContain('pnpm format:check');
-    expect(stepItemCounts(contributingHtml)).toEqual([5]);
-    expect(reportingIssuesHtml).toContain('Choose the right channel');
-    expect(reportingIssuesHtml).toContain('Prepare a reproducible issue');
+    expect(contributingHtml).toContain('Development Commands');
+    expect(contributingHtml).toContain('Dependency Maintenance');
+    expect(reportingIssuesHtml).toContain('What To Include');
+    expect(reportingIssuesHtml).toContain('Support Boundaries');
     expect(reportingIssuesHtml).toContain('SL_API_KEY');
     expect(reportingIssuesHtml).toContain('MCP_AUTH_TOKEN');
     expect(reportingIssuesHtml).toContain('authorization headers');
-    expect(reportingIssuesHtml).toContain('private account data');
-    expect(stepItemCounts(reportingIssuesHtml)).toEqual([6]);
+    expect(reportingIssuesHtml).toContain('account details');
     expect(securityPolicyHtml).toContain('Do not open a public vulnerability report');
     expect(securityPolicyHtml).toMatch(/Security → Report a\s+vulnerability/);
+    expect(securityPolicyHtml).toContain('Credential risk model');
+    expect(securityPolicyHtml).toContain('Network exposure model');
     expect(securityPolicyHtml).toContain('SL_API_KEY');
     expect(securityPolicyHtml).toContain('MCP_AUTH_TOKEN');
-    expect(stepItemCounts(securityPolicyHtml)).toEqual([4]);
+    expect(securityPolicyHtml).toContain('<table tabindex="0">');
 
-    for (const page of [
-      productionReferenceHtml,
-      productionContributingHtml,
-      productionReportingIssuesHtml,
-      canonicalReferenceHtml,
-      canonicalContributingHtml,
-      canonicalReportingIssuesHtml,
-    ]) {
+    for (const page of [referenceHtml, contributingHtml, reportingIssuesHtml]) {
       expect(page).toContain(`href="${REPOSITORY_URL}"`);
     }
-    for (const page of [productionReportingIssuesHtml, canonicalReportingIssuesHtml]) {
-      expect(page).toContain(`href="${REPOSITORY_URL}/issues/new/choose"`);
-      expect(page).toContain('Open an issue');
-    }
-    for (const page of [productionSecurityPolicyHtml, canonicalSecurityPolicyHtml]) {
-      expect(page).not.toContain('/security/advisories/new');
-    }
+    expect(reportingIssuesHtml).toContain(`href="${REPOSITORY_URL}/issues/new/choose"`);
+    expect(reportingIssuesHtml).toContain('Open an issue');
+    expect(securityPolicyHtml).not.toContain('/security/advisories/new');
   });
 
   it('keeps critical website policy guidance aligned with repository policy files', async () => {
-    const [contributing, security, support, websiteContributing, websiteSecurity] =
-      await Promise.all([
-        readRepoFile('CONTRIBUTING.md'),
-        readRepoFile('SECURITY.md'),
-        readRepoFile('SUPPORT.md'),
-        readRepoFile('website/src/content/docs/reference/contributing.mdx'),
-        readRepoFile('website/src/content/docs/reference/security-policy.mdx'),
-      ]);
+    const [
+      contributing,
+      security,
+      support,
+      policyComponent,
+      websiteContributing,
+      websiteSupport,
+      websiteSecurity,
+    ] = await Promise.all([
+      readRepoFile('CONTRIBUTING.md'),
+      readRepoFile('SECURITY.md'),
+      readRepoFile('SUPPORT.md'),
+      readRepoFile('website/src/components/PolicyContent.astro'),
+      readRepoFile('website/src/content/docs/reference/contributing.mdx'),
+      readRepoFile('website/src/content/docs/reference/reporting-issues.mdx'),
+      readRepoFile('website/src/content/docs/reference/security-policy.mdx'),
+    ]);
 
     expect(contributing).toContain('pnpm website:check');
-    expect(websiteContributing).toContain('pnpm website:check');
-    for (const policy of [security, support, websiteSecurity]) {
+    expect(policyComponent).toContain("from '../../../CONTRIBUTING.md'");
+    expect(policyComponent).toContain("from '../../../SUPPORT.md'");
+    expect(policyComponent).toContain("from '../../../SECURITY.md'");
+    expect(websiteContributing).toContain('<PolicyContent source="contributing" />');
+    expect(websiteSupport).toContain('<PolicyContent source="support" />');
+    expect(websiteSecurity).toContain('<PolicyContent source="security" />');
+    for (const policy of [security, support]) {
       expect(policy).toMatch(/vulnerab/i);
       expect(policy).toMatch(/not (?:publish|open a public)/i);
     }
@@ -707,18 +754,32 @@ describe('Starlight website', () => {
 
   it('redirects every previous documentation route to its canonical page', async () => {
     for (const [legacyRoute, canonicalRoute] of Object.entries(LEGACY_REDIRECTS)) {
-      const [localRedirect, productionRedirect] = await Promise.all([
-        readOutputFile(`${legacyRoute}/index.html`),
-        readOutputFile(`${legacyRoute}/index.html`, productionRoot),
-      ]);
+      const redirect = await readOutputFile(`${legacyRoute}/index.html`);
 
-      expect(localRedirect).toContain(`content="0;url=/${canonicalRoute}/"`);
-      expect(localRedirect).toContain('<meta name="robots" content="noindex">');
-      expect(productionRedirect).toContain(`content="0;url=/simplelogin-mcp/${canonicalRoute}/"`);
-      expect(productionRedirect).toContain(
-        `href="https://docs.example.test/simplelogin-mcp/${canonicalRoute}/"`,
-      );
+      expect(redirect).toContain(`content="0;url=/${canonicalRoute}/"`);
+      expect(redirect).toContain('<meta name="robots" content="noindex">');
+      expect(redirect).toContain(`href="${CANONICAL_WEBSITE_URL}${canonicalRoute}/"`);
     }
+  });
+
+  it('ships Cloudflare-native redirects and conservative security headers', async () => {
+    const [redirects, headers] = await Promise.all([
+      readOutputFile('_redirects'),
+      readOutputFile('_headers'),
+    ]);
+
+    for (const [legacyRoute, canonicalRoute] of Object.entries(LEGACY_REDIRECTS)) {
+      expect(redirects).toContain(`/${legacyRoute} /${canonicalRoute}/ 301`);
+      expect(redirects).toContain(`/${legacyRoute}/ /${canonicalRoute}/ 301`);
+    }
+
+    expect(headers).toContain('X-Content-Type-Options: nosniff');
+    expect(headers).toContain('Referrer-Policy: strict-origin-when-cross-origin');
+    expect(headers).toContain('X-Frame-Options: DENY');
+    expect(headers).toContain(
+      'Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+    );
+    expect(headers).not.toContain('Content-Security-Policy:');
   });
 
   it('prevents the enhanced tool catalog form from submitting', async () => {
@@ -729,7 +790,7 @@ describe('Starlight website', () => {
     );
   });
 
-  it('leads with an alias-creation demo and client-first onboarding', async () => {
+  it('shows the live alias-creation example before the client picker', async () => {
     const homepageSource = await readRepoFile('website/src/content/docs/index.mdx');
     const demoStart = homeHtml.indexOf('Let your MCP client create an alias for you');
     const clientStart = homeHtml.indexOf('Pick your MCP client');
@@ -748,6 +809,13 @@ describe('Starlight website', () => {
     expect(homeHtml).toContain(
       `<a href="reference/tools/">See all ${TOOL_CATALOG.length} tools</a>`,
     );
+    expect(homeHtml).toContain('href="guides/faq/#do-all-tools-work-on-every-simplelogin-plan"');
+    const usefulByDesign = homeHtml.slice(
+      homeHtml.indexOf('Useful by design'),
+      homeHtml.indexOf('One canonical, searchable tool catalog'),
+    );
+    expect(usefulByDesign).toContain('contact_list → contact_create');
+    expect(usefulByDesign).not.toContain('contact_create → contact_set_blocked');
 
     for (const [href, label] of [
       ['guides/workflows/', 'Follow the workflow guide'],
@@ -802,8 +870,8 @@ describe('Starlight website', () => {
     expect(homeHtml).not.toContain('Generic MCP');
     expect(clientsHtml).not.toContain('Generic MCP');
     expect(compatibilityHtml).toContain('Generic MCP');
-    expect(homeHtml).toContain('Each tested label means the documented local stdio recipe');
-    expect(homeHtml.match(/Client tested —/g)).toHaveLength(CLIENT_SETUPS.length);
+    expect(homeHtml).toContain('The documented local stdio recipes connected');
+    expect(homeHtml).not.toContain('Client tested —');
     expect(homeHtml).toContain('discovered all 27 tools');
     expect(homeHtml).not.toContain(VERIFY_PROMPT);
     expect(clientsHtml).toContain(VERIFY_PROMPT);
@@ -819,12 +887,10 @@ describe('Starlight website', () => {
     const clientSetupSource = await readRepoFile('website/src/components/ClientSetup.astro');
     const customCss = await readRepoFile('website/src/styles/custom.css');
     const notices = await readRepoFile('website/public/third-party-notices.txt');
-    const productionFiles = await listFiles(productionRoot);
-    const productionCss = (
+    const builtFiles = await listFiles(outputRoot);
+    const builtCss = (
       await Promise.all(
-        productionFiles
-          .filter((path) => path.endsWith('.css'))
-          .map((path) => readOutputFile(path, productionRoot)),
+        builtFiles.filter((path) => path.endsWith('.css')).map((path) => readOutputFile(path)),
       )
     ).join('\n');
     const clientIcons = {
@@ -858,14 +924,21 @@ describe('Starlight website', () => {
       );
     }
     expect(clientSetupSource).toContain('tab.dataset.clientIcon = icon');
+    expect(customCss).toMatch(/\[data-client-setups\] \[role='tab'\] \{[^}]*white-space: nowrap;/);
 
     for (const icon of ['claude', 'openai', 'vscode', 'opencode', 'evidence']) {
       const source = await readRepoFile(`website/src/assets/client-icons/${icon}.svg`);
       expect(source).toContain('<svg');
       expect(source).toContain('<title>');
+      if (icon === 'evidence') {
+        expect(source).toContain('Lucide Clipboard Check');
+      } else {
+        expect(source).toContain('Font Awesome Free 7.3.1');
+        expect(source).not.toContain('Simple Icons');
+      }
       expect(customCss).toContain(`a[data-client-icon='${icon}']`);
       expect(customCss).toContain(`url('../assets/client-icons/${icon}.svg')`);
-      expect(productionCss).toContain(`[data-client-icon=${icon}]`);
+      expect(builtCss).toContain(`[data-client-icon=${icon}]`);
     }
 
     expect(customCss).toContain('.sl-link-card a[data-client-icon] .title::before');
@@ -875,12 +948,13 @@ describe('Starlight website', () => {
     expect(customCss).toContain('mask: var(--client-heading-icon) center / contain no-repeat');
     expect(customCss).toContain('background-color: currentColor');
     expect(customCss).toContain('mask: var(--client-card-icon) center / contain no-repeat');
-    expect(productionCss.match(/--client-card-icon:url\("data:image\/svg\+xml,/g)).toHaveLength(5);
-    expect(productionCss).not.toContain("url('/client-icons/");
-    expect(productionCss).not.toContain('url("/client-icons/');
-    expect(notices).toContain('Simple Icons client marks');
-    expect(notices).toContain('OpenCode');
-    expect(notices).toContain('Lucide Mail, Clipboard Check, and Hammer icons');
+    expect(builtCss.match(/--client-card-icon:url\("data:image\/svg\+xml,/g)).toHaveLength(5);
+    expect(builtCss).not.toContain("url('/client-icons/");
+    expect(builtCss).not.toContain('url("/client-icons/');
+    expect(notices).toContain('Font Awesome Free 7.3.1 client icons');
+    expect(notices).toContain('Icons: OpenAI, Claude, Code, Robot');
+    expect(notices).toContain('Copyright 2026 Fonticons, Inc.');
+    expect(notices).toContain('Lucide Mail and Clipboard Check icons');
   });
 
   it('ships the tested OpenCode stdio setup using an environment reference', () => {
@@ -943,16 +1017,9 @@ describe('Starlight website', () => {
   });
 
   it('publishes and links a dedicated SimpleLogin API key guide', async () => {
-    const [
-      localShortRedirectHtml,
-      productionShortRedirectHtml,
-      localRootRedirectHtml,
-      productionRootRedirectHtml,
-    ] = await Promise.all([
+    const [shortRedirectHtml, rootRedirectHtml] = await Promise.all([
       readOutputFile('getting-started/api-key/index.html'),
-      readOutputFile('getting-started/api-key/index.html', productionRoot),
       readOutputFile('simplelogin-api-key/index.html'),
-      readOutputFile('simplelogin-api-key/index.html', productionRoot),
     ]);
 
     expect(apiKeyHtml).toContain('Get a SimpleLogin API key');
@@ -990,11 +1057,11 @@ describe('Starlight website', () => {
     expect(installHtml).toContain('href="simplelogin-api-key/"');
     expect(clientsHtml).toContain('href="../simplelogin-api-key/"');
     expect(configurationHtml).toContain('href="../../getting-started/simplelogin-api-key/"');
-    for (const redirect of [localShortRedirectHtml, localRootRedirectHtml]) {
+    for (const redirect of [shortRedirectHtml, rootRedirectHtml]) {
       expect(redirect).toContain('url=/getting-started/simplelogin-api-key');
-    }
-    for (const redirect of [productionShortRedirectHtml, productionRootRedirectHtml]) {
-      expect(redirect).toContain('url=/simplelogin-mcp/getting-started/simplelogin-api-key');
+      expect(redirect).toContain(
+        `href="${CANONICAL_WEBSITE_URL}getting-started/simplelogin-api-key/"`,
+      );
     }
   });
 
@@ -1051,7 +1118,7 @@ describe('Starlight website', () => {
       expect(readme, `README contract: ${phrase}`).toContain(phrase);
     }
     expect(installSource).toContain('"TRANSPORT": "stdio"');
-    expect(readme).toContain('"TRANSPORT": "stdio"');
+    expect(readme).toContain('TRANSPORT=stdio');
 
     expect(installHtml).toContain('data-install-method="docker"');
     expect(installHtml).toContain('data-install-method="http"');
@@ -1101,10 +1168,7 @@ describe('Starlight website', () => {
   });
 
   it('uses Starlight tabs and Expressive Code copy controls without custom replacements', async () => {
-    const quickClientHtml = installHtml.slice(
-      installHtml.indexOf('data-client-setups'),
-      installHtml.indexOf('id="choose-a-deployment-shape"'),
-    );
+    const quickClientHtml = installHtml.slice(installHtml.indexOf('data-client-setups'));
     const quickClientTabs = [...quickClientHtml.matchAll(/<a role="tab"/g)];
     const quickClientPanels = [
       ...quickClientHtml.matchAll(/<div id="tab-panel-[^"]+"[^>]+role="tabpanel"/g),
@@ -1122,7 +1186,9 @@ describe('Starlight website', () => {
     const detailedClientSource = await readRepoFile(
       'website/src/content/docs/getting-started/clients.mdx',
     );
-    const headSource = await readRepoFile('website/src/components/Head.astro');
+    const footerSource = await readRepoFile('website/src/components/Footer.astro');
+    const routeDataSource = await readRepoFile('website/src/starlightRouteData.ts');
+    const astroConfig = await readRepoFile('website/astro.config.mjs');
 
     expect(homeHtml).not.toContain('<starlight-tabs');
     expect(clientsHtml).toContain('<starlight-tabs');
@@ -1161,10 +1227,15 @@ describe('Starlight website', () => {
     expect(
       detailedClientSource.match(/^## (?:Codex|Claude Code|Claude Desktop|VS Code|OpenCode)$/gm),
     ).toHaveLength(CLIENT_SETUPS.length);
-    expect(headSource).toContain('Copy failed. Select the code and copy it manually.');
-    expect(headSource).toContain("querySelector<HTMLElement>('[aria-live]')");
-    expect(headSource).toContain('{ capture: true }');
-    expect(headSource).toContain("querySelectorAll('.feedback')");
+    expect(footerSource).toContain('Copy failed. Select the code and copy it manually.');
+    expect(footerSource).toContain("querySelector<HTMLElement>('[aria-live]')");
+    expect(footerSource).toContain('{ capture: true }');
+    expect(footerSource).toContain("querySelectorAll('.feedback')");
+    expect(astroConfig).toContain("routeMiddleware: './src/starlightRouteData.ts'");
+    expect(astroConfig).not.toContain('Head:');
+    expect(astroConfig).not.toContain('PageSidebar:');
+    expect(routeDataSource).toContain('getApiCoverageHeadings');
+    expect(routeDataSource).not.toContain('matchAll(/<h2');
   });
 
   it('keeps custom CSS focused on brand tokens and specialized visualizations', async () => {
@@ -1214,9 +1285,9 @@ describe('Starlight website', () => {
     );
     expect(compatibilitySource.match(/style=\{\{ whiteSpace: 'nowrap' \}\}/g)).toHaveLength(6);
     expect(compatibilitySource).toContain('<div className="compatibility-matrix">');
-    expect(catalogPreviewSource).toContain('https://lucide.dev/icons/hammer');
-    expect(catalogPreviewSource).toContain('m15 12-9.373 9.373');
-    expect(catalogPreviewSource).not.toContain('<Icon');
+    expect(catalogPreviewSource).toContain("import { Icon } from '@astrojs/starlight/components'");
+    expect(catalogPreviewSource).toContain('<Icon name="puzzle" size="1.1rem" />');
+    expect(catalogPreviewSource).not.toContain('https://lucide.dev/icons/hammer');
     expect(catalogPreviewSource).not.toContain('>✓</span>');
     expect(customCss).toContain('html[data-has-hero] .card-grid:first-of-type > .card:first-child');
     expect(customCss).toContain('--sl-card-bg: var(--sl-color-blue-low)');
@@ -1313,112 +1384,73 @@ describe('Starlight website', () => {
       .flat()
       .join('\n');
 
-    expect(homeHtml).not.toMatch(/<(?:script|link)[^>]+(?:src|href)="https?:/i);
+    expect(homeHtml).not.toMatch(/<script[^>]+src="https?:/i);
+    expect(homeHtml).not.toMatch(/<link[^>]+rel="stylesheet"[^>]+href="https?:/i);
     expect(homeHtml).not.toMatch(/googletagmanager|segment\.com|posthog|plausible\.io/i);
     expect(homeHtml).not.toMatch(/sl-[A-Za-z0-9]{20,}/);
     expect(websiteSources).not.toMatch(/(?<![\d.])\d+\.\d+\.\d+(?![\d.])/);
     expect(homeHtml).not.toMatch(/<a[^>]+href="https:\/\/ghcr\.io/);
   });
 
-  it('keeps unconfigured builds out of indexes and adds no false canonical URL', async () => {
+  it('builds canonical production metadata without a publication environment variable', async () => {
     const robots = await readOutputFile('robots.txt');
+    const notFoundHtml = await readOutputFile('404.html');
+    const sitemapIndex = await readOutputFile('sitemap-index.xml');
+    const sitemap = await readOutputFile('sitemap-0.xml');
+    const websiteReadme = await readRepoFile('website/README.md');
+    const socialCard = await readRepoFile('website/og-image.html');
     const files = await listFiles(outputRoot);
+    const apiKeyCanonical = `${CANONICAL_WEBSITE_URL}getting-started/simplelogin-api-key/`;
 
     expect(homeHtml.match(/<h1\b/g)).toHaveLength(1);
     expect(homeHtml).toMatch(/<meta\s+name="description"/);
     expect(homeHtml).toContain('<meta property="og:type" content="website"/>');
     expect(homeHtml.match(/<meta property="og:type"/g)).toHaveLength(1);
-    expect(homeHtml).toContain('<meta name="twitter:card" content="summary"/>');
+    expect(homeHtml).toContain('<meta name="twitter:card" content="summary_large_image"/>');
     expect(homeHtml.match(/<meta name="twitter:card"/g)).toHaveLength(1);
     expect(homeHtml).toContain('<meta property="og:title"');
     expect(homeHtml).toMatch(/<meta\s+property="og:description"/);
     expect(homeHtml).toContain('<link rel="shortcut icon" href="/favicon.svg"');
-    expect(homeHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
-    expect(homeHtml).not.toContain('rel="canonical"');
-    expect(homeHtml).not.toContain('property="og:url"');
-    expect(homeHtml).not.toContain('property="og:image"');
-    expect(homeHtml).not.toContain('name="twitter:image"');
-    expect(robots).toBe('User-agent: *\nDisallow: /\n');
-    expect(files.some((path) => path.startsWith('sitemap'))).toBe(false);
-  });
-
-  it('adds canonical, Open Graph, robots, and Starlight sitemap data for a real HTTPS URL', async () => {
-    const productionHtml = await readOutputFile('index.html', productionRoot);
-    const productionApiKeyHtml = await readOutputFile(
-      'getting-started/simplelogin-api-key/index.html',
-      productionRoot,
+    expect(homeHtml).toContain('<meta name="robots" content="index, follow"/>');
+    expect(homeHtml).toContain(`<link rel="canonical" href="${CANONICAL_WEBSITE_URL}"/>`);
+    expect(homeHtml).toContain(`<meta property="og:url" content="${CANONICAL_WEBSITE_URL}"/>`);
+    expect(apiKeyHtml).toContain(`<link rel="canonical" href="${apiKeyCanonical}"/>`);
+    expect(apiKeyHtml).toContain(`<meta property="og:url" content="${apiKeyCanonical}"/>`);
+    expect(homeHtml).toContain(
+      `<meta property="og:image" content="${CANONICAL_WEBSITE_URL}og-card.png"/>`,
     );
-    const canonicalDefaultHtml = await readOutputFile('index.html', canonicalDefaultRoot);
-    const robots = await readOutputFile('robots.txt', productionRoot);
-    const notFoundHtml = await readOutputFile('404.html', productionRoot);
-    const sitemapIndex = await readOutputFile('sitemap-index.xml', productionRoot);
-    const sitemap = await readOutputFile('sitemap-0.xml', productionRoot);
-    const websiteReadme = await readRepoFile('website/README.md');
-    const socialCard = await readRepoFile('website/public/og-card.svg');
-    const canonical = 'https://docs.example.test/simplelogin-mcp/';
-    const apiKeyCanonical = `${canonical}getting-started/simplelogin-api-key/`;
-
-    expect(productionHtml).toContain(`<link rel="canonical" href="${canonical}"/>`);
-    expect(productionHtml).toContain(`<meta property="og:url" content="${canonical}"/>`);
-    expect(productionApiKeyHtml).toContain(`<link rel="canonical" href="${apiKeyCanonical}"/>`);
-    expect(productionApiKeyHtml).toContain(
-      `<meta property="og:url" content="${apiKeyCanonical}"/>`,
+    expect(homeHtml).toContain(
+      `<meta name="twitter:image" content="${CANONICAL_WEBSITE_URL}og-card.png"/>`,
     );
-    expect(productionHtml).toContain('<meta name="robots" content="index, follow"/>');
-    expect(productionHtml).toContain('<meta name="twitter:card" content="summary_large_image"/>');
-    expect(productionHtml).toContain(
-      '<meta property="og:image" content="https://docs.example.test/simplelogin-mcp/og-card.png"/>',
-    );
-    expect(productionHtml).toContain(
-      '<meta name="twitter:image" content="https://docs.example.test/simplelogin-mcp/og-card.png"/>',
-    );
-    expect(productionHtml).toContain('<meta property="og:image:width" content="1200"/>');
-    expect(productionHtml).toContain('<meta property="og:image:height" content="630"/>');
-    expect(productionHtml).toContain('href="/simplelogin-mcp/_astro/');
-    expect(productionHtml).toContain(
-      '<link rel="shortcut icon" href="/simplelogin-mcp/favicon.svg"',
-    );
-    expect(productionHtml).not.toContain('<link rel="shortcut icon" href="/favicon.svg"');
-    expect(productionHtml).toContain('href="getting-started/clients/"');
-    expect(productionHtml).toMatch(
-      /src="\/simplelogin-mcp\/_astro\/simplelogin-mcp-mark\.[^"]+\.svg"/,
-    );
-    expect(productionHtml).not.toMatch(
-      /href="\/(?:concepts|faq|getting-started|guides|project|reference|security|simplelogin-api-key|tools)(?:\/|")/,
-    );
-    expect(productionHtml).toContain(`href="${REPOSITORY_URL}"`);
-    expect(productionHtml).toContain('View on GitHub</a>');
-    expect(productionHtml).not.toContain('>Star on GitHub<');
-    expect(productionHtml).not.toContain('>Node 24<');
-    expect(canonicalDefaultHtml).toContain(`href="${REPOSITORY_URL}"`);
-    expect(canonicalDefaultHtml).toContain(
-      `<link rel="canonical" href="${CANONICAL_WEBSITE_URL}"/>`,
-    );
-    expect(canonicalDefaultHtml).toContain(
-      `<meta property="og:url" content="${CANONICAL_WEBSITE_URL}"/>`,
-    );
-    expect(canonicalDefaultHtml).toContain('View on GitHub</a>');
-    expect(canonicalDefaultHtml).not.toContain('>Star on GitHub<');
-    expect(canonicalDefaultHtml).not.toContain('>Node 24<');
-    expect(canonicalDefaultHtml).not.toMatch(/\b\d[\d,.]* GitHub stars\b/);
+    expect(homeHtml).toContain('<meta property="og:image:width" content="1200"/>');
+    expect(homeHtml).toContain('<meta property="og:image:height" content="630"/>');
+    expect(homeHtml).toContain(`href="${REPOSITORY_URL}"`);
+    expect(homeHtml).toContain('View on GitHub</a>');
+    expect(homeHtml).not.toContain('>Star on GitHub<');
+    expect(homeHtml).not.toContain('>Node 24<');
+    expect(homeHtml).not.toMatch(/\b\d[\d,.]* GitHub stars\b/);
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
     expect(notFoundHtml).not.toContain('<meta name="robots" content="index, follow"/>');
     expect(notFoundHtml).not.toContain('rel="canonical"');
     expect(notFoundHtml).not.toContain('property="og:url"');
-    expect(robots).toContain('Allow: /');
-    expect(robots).toContain(`${canonical}sitemap-index.xml`);
-    expect(sitemapIndex).toContain(`${canonical}sitemap-0.xml`);
+    expect(robots).toBe(
+      `User-agent: *\nAllow: /\n\nSitemap: ${CANONICAL_WEBSITE_URL}sitemap-index.xml\n`,
+    );
+    expect(sitemapIndex).toContain(`${CANONICAL_WEBSITE_URL}sitemap-0.xml`);
     expect(sitemap).toContain(`<loc>${apiKeyCanonical}</loc>`);
-    expect(sitemap).not.toContain(`<loc>${canonical}simplelogin-api-key/</loc>`);
-    expect(sitemap).not.toContain(`<loc>${canonical}getting-started/api-key/</loc>`);
+    expect(sitemap).toContain(`<loc>${CANONICAL_WEBSITE_URL}guides/operations/</loc>`);
+    expect(sitemap).not.toContain(`<loc>${CANONICAL_WEBSITE_URL}simplelogin-api-key/</loc>`);
+    expect(sitemap).not.toContain(`<loc>${CANONICAL_WEBSITE_URL}getting-started/api-key/</loc>`);
     expect(sitemap).not.toContain('/404/');
-    expect(websiteReadme).toContain('origin-root `/robots.txt`');
+    expect(files).toContain('sitemap-index.xml');
+    expect(files).toContain('sitemap-0.xml');
+    expect(websiteReadme).toContain('origin root, so its generated `/robots.txt`');
+    expect(websiteReadme).toContain('No website publication or base-URL environment variable');
     expect(socialCard).toContain(`${TOOL_CATALOG.length} tools`);
   });
 
-  it('publishes machine-readable documentation discovery without a false local origin', async () => {
-    const localLlms = await readOutputFile('llms.txt');
-    const productionLlms = await readOutputFile('llms.txt', productionRoot);
+  it('publishes machine-readable documentation discovery at the canonical origin', async () => {
+    const llms = await readOutputFile('llms.txt');
     const canonicalRoutes = [
       'getting-started/clients',
       'getting-started/compatibility',
@@ -1429,6 +1461,7 @@ describe('Starlight website', () => {
       'guides/how-it-works',
       'guides/workflows',
       'guides/security',
+      'guides/operations',
       'guides/troubleshooting',
       'guides/faq',
       'reference',
@@ -1440,11 +1473,9 @@ describe('Starlight website', () => {
       'reference/security-policy',
     ];
 
-    expect(localLlms).toContain('# simplelogin-mcp');
-    expect(localLlms).not.toContain('https://docs.example.test');
+    expect(llms).toContain('# simplelogin-mcp');
     for (const route of canonicalRoutes) {
-      expect(localLlms).toContain(`(/${route}/)`);
-      expect(productionLlms).toContain(`(https://docs.example.test/simplelogin-mcp/${route}/)`);
+      expect(llms).toContain(`(${CANONICAL_WEBSITE_URL}${route}/)`);
     }
     for (const legacyRoute of [
       'concepts/how-it-works',
@@ -1461,54 +1492,38 @@ describe('Starlight website', () => {
       'simplelogin-api-key',
       'faq',
     ]) {
-      expect(localLlms).not.toContain(`](/${legacyRoute}/)`);
-      expect(productionLlms).not.toContain(
-        `](https://docs.example.test/simplelogin-mcp/${legacyRoute}/)`,
-      );
+      expect(llms).not.toContain(`](${CANONICAL_WEBSITE_URL}${legacyRoute}/)`);
     }
-    expect(productionLlms).toContain('must never be placed in a prompt');
+    expect(llms).toContain('must never be placed in a prompt');
   });
 
-  it('rejects unsafe or ambiguous publication URLs before writing output', () => {
-    expect(resolvePublicationUrl(undefined, true)?.href).toBe(CANONICAL_WEBSITE_URL);
-    expect(resolvePublicationUrl('', true)).toBeUndefined();
-    expect(() => normalizePublicationUrl('http://example.test')).toThrow('must use https');
-    expect(() => normalizePublicationUrl('https://user:secret@example.test')).toThrow(
-      'must not include credentials',
+  it('uses Astro dev and build without custom publication modes', async () => {
+    const [rootPackage, websitePackage, astroConfig, robotsSource, websiteReadme] =
+      await Promise.all([
+        readRepoFile('package.json'),
+        readRepoFile('website/package.json'),
+        readRepoFile('website/astro.config.mjs'),
+        readRepoFile('website/src/pages/robots.txt.ts'),
+        readRepoFile('website/README.md'),
+      ]);
+    const rootPackageJson = JSON.parse(rootPackage) as PackageJson;
+    const websitePackageJson = JSON.parse(websitePackage) as PackageJson;
+
+    expect(rootPackageJson.scripts['website:build']).toBe('pnpm --dir website build');
+    expect(rootPackageJson.scripts['website:dev']).toBe('pnpm --dir website dev');
+    expect(rootPackageJson.scripts['website:og']).toBe('tsx website/scripts/render-og-image.ts');
+    expect(rootPackageJson.scripts['website:og:check']).toBe(
+      'tsx website/scripts/render-og-image.ts --check',
     );
-    expect(() => normalizePublicationUrl('https://example.test/?preview=1')).toThrow(
-      'must not include a query string or fragment',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/path?')).toThrow(
-      'must not include a query string or fragment',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/path#')).toThrow(
-      'must not include a query string or fragment',
-    );
-    expect(() => normalizePublicationUrl('https://example.test//cdn.example/')).toThrow(
-      'must not use a protocol-relative path',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/%2fcdn/')).toThrow(
-      'contains an unsafe path separator',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/docs%2Dsite/')).toThrow(
-      'must not contain percent-encoded path segments',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/%2e/foo/')).toThrow(
-      'must not contain percent-encoded path segments',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/foo/%2e%2e/bar/')).toThrow(
-      'must not contain percent-encoded path segments',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/docs site/')).toThrow(
-      'must not contain percent-encoded path segments',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/café/')).toThrow(
-      'must not contain percent-encoded path segments',
-    );
-    expect(() => normalizePublicationUrl('https://example.test/foo//bar/')).toThrow(
-      'must not contain repeated path separators',
-    );
+    expect(rootPackageJson.scripts['website:check']).toContain('pnpm website:og:check');
+    expect(rootPackageJson.scripts).not.toHaveProperty(`website:build${':production'}`);
+    expect(websitePackageJson.scripts['build']).toBe('astro build');
+    expect(websitePackageJson.scripts['dev']).toBe('astro dev --host 127.0.0.1 --port 4173');
+    expect(websitePackageJson.scripts).not.toHaveProperty(`build${':production'}`);
+    expect(astroConfig).toContain('site: CANONICAL_WEBSITE_URL');
+    expect(astroConfig).not.toContain("from 'node:process'");
+    expect(robotsSource).toContain('CANONICAL_WEBSITE_URL');
+    expect(websiteReadme).toContain('No website publication or base-URL environment variable');
   });
 
   it('keeps website packages and output out of the MCP runtime artifact', async () => {

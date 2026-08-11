@@ -19,8 +19,8 @@ or the SimpleLogin key is valid.
 
 <Steps>
 
-1. **Identify the run shape.** Record Docker Compose, direct HTTP, or stdio and the
-   simplelogin-mcp version or commit.
+1. **Identify the run shape.** Record Local stdio, Direct Node.js — Streamable HTTP, or Docker
+   Compose — Streamable HTTP and the simplelogin-mcp version or commit.
 
 2. **Read the process diagnostics.** Direct and stdio runs write logs to stderr. For Compose, run
    `docker compose logs simplelogin-mcp`.
@@ -28,9 +28,9 @@ or the SimpleLogin key is valid.
 3. **Check only the relevant boundary.** For HTTP, request `GET /health`. For stdio, confirm the
    client can launch the configured absolute command and reload its configuration.
 
-4. **Verify credentials with a read-only call.** After the client discovers tools, review and
-   approve only `account_get_stats` as the SimpleLogin API-key sanity check. Its aggregate counts
-   still pass through the client and its configured model.
+4. **Verify credentials with a read-only call.** After the client discovers tools, the expected
+   tool is `account_get_stats`. Confirm that it is marked read-only before approving it. Its
+   aggregate counts still pass through the client and its configured model.
 
 </Steps>
 
@@ -41,10 +41,10 @@ or the SimpleLogin key is valid.
 | `SL_API_KEY is required`                       | Set a non-empty key. Compose reads `.env`; direct Node.js runs require the file to be sourced or the variable to be passed by the client process environment.                              |
 | `Invalid configuration` names another variable | Compare the setting with the [configuration reference](../../reference/configuration/). `PORT` and `SL_REQUEST_TIMEOUT_MS` must be valid positive integers within their documented ranges. |
 | Startup refuses a non-loopback `HOST`          | Set `MCP_AUTH_TOKEN`, return to `HOST=127.0.0.1`, or use `ALLOW_UNAUTHENTICATED_EXPOSURE=true` only when another layer already authenticates or isolates the endpoint.                     |
-| `EADDRINUSE` or port `3000` is unavailable     | For direct HTTP, choose a free `PORT`. For Compose, change `SIMPLELOGIN_MCP_HOST_PORT` and leave the internal `PORT=3000`.                                                                 |
+| `EADDRINUSE` or port `3000` is unavailable     | For Direct Node.js — Streamable HTTP, choose a free `PORT`. For Compose, change `SIMPLELOGIN_MCP_HOST_PORT` and leave the internal `PORT=3000`.                                            |
 | A direct run ignores `.env`                    | This is expected: the application does not load it automatically. Source it for the process or configure the variables in the MCP client.                                                  |
 
-## stdio connection problems
+## Local stdio connection problems
 
 | Symptom                                                | Check                                                                                                                                                             |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |

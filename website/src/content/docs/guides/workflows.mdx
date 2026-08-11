@@ -23,21 +23,21 @@ explicit, and treat permanent deletion as a separate decision.
 
 </Steps>
 
-## Investigate recent mail
+## Review recent alias activity
 
 <Steps>
 
 1. **Read the alias.** `alias_get` returns details for one known alias id.
 
-2. **Inspect bounded activity pages.** `alias_activity_list` covers forwards, replies, blocks, and
-   bounces.
+2. **Inspect bounded activity-metadata pages.** `alias_activity_list` covers forwards, replies,
+   blocks, and bounces. It does not read message bodies.
 
 3. **Decide separately.** Activity inspection is read-only; any routing or state change uses a
    dedicated write tool.
 
 </Steps>
 
-## Send from an alias
+## Create a reverse alias for sending
 
 <Steps>
 
@@ -45,8 +45,12 @@ explicit, and treat permanent deletion as a separate decision.
 
 2. **Create or reuse one.** `contact_create` returns an existing contact when appropriate.
 
-3. **Block before deleting.** `contact_set_blocked` is reversible; `contact_delete` is permanent and
-   requires `confirm=true`.
+3. **Send from the owning mailbox.** Address the actual message to the returned reverse-alias
+   address from a real mailbox that owns the alias. simplelogin-mcp creates the routing address; it
+   does not compose or send the email.
+
+4. **Block before deleting.** `contact_set_blocked` is reversible; `contact_delete` is permanent
+   and requires `confirm=true`.
 
 </Steps>
 

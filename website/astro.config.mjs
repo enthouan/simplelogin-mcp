@@ -1,65 +1,68 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import { satteri } from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
-import { argv, env } from 'node:process';
 import { URL } from 'node:url';
-import { resolvePublicationUrl } from './src/data/publication.js';
+import { CANONICAL_WEBSITE_URL } from './src/data/publication.js';
 import { REPOSITORY_URL } from './src/data/repository.js';
 
-const PUBLICATION_ENV = 'WEBSITE_BASE_URL';
-const publicationUrl = resolvePublicationUrl(env[PUBLICATION_ENV], argv.slice(2).includes('build'));
-const base = publicationUrl?.pathname ?? '/';
-/** @param {string} path */
-const sitePath = (path) => `${base}${path}`.replace(/\/{2,}/g, '/');
-const simpleLoginApiKeyPath = sitePath('getting-started/simplelogin-api-key/');
-const socialImageUrl = publicationUrl ? new URL('og-card.png', publicationUrl).href : undefined;
+const simpleLoginApiKeyPath = '/getting-started/simplelogin-api-key/';
+const socialImageUrl = new URL('og-card.png', CANONICAL_WEBSITE_URL).href;
 /** @type {Array<{ tag: 'meta'; attrs: Record<string, string> }>} */
-const socialImageHead = socialImageUrl
-  ? [
-      { tag: 'meta', attrs: { property: 'og:image', content: socialImageUrl } },
-      { tag: 'meta', attrs: { property: 'og:image:type', content: 'image/png' } },
-      { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
-      { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
-      {
-        tag: 'meta',
-        attrs: {
-          property: 'og:image:alt',
-          content: 'simplelogin-mcp — manage aliases from your MCP client',
-        },
-      },
-      { tag: 'meta', attrs: { name: 'twitter:image', content: socialImageUrl } },
-      {
-        tag: 'meta',
-        attrs: {
-          name: 'twitter:image:alt',
-          content: 'simplelogin-mcp — manage aliases from your MCP client',
-        },
-      },
-    ]
-  : [];
+const socialImageHead = [
+  { tag: 'meta', attrs: { property: 'og:image', content: socialImageUrl } },
+  { tag: 'meta', attrs: { property: 'og:image:type', content: 'image/png' } },
+  { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+  { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+  {
+    tag: 'meta',
+    attrs: {
+      property: 'og:image:alt',
+      content: 'simplelogin-mcp — manage aliases from your MCP client',
+    },
+  },
+  { tag: 'meta', attrs: { name: 'twitter:image', content: socialImageUrl } },
+  {
+    tag: 'meta',
+    attrs: {
+      name: 'twitter:image:alt',
+      content: 'simplelogin-mcp — manage aliases from your MCP client',
+    },
+  },
+];
 
-// Astro exposes its configured base as BASE_URL internally. Ignore an ambient shell value so
-// Starlight cannot accidentally render navigation for a different deployment path.
-delete env.BASE_URL;
+/** @type {NonNullable<import('@astrojs/markdown-satteri').SatteriProcessorOptions['hastPlugins']>[number]} */
+const keyboardAccessibleTables = {
+  name: 'keyboard-accessible-tables',
+  element: {
+    filter: ['table'],
+    visit(node, context) {
+      if (context.fileURL?.pathname.endsWith('/docs/api-coverage.md')) return;
+      context.setProperty(node, 'tabIndex', 0);
+    },
+  },
+};
 
 export default defineConfig({
   output: 'static',
-  site: publicationUrl?.origin,
-  base,
+  site: CANONICAL_WEBSITE_URL,
+  markdown: {
+    processor: satteri({ hastPlugins: [keyboardAccessibleTables] }),
+  },
   redirects: {
     '/getting-started/api-key': simpleLoginApiKeyPath,
     '/simplelogin-api-key': simpleLoginApiKeyPath,
-    '/concepts/how-it-works': sitePath('guides/how-it-works/'),
-    '/faq': sitePath('guides/faq/'),
-    '/security': sitePath('guides/security/'),
-    '/getting-started/configuration': sitePath('reference/configuration/'),
-    '/getting-started/troubleshooting': sitePath('guides/troubleshooting/'),
-    '/tools': sitePath('reference/tools/'),
-    '/tools/api-coverage': sitePath('reference/api-coverage/'),
-    '/tools/workflows': sitePath('guides/workflows/'),
-    '/project': sitePath('reference/'),
-    '/project/contributing': sitePath('reference/contributing/'),
-    '/project/security-policy': sitePath('reference/security-policy/'),
+    '/concepts/how-it-works': '/guides/how-it-works/',
+    '/faq': '/guides/faq/',
+    '/security': '/guides/security/',
+    '/getting-started/configuration': '/reference/configuration/',
+    '/getting-started/troubleshooting': '/guides/troubleshooting/',
+    '/tools': '/reference/tools/',
+    '/tools/api-coverage': '/reference/api-coverage/',
+    '/tools/workflows': '/guides/workflows/',
+    '/project': '/reference/',
+    '/project/contributing': '/reference/contributing/',
+    '/project/security-policy': '/reference/security-policy/',
   },
   integrations: [
     starlight({
@@ -75,10 +78,9 @@ export default defineConfig({
       },
       credits: false,
       customCss: ['./src/styles/custom.css'],
+      routeMiddleware: './src/starlightRouteData.ts',
       components: {
         Footer: './src/components/Footer.astro',
-        Head: './src/components/Head.astro',
-        PageSidebar: './src/components/PageSidebar.astro',
       },
       social: [
         {
@@ -92,7 +94,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'robots',
-            content: publicationUrl ? 'index, follow' : 'noindex, nofollow',
+            content: 'index, follow',
           },
         },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#ea319f' } },
@@ -101,7 +103,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:card',
-            content: socialImageUrl ? 'summary_large_image' : 'summary',
+            content: 'summary_large_image',
           },
         },
         ...socialImageHead,
@@ -125,6 +127,7 @@ export default defineConfig({
             { label: 'How it works', slug: 'guides/how-it-works' },
             { label: 'Workflows', slug: 'guides/workflows' },
             { label: 'Security & Data', slug: 'guides/security' },
+            { label: 'Operations', slug: 'guides/operations' },
             { label: 'Troubleshooting', slug: 'guides/troubleshooting' },
             { label: 'FAQ', slug: 'guides/faq' },
           ],

@@ -21,14 +21,14 @@ with every past or future client release.
 
 <div className="compatibility-matrix">
 
-| MCP client     | Tested route             | Current evidence                                                                                                                                         | Test scope                                                                                                           |
-| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Codex          | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The shared-TOML recipe connected, discovered all 27 tools, and completed the read-only account-usage check.          |
-| Claude Code    | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The project-scoped recipe connected, discovered all 27 tools, and completed the read-only account-usage check.       |
-| Claude Desktop | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The local Node.js recipe connected, discovered all 27 tools, and completed the read-only account-usage check.        |
-| VS Code        | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The user-profile recipe connected, discovered all 27 tools, and completed the read-only account-usage check.         |
-| OpenCode       | Local stdio              | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The environment-backed recipe connected, discovered all 27 tools, and completed the read-only account-usage check.   |
-| Generic MCP    | stdio or Streamable HTTP | <Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} /> | Compatibility depends on the host supporting the selected transport and, for protected HTTP, a custom bearer header. |
+| MCP client     | Tested route                   | Current evidence                                                                                                                                         | Test scope                                                                                                           |
+| -------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Codex          | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The shared-TOML recipe connected, discovered all 27 tools, and completed the read-only account-usage check.          |
+| Claude Code    | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The project-scoped recipe connected, discovered all 27 tools, and completed the read-only account-usage check.       |
+| Claude Desktop | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The local Node.js recipe connected, discovered all 27 tools, and completed the read-only account-usage check.        |
+| VS Code        | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The user-profile recipe connected, discovered all 27 tools, and completed the read-only account-usage check.         |
+| OpenCode       | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The environment-backed recipe connected, discovered all 27 tools, and completed the read-only account-usage check.   |
+| Generic MCP    | Local stdio or Streamable HTTP | <Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} /> | Compatibility depends on the host supporting the selected transport and, for protected HTTP, a custom bearer header. |
 
 </div>
 
@@ -41,7 +41,7 @@ its current documentation remains authoritative.
 
 ## Transport requirements
 
-### stdio clients
+### Local stdio clients
 
 A compatible stdio host must be able to:
 

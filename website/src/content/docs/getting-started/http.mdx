@@ -1,5 +1,5 @@
 ---
-title: Streamable HTTP
+title: Direct Node.js — Streamable HTTP
 description: Run the Node.js server directly on loopback and connect an HTTP MCP client.
 ---
 
@@ -7,8 +7,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import InstallMethod from '../../../components/InstallMethod.astro';
 import VerifySetup from '../../../components/VerifySetup.astro';
 
-Direct HTTP defaults to loopback and exposes the MCP endpoint at `POST /mcp` plus a small health
-endpoint at `GET /health`.
+The direct Node.js service defaults to loopback and exposes Streamable HTTP at `POST /mcp` plus a
+small health endpoint at `GET /health`.
 
 <InstallMethod method="http" />
 
@@ -41,3 +41,6 @@ The health endpoint does not exercise MCP discovery or the SimpleLogin API. Afte
 endpoint in a client, verify the complete read-only path.
 
 <VerifySetup />
+
+Use [Operations](../../guides/operations/) for process inspection, credential rotation, upgrades,
+rollback, and shutdown.

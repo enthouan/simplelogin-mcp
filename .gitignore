@@ -5,6 +5,8 @@ node_modules/
 dist/
 website/dist/
 website/.astro/
+playwright-report/
+test-results/
 
 # Environment / secrets
 .env

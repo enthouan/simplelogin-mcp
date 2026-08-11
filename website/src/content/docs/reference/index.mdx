@@ -7,7 +7,8 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import RepositoryLink from '../../../components/RepositoryLink.astro';
 
 `simplelogin-mcp` is a self-hostable, MIT-licensed open source project. It provides an MCP server
-for the SimpleLogin API that runs as a local stdio process or a Streamable HTTP service you host.
+for the SimpleLogin API that runs through Local stdio, Direct Node.js — Streamable HTTP, or Docker
+Compose — Streamable HTTP.
 
 <Aside type="note" title="Pre-1.0, with a carefully managed tool surface">
   Tool names, response bounds, MCP annotations, and safety behavior are treated as public contracts.
@@ -71,9 +72,13 @@ workflow and is not required for ordinary first-run verification.
 
 ## Documentation and support
 
+- [Published container package](https://github.com/enthouan/simplelogin-mcp/pkgs/container/simplelogin-mcp)
+  provides the GHCR image used by the operator Compose file.
 - [`llms.txt`](../llms.txt) provides a machine-readable index of this documentation.
 - [Troubleshooting](../guides/troubleshooting/) covers startup, transport, Docker, and upstream API
   failures.
+- [Operations](../guides/operations/) covers inspection, exact-version upgrades, rollback,
+  credential rotation, and shutdown.
 - [FAQ](../guides/faq/) explains project scope, privacy, plan limitations, and when to use
   SimpleLogin directly.
 - [Reporting issues and support](reporting-issues/) explains what to include in a public issue and

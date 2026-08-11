@@ -21,12 +21,12 @@ control, and then follow the complete section for the client you already use.
 
 | Choose          | When it fits                                                                                 | Where `SL_API_KEY` lives                  | Client configuration                               |
 | --------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| Local `stdio`   | The client and a built `simplelogin-mcp` checkout are on the same machine.                   | In the environment or private client file | A command, arguments, and environment variables    |
+| Local stdio     | The client and a built `simplelogin-mcp` checkout are on the same machine.                   | In the environment or private client file | A command, arguments, and environment variables    |
 | Streamable HTTP | The server already runs continuously in Node.js, Docker, behind a proxy, or on another host. | On the server only                        | An `/mcp` URL and, when configured, a bearer token |
 
-Use `stdio` for the shortest local path. Use Streamable HTTP when you already operate the server as
-a service. A cloud client cannot reach `127.0.0.1` on your laptop; give it a deliberately reachable
-HTTPS endpoint instead.
+Use Local stdio for the shortest local path. Use Streamable HTTP when you already operate the
+server as a service. A cloud client cannot reach `127.0.0.1` on your laptop; give it a deliberately
+reachable HTTPS endpoint instead.
 
 <Aside type="caution" title="Keep the two credentials separate">
   `SL_API_KEY` grants SimpleLogin account access and stays with `simplelogin-mcp`. `MCP_AUTH_TOKEN`
@@ -57,8 +57,9 @@ pnpm build`}
    Copy the absolute path to `dist/index.js`. If a desktop client cannot find `node`, use the
    absolute executable path reported by `which node`.
 
-3. **For Streamable HTTP, start the service first.** Follow the [Streamable HTTP
-   guide](../http/). The default local endpoint is `http://127.0.0.1:3000/mcp`.
+3. **For Streamable HTTP, start the service first.** Follow the [Direct Node.js — Streamable HTTP
+   guide](../http/) or [Docker Compose — Streamable HTTP guide](../docker/). The default local
+   endpoint is `http://127.0.0.1:3000/mcp`.
 
 4. **Prepare the appropriate private credential source.** For stdio, follow the client section's
    API-key instructions. For authenticated HTTP, enter a client-side alias with the same value as

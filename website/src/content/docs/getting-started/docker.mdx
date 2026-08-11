@@ -1,5 +1,5 @@
 ---
-title: Docker Compose
+title: Docker Compose — Streamable HTTP
 description: Run simplelogin-mcp as a loopback-published Compose service.
 ---
 
@@ -7,11 +7,18 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import InstallMethod from '../../../components/InstallMethod.astro';
 import VerifySetup from '../../../components/VerifySetup.astro';
 
-Use the operator Compose file to run the published container image. The application listens on
+Use the operator Compose file to run the [published container image](https://github.com/enthouan/simplelogin-mcp/pkgs/container/simplelogin-mcp).
+The application listens on
 `0.0.0.0:3000` inside the container so Docker can forward the port, while the host publishes only
 to `127.0.0.1` by default.
 
 <InstallMethod method="docker" />
+
+<Aside type="note" title="Pin long-lived deployments">
+  The quick start uses the moving `latest` image tag. Before operating a long-lived installation,
+  set `SIMPLELOGIN_MCP_IMAGE_TAG` to an available exact `X.Y.Z` release. See
+  [Operations](../../guides/operations/) for upgrade and rollback guidance.
+</Aside>
 
 ## Configure the two credentials
 
@@ -49,3 +56,6 @@ Health only proves that the process is running. Connect an MCP client to `http:/
 with the configured bearer token, then verify discovery and a read-only tool call.
 
 <VerifySetup />
+
+Use [Operations](../../guides/operations/) for exact-version upgrades, rollback, credential
+rotation, inspection, and shutdown.

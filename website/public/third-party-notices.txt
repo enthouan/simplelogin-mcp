@@ -1,20 +1,20 @@
 simplelogin-mcp website third-party notices
 
-Simple Icons client marks
-Icons: Claude, OpenAI, OpenCode, Visual Studio Code
+Font Awesome Free 7.3.1 client icons
+Icons: OpenAI, Claude, Code, Robot
 Sources:
-- https://simpleicons.org/?q=claude
-- https://github.com/simple-icons/simple-icons/tree/14.15.0 (OpenAI)
-- https://simpleicons.org/?q=opencode
-- https://github.com/simple-icons/simple-icons/tree/11.15.0 (Visual Studio Code)
-License: CC0 1.0 Universal
-https://creativecommons.org/publicdomain/zero/1.0/
+- https://fontawesome.com/icons/brands/solid/openai
+- https://fontawesome.com/icons/brands/solid/claude
+- https://fontawesome.com/icons/classic/solid/code
+- https://fontawesome.com/icons/classic/solid/robot
+License: CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/
+Copyright 2026 Fonticons, Inc.
 
-Lucide Mail, Clipboard Check, and Hammer icons
+Lucide Mail and Clipboard Check icons
 Sources:
 - https://lucide.dev/icons/mail
 - https://lucide.dev/icons/clipboard-check
-- https://lucide.dev/icons/hammer
 
 ISC License
 Copyright (c) 2026 Lucide Icons and Contributors

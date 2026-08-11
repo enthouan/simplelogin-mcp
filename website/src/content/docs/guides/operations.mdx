@@ -1,0 +1,236 @@
+---
+title: Operate simplelogin-mcp
+description: Inspect, upgrade, roll back, stop, and rotate credentials for a running simplelogin-mcp deployment.
+---
+
+Use this guide for routine inspection, exact-version upgrades, rollback, credential rotation, and
+shutdown after `simplelogin-mcp` is already connected. The commands assume the published-image
+Docker Compose path from [Install and run](../../getting-started/). For a local image, add
+`-f docker-compose.local.yml` to the relevant Compose commands.
+
+> **Keep operational output private.** Do not post `.env`, resolved Compose configuration,
+> authorization headers, raw MCP traffic, SimpleLogin account data, or unredacted logs. The logger
+> redacts known credential fields, but endpoints, resource identifiers, and other account-specific
+> metadata can still be private.
+
+## Before a change
+
+1. Record the running image and the exact tag configured in your private deployment settings:
+
+   ```bash
+   docker compose images simplelogin-mcp
+   docker compose ps simplelogin-mcp
+   ```
+
+   Do not use `docker compose config` as a diagnostic export: its resolved output can include
+   secrets. For reproducible upgrades and rollback, set `SIMPLELOGIN_MCP_IMAGE_TAG` to an available
+   exact `X.Y.Z` release rather than `latest` or the moving `X.Y` tag.
+
+2. Read the target release notes and check for configuration, transport, tool-catalog, or client
+   compatibility changes.
+3. Keep the previous exact image tag and operator-owned deployment settings available. The server
+   has no application database or schema migrations to back up; SimpleLogin remains the source of
+   truth for aliases, routing, activity, mailboxes, domains, and account settings.
+4. Plan to reconnect clients after the restart so they rediscover the current tool catalog. The
+   Streamable HTTP implementation is stateless and creates a fresh MCP server and transport for
+   each request.
+
+## Inspect a running service
+
+Start with process and container state:
+
+```bash
+docker compose ps simplelogin-mcp
+docker compose logs --tail=100 simplelogin-mcp
+```
+
+Follow new logs only while reproducing one narrow operation:
+
+```bash
+docker compose logs --tail=100 --follow simplelogin-mcp
+```
+
+Review excerpts before sharing them. Known credentials and authorization headers are redacted, but
+account-specific metadata may still be private.
+
+For Streamable HTTP, check the process-health endpoint on the host address and port you published:
+
+```bash
+curl http://127.0.0.1:3000/health
+```
+
+Use the configured `SIMPLELOGIN_MCP_HOST_PORT` instead of `3000` when it differs. `/health` proves
+that the HTTP process is serving requests and reports its version. It does not validate
+`SL_API_KEY`, initialize MCP, or list tools. After connecting through an MCP client, ask “Can you
+show me my SimpleLogin account usage?” and confirm the proposed `account_get_stats` call is marked
+read-only before approving it.
+
+See [Troubleshooting](../troubleshooting/) when one of those boundaries fails.
+
+## Upgrade the published image
+
+1. Set `SIMPLELOGIN_MCP_IMAGE_TAG` in the deployment's ignored `.env` or secret source to the target
+   exact `X.Y.Z` release.
+2. Pull that image and recreate the service:
+
+   ```bash
+   docker compose pull simplelogin-mcp
+   docker compose up -d --force-recreate simplelogin-mcp
+   ```
+
+3. Inspect `docker compose ps simplelogin-mcp`, then request `GET /health` on the published host
+   port.
+4. Restart or reconnect each MCP client and confirm that the expected tool catalog is discovered.
+5. Run the read-only account-usage check before approving a write.
+
+Recreating the container sends the running process a termination signal and starts the selected
+image with the current environment. A tool call interrupted by the restart can have an uncertain
+outcome. Inspect the target in SimpleLogin before retrying; the server does not provide a
+cross-tool transaction or automatic rollback.
+
+## Roll back
+
+Rollback changes the server version. It does not undo SimpleLogin mutations that already
+succeeded.
+
+1. Restore the previously recorded exact `X.Y.Z` value of `SIMPLELOGIN_MCP_IMAGE_TAG`.
+2. Pull and recreate that version:
+
+   ```bash
+   docker compose pull simplelogin-mcp
+   docker compose up -d --force-recreate simplelogin-mcp
+   ```
+
+3. Repeat the health check, client reconnection, tool discovery, and read-only account-usage check
+   from the upgrade procedure.
+
+Do not roll back by changing to `latest`: it follows the current `main` image and is not a record
+of the previous deployment. Reverse account changes explicitly in SimpleLogin when that is
+supported and safe.
+
+## Rotate credentials
+
+`SL_API_KEY` and `MCP_AUTH_TOKEN` protect different boundaries. Rotate them independently and
+restart the server after changing its environment. `docker compose restart` does not reload changed
+Compose environment values; recreate the service instead.
+
+### Rotate `SL_API_KEY`
+
+For a planned rotation:
+
+1. [Create a replacement SimpleLogin API key](../../getting-started/simplelogin-api-key/) on the
+   same hosted or self-hosted instance configured by `SL_API_URL`.
+2. Replace `SL_API_KEY` in the private server secret source. For stdio, update the MCP client's
+   private process environment instead.
+3. For Compose, recreate the service:
+
+   ```bash
+   docker compose up -d --force-recreate simplelogin-mcp
+   ```
+
+4. Restart or reconnect the client, confirm tool discovery, and run the read-only account-usage
+   check.
+5. Delete the old key in SimpleLogin after the replacement works.
+
+If the old key may be exposed, revoke it immediately and accept the service interruption instead
+of keeping it active for a staged handoff. Never print either key or include one in an inspection
+command.
+
+### Rotate `MCP_AUTH_TOKEN`
+
+`MCP_AUTH_TOKEN` protects only Streamable HTTP requests to `/mcp`; it is not sent to SimpleLogin
+and has no effect on stdio.
+
+1. Generate a new strong value in a password manager or secrets system.
+2. Replace `MCP_AUTH_TOKEN` on the server and the corresponding bearer secret in every authorized
+   HTTP client.
+3. Recreate the service:
+
+   ```bash
+   docker compose up -d --force-recreate simplelogin-mcp
+   ```
+
+4. Restart or reconnect clients and confirm tool discovery. Requests carrying the old bearer value
+   should now receive `401 Unauthorized`.
+
+Keep HTTPS and the deployment's network boundary in place. Rotating this shared bearer secret does
+not encrypt traffic, create per-client identities, or narrow the permissions granted by
+`SL_API_KEY`.
+
+## Stop or remove the service
+
+Stop only the simplelogin-mcp container while preserving the rest of the Compose project:
+
+```bash
+docker compose stop simplelogin-mcp
+```
+
+Stop and remove every service container and the network in this Compose project:
+
+```bash
+docker compose down
+```
+
+The checked-in project contains only `simplelogin-mcp`, but `docker compose down` also removes
+sidecars added through private overrides. Stop only the named service when those other services
+must keep running. Do not add `-v` as a routine shutdown step: the checked-in files declare no
+volumes, but operators may add their own in private overrides.
+
+`docker compose down` does not remove the image, ignored `.env`, external secret store, or any data
+held by SimpleLogin. Remove operator-owned deployment material separately only after resolving its
+exact location and retention requirements.
+
+For stdio, the MCP client owns the child process. Fully quit or disable the client's server entry
+instead of starting and stopping a second background copy. For Direct Node.js — Streamable HTTP,
+use the service manager that launched it and allow `SIGTERM` to complete instead of force-killing
+the process during active work.
+
+## State, backup, and retention
+
+`simplelogin-mcp` is stateless with respect to persistent SimpleLogin data:
+
+- SimpleLogin remains the source of truth for aliases, contacts, routing, activity, mailboxes,
+  custom domains, notifications, and account settings.
+- Streamable HTTP creates a fresh MCP server and transport for each request and does not issue an
+  application session ID.
+- The server has no application database, schema migrations, or built-in backup and restore
+  procedure.
+- Back up operator-owned deployment material according to your own policy: secret-manager records,
+  Compose overrides, reverse-proxy and TLS configuration, firewall rules, private CA mounts, proxy
+  settings, and release-tag records. Store secret backups encrypted and access-controlled.
+- Logs are owned by the process manager, container runtime, or logging service. Set retention and
+  access controls there, and sanitize any export.
+
+Copying the container does not back up SimpleLogin. Use SimpleLogin's supported account-data or
+self-hosted backup procedures when they are available and account-level retention is required.
+
+## Upgrade a source or stdio installation
+
+Use a separate clean checkout and an exact release tag when reproducibility matters. Replace
+`vX.Y.Z` below with the target tag:
+
+```bash
+git clone --branch vX.Y.Z --depth 1 https://github.com/enthouan/simplelogin-mcp.git simplelogin-mcp-X.Y.Z
+cd simplelogin-mcp-X.Y.Z
+corepack enable
+pnpm install --frozen-lockfile
+pnpm build
+```
+
+Do not switch a checkout with uncommitted work merely to upgrade a running service. A separate
+checkout also preserves the previous absolute `dist/index.js` path for rollback.
+
+For stdio, point the MCP client at the new checkout's absolute `dist/index.js`, fully restart the
+client, confirm tool discovery, and run the read-only account-usage check. Roll back by restoring
+the previous clean-checkout path and restarting the client.
+
+For Direct Node.js — Streamable HTTP, restart the process through its service manager, request
+`GET /health`, reconnect clients, and repeat the read-only check. For a local-image Compose
+deployment, rebuild and recreate the named service:
+
+```bash
+docker compose -f docker-compose.local.yml up -d --build --force-recreate simplelogin-mcp
+```
+
+Continue with [Security & Data](../security/) for trust-boundary guidance or
+[Troubleshooting](../troubleshooting/) when an operational check fails.

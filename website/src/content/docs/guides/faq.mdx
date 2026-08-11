@@ -50,18 +50,18 @@ to use.
 
 ## Is simplelogin-mcp hosted for me?
 
-The documented deployment paths are self-managed: a local stdio process, a direct loopback HTTP
-process, or Docker Compose. The project website is documentation, not an MCP endpoint and not a
-hosted SimpleLogin account service.
+The documented deployment paths are self-managed: Local stdio, Direct Node.js — Streamable HTTP,
+or Docker Compose — Streamable HTTP. The project website is documentation, not an MCP endpoint and
+not a hosted SimpleLogin account service.
 
 ## Which installation should I choose?
 
-- Choose **local stdio** when one desktop or command-line MCP client should launch the server. It
+- Choose **Local stdio** when one desktop or command-line MCP client should launch the server. It
   opens no network listener and is the smallest trust boundary.
-- Choose **direct HTTP** when you need a persistent same-machine service or an MCP client that uses
-  Streamable HTTP.
-- Choose **Docker Compose** when you want an operator-managed container deployment. The bundled
-  configuration publishes on host loopback by default.
+- Choose **Direct Node.js — Streamable HTTP** when you need a persistent same-machine service or an
+  MCP client that uses Streamable HTTP.
+- Choose **Docker Compose — Streamable HTTP** when you want an operator-managed container
+  deployment. The bundled configuration publishes on host loopback by default.
 
 Start with [Client setup](../../getting-started/clients/) if you know the client you want to use, or
 [Install and run](../../getting-started/) if you are choosing a deployment shape.

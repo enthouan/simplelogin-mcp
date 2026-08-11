@@ -1,5 +1,5 @@
 ---
-title: stdio
+title: Local stdio
 description: Let a local desktop MCP client launch simplelogin-mcp as a child process.
 ---
 
@@ -7,8 +7,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import InstallMethod from '../../../components/InstallMethod.astro';
 import VerifySetup from '../../../components/VerifySetup.astro';
 
-Stdio is the smallest trust boundary: the MCP client launches the compiled server and communicates
-over its standard input and output streams. No network listener is opened.
+Local stdio is the smallest trust boundary: the MCP client launches the compiled server and
+communicates over its standard input and output streams. No network listener is opened.
 
 <InstallMethod method="stdio" />
 
@@ -49,3 +49,6 @@ After the client reports that `simplelogin-mcp` is connected and its tools are d
 read-only account call.
 
 <VerifySetup />
+
+Use [Operations](../../guides/operations/) when upgrading or rolling back the source checkout used
+by this client configuration.

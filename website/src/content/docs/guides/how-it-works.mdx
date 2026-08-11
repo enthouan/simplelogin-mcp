@@ -54,11 +54,11 @@ replace SimpleLogin, host an account, or move alias routing into the MCP client.
 
 ## Choose the process boundary
 
-| Shape          | Process and network boundary                                                                       | Best fit                                           |
-| -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Local stdio    | The MCP client launches a child process. No HTTP listener opens.                                   | One local desktop or command-line client.          |
-| Direct HTTP    | A persistent Node.js process listens on loopback by default.                                       | Same-machine clients that support Streamable HTTP. |
-| Docker Compose | A container listens internally on `0.0.0.0:3000`; Docker publishes it on host loopback by default. | Operator-managed or self-hosted deployments.       |
+| Shape                            | Process and network boundary                                                                       | Best fit                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Local stdio                      | The MCP client launches a child process. No HTTP listener opens.                                   | One local desktop or command-line client.          |
+| Direct Node.js — Streamable HTTP | A persistent Node.js process listens on loopback by default.                                       | Same-machine clients that support Streamable HTTP. |
+| Docker Compose — Streamable HTTP | A container listens internally on `0.0.0.0:3000`; Docker publishes it on host loopback by default. | Operator-managed or self-hosted deployments.       |
 
 All three expose the same [tool catalog](../../reference/tools/). The choice changes how the client
 reaches the server and where its environment secrets live—not which SimpleLogin actions are

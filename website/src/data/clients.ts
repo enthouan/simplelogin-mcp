@@ -29,7 +29,7 @@ export interface ClientSetup {
 export const VERIFY_PROMPT = 'Can you show me my SimpleLogin account usage?';
 
 export const VERIFY_EXPECTED =
-  'Review the proposed call and approve only account_get_stats. It takes no arguments, is marked read-only, and returns aggregate account counts without changing SimpleLogin. Those counts still pass through the client and its configured model.';
+  'The expected tool is account_get_stats. Confirm that it is marked read-only before approving it. It takes no arguments and returns aggregate account counts without changing SimpleLogin. Those counts still pass through the client and its configured model.';
 
 export const CLIENT_SETUPS = [
   {
@@ -254,7 +254,7 @@ bearer_token_env_var = "SIMPLELOGIN_MCP_BEARER_TOKEN"`,
     reload:
       'Relaunch OpenCode and run opencode2 mcp list. OpenCode does not currently promise hot reload after direct configuration edits.',
     secretNote:
-      'Keep the environment that supplies SL_API_KEY private. The local stdio recipe has been maintainer-tested; the HTTP example remains documentation-reviewed.',
+      'Keep the environment that supplies SL_API_KEY private. The local stdio recipe has been maintainer-tested; the Streamable HTTP example remains documentation-reviewed.',
     docsLabel: 'OpenCode MCP documentation',
     docsUrl: 'https://opencode.ai/v2/docs/mcp-servers',
   },

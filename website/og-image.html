@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>simplelogin-mcp Open Graph image</title>
+    <style>
+      /*
+       * Portable social-card template adapted from trello-mcp.
+       * Keep the 1200 x 630 canvas unchanged for Open Graph previews.
+       */
+      :root {
+        --og-canvas: #fff4f9;
+        --og-panel: #ffffff;
+        --og-panel-tint: #fdf0f7;
+        --og-border: #ead4e0;
+        --og-accent: #b72570;
+        --og-accent-bright: #ea319f;
+        --og-title: #1b1730;
+        --og-muted: #4d4458;
+        --og-proof: #64133f;
+        --og-mark: #b72570;
+        --og-mark-detail: #fffafd;
+        --og-shadow: rgb(100 19 63 / 14%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      .og-card {
+        position: relative;
+        display: grid;
+        width: 1200px;
+        height: 630px;
+        padding: 66px 72px;
+        overflow: hidden;
+        color: var(--og-title);
+        background:
+          radial-gradient(circle at 90% 12%, rgb(234 49 159 / 24%), transparent 290px),
+          var(--og-canvas);
+      }
+
+      .frame {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 238px;
+        gap: 50px;
+        width: 1056px;
+        height: 498px;
+        padding: 46px 48px 44px;
+        overflow: hidden;
+        background: linear-gradient(
+          132deg,
+          var(--og-panel) 0%,
+          var(--og-panel) 70%,
+          var(--og-panel-tint) 100%
+        );
+        border: 2px solid var(--og-border);
+        border-radius: 28px;
+        box-shadow: 0 24px 70px var(--og-shadow);
+      }
+
+      .copy {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+      }
+
+      .project {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin: 0;
+        color: var(--og-accent);
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+        font-size: 32px;
+        font-weight: 750;
+        letter-spacing: -0.035em;
+      }
+
+      .project::before {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        content: '';
+        background: var(--og-accent-bright);
+        border: 4px solid rgb(234 49 159 / 24%);
+        border-radius: 999px;
+        background-clip: padding-box;
+      }
+
+      h1 {
+        margin: 44px 0 0;
+        color: var(--og-title);
+        font-size: 62px;
+        font-weight: 760;
+        letter-spacing: -0.045em;
+        line-height: 1.08;
+      }
+
+      h1 span {
+        display: block;
+        white-space: nowrap;
+      }
+
+      .subtitle {
+        margin: 25px 0 0;
+        color: var(--og-muted);
+        font-size: 28px;
+        line-height: 1.25;
+      }
+
+      .proof {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-top: auto;
+        padding-top: 26px;
+        color: var(--og-proof);
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+        border-top: 2px solid var(--og-border);
+      }
+
+      .proof-separator {
+        color: var(--og-accent-bright);
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .mark {
+        display: grid;
+        width: 196px;
+        height: 196px;
+        place-items: center;
+        filter: drop-shadow(0 20px 32px rgb(183 37 112 / 22%));
+      }
+
+      .mark svg {
+        display: block;
+        width: 196px;
+        height: 196px;
+      }
+
+      .identity {
+        margin: 0;
+        color: var(--og-muted);
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      class="og-card"
+      data-social-card
+      aria-label="simplelogin-mcp — independent, self-hosted SimpleLogin MCP server"
+    >
+      <section class="frame">
+        <div class="copy">
+          <p class="project">simplelogin-mcp</p>
+          <h1>
+            <span>Manage aliases from</span>
+            <span>your MCP client.</span>
+          </h1>
+          <p class="subtitle">Self-hosted, auditable alias automation.</p>
+          <div class="proof">
+            <span>27 tools</span>
+            <span class="proof-separator" aria-hidden="true">•</span>
+            <span>stdio</span>
+            <span class="proof-separator" aria-hidden="true">•</span>
+            <span>Streamable HTTP</span>
+          </div>
+        </div>
+        <div class="brand">
+          <div class="mark" aria-hidden="true">
+            <!-- Mail icon geometry from Lucide. Full license: public/third-party-notices.txt -->
+            <svg viewBox="0 0 64 64" role="presentation">
+              <rect width="64" height="64" rx="14" fill="var(--og-mark)" />
+              <g
+                transform="translate(8 8) scale(2)"
+                fill="none"
+                stroke="var(--og-mark-detail)"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+              </g>
+            </svg>
+          </div>
+          <p class="identity">Independent community project</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -12,8 +12,8 @@ export interface InstallMethod {
 export const INSTALL_METHODS = [
   {
     key: 'docker',
-    label: 'Docker',
-    title: 'Docker Compose quick start',
+    label: 'Docker Compose — Streamable HTTP',
+    title: 'Docker Compose — Streamable HTTP quick start',
     language: 'shell',
     href: 'getting-started/docker/',
     code: `git clone https://github.com/enthouan/simplelogin-mcp.git
@@ -29,8 +29,8 @@ curl http://localhost:3000/health`,
   },
   {
     key: 'http',
-    label: 'HTTP',
-    title: 'Direct Node.js on loopback',
+    label: 'Direct Node.js — Streamable HTTP',
+    title: 'Direct Node.js — Streamable HTTP on loopback',
     language: 'shell',
     href: 'getting-started/http/',
     code: `git clone https://github.com/enthouan/simplelogin-mcp.git
@@ -52,8 +52,8 @@ pnpm build
   },
   {
     key: 'stdio',
-    label: 'stdio',
-    title: 'Claude Desktop-compatible stdio configuration',
+    label: 'Local stdio',
+    title: 'Local stdio configuration',
     language: 'json',
     href: 'getting-started/stdio/',
     code: `{
