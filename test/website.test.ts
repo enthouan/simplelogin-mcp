@@ -530,6 +530,34 @@ describe('Starlight website', () => {
     expect(footerSource).not.toContain('grid-template-columns: minmax(0, 1fr) auto');
   });
 
+  it('omits misleading wrapper timestamps from imported and generated reference pages', async () => {
+    const wrapperPaths = [
+      'website/src/content/docs/reference/tools.mdx',
+      'website/src/content/docs/reference/api-coverage.mdx',
+      'website/src/content/docs/reference/contributing.mdx',
+      'website/src/content/docs/reference/reporting-issues.mdx',
+      'website/src/content/docs/reference/security-policy.mdx',
+    ];
+    const [astroConfig, ...wrapperSources] = await Promise.all([
+      readRepoFile('website/astro.config.mjs'),
+      ...wrapperPaths.map(readRepoFile),
+    ]);
+
+    expect(astroConfig).toMatch(/^\s+lastUpdated: true,$/m);
+    for (const source of wrapperSources) {
+      expect(source).toMatch(/^lastUpdated: false$/m);
+    }
+    for (const page of [
+      toolsHtml,
+      apiCoverageHtml,
+      contributingHtml,
+      reportingIssuesHtml,
+      securityPolicyHtml,
+    ]) {
+      expect(page).not.toContain('Last updated:');
+    }
+  });
+
   it('renders static repository trust details without build-time GitHub requests', async () => {
     const [repositorySource, repositoryDataSource, websiteReadme] = await Promise.all([
       readRepoFile('website/src/components/RepositoryLink.astro'),
