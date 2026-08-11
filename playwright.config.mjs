@@ -25,7 +25,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      'ASTRO_PREVIEW_BACKGROUND=0 pnpm --dir website exec astro preview --host 127.0.0.1 --port 4174',
+      'cross-env ASTRO_PREVIEW_BACKGROUND=0 pnpm --dir website exec astro preview --host 127.0.0.1 --port 4174',
     url: previewUrl,
     reuseExistingServer: false,
     timeout: 120_000,

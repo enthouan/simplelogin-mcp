@@ -1594,15 +1594,22 @@ describe('Starlight website', () => {
     expect(llmsSource).toContain("'Content-Type': 'text/plain; charset=utf-8'");
   });
 
-  it('uses Astro dev and build without custom publication modes', async () => {
-    const [rootPackage, websitePackage, astroConfig, robotsSource, websiteReadme] =
-      await Promise.all([
-        readRepoFile('package.json'),
-        readRepoFile('website/package.json'),
-        readRepoFile('website/astro.config.mjs'),
-        readRepoFile('website/src/pages/robots.txt.ts'),
-        readRepoFile('website/README.md'),
-      ]);
+  it('uses portable Astro commands without custom publication modes', async () => {
+    const [
+      rootPackage,
+      websitePackage,
+      playwrightConfig,
+      astroConfig,
+      robotsSource,
+      websiteReadme,
+    ] = await Promise.all([
+      readRepoFile('package.json'),
+      readRepoFile('website/package.json'),
+      readRepoFile('playwright.config.mjs'),
+      readRepoFile('website/astro.config.mjs'),
+      readRepoFile('website/src/pages/robots.txt.ts'),
+      readRepoFile('website/README.md'),
+    ]);
     const rootPackageJson = JSON.parse(rootPackage) as PackageJson;
     const websitePackageJson = JSON.parse(websitePackage) as PackageJson;
 
@@ -1612,10 +1619,23 @@ describe('Starlight website', () => {
     expect(rootPackageJson.scripts['website:og:check']).toBe(
       'tsx website/scripts/render-og-image.ts --check',
     );
+    expect(rootPackageJson.scripts['website:test:built']).toBe(
+      'cross-env WEBSITE_TEST_USE_DIST=1 vitest run test/website.test.ts',
+    );
+    expect(rootPackageJson.devDependencies['cross-env']).toBe('10.1.0');
     expect(rootPackageJson.scripts['website:check']).toContain('pnpm website:og:check');
     expect(rootPackageJson.scripts).not.toHaveProperty(`website:build${':production'}`);
     expect(websitePackageJson.scripts['build']).toBe('astro build');
     expect(websitePackageJson.scripts['dev']).toBe('astro dev --host 127.0.0.1 --port 4173');
+    expect(websitePackageJson.scripts['preview']).toBe(
+      'astro preview --host 127.0.0.1 --port 4173',
+    );
+    expect(playwrightConfig).toContain(
+      'cross-env ASTRO_PREVIEW_BACKGROUND=0 pnpm --dir website exec astro preview --host 127.0.0.1 --port 4174',
+    );
+    for (const command of Object.values(websitePackageJson.scripts)) {
+      expect(command).not.toMatch(/^[A-Z][A-Z0-9_]*=/);
+    }
     expect(websitePackageJson.scripts).not.toHaveProperty(`build${':production'}`);
     expect(astroConfig).toContain('site: CANONICAL_WEBSITE_URL');
     expect(astroConfig).toContain("trailingSlash: 'always'");
