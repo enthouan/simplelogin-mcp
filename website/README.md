@@ -6,8 +6,11 @@ MDX structure, responsive layouts, themes, and accessibility behavior as the ins
 content grows. Its dependencies live in the private `website` workspace so the MCP server build and
 runtime do not install them. Tool names, summaries, groups, and counts are generated from
 `src/tools/catalog.ts`; install and security copy is covered by drift tests against the repository
-documentation and configuration. The Font Awesome client icons and Lucide-derived mail geometry
-used by the logo and social-card template are covered by the distributed
+documentation and configuration. All icon assets remain local to the site. Client marks are
+generated at build time from the pinned Font Awesome packages and emitted in `client-icons.css`.
+That stylesheet carries the required Font Awesome Free attribution; the browser downloads no Font
+Awesome JavaScript, webfont, CDN resource, or individual icon file. The Lucide-derived mail geometry
+used by the logo and social-card template is covered by the distributed
 `public/third-party-notices.txt`.
 
 The sidebar is organized into **Get started**, **Guides**, and **Reference**. The API coverage and

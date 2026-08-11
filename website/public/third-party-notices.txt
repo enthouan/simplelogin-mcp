@@ -1,20 +1,8 @@
 simplelogin-mcp website third-party notices
 
-Font Awesome Free 7.3.1 client icons
-Icons: OpenAI, Claude, Code, Robot
-Sources:
-- https://fontawesome.com/icons/brands/solid/openai
-- https://fontawesome.com/icons/brands/solid/claude
-- https://fontawesome.com/icons/classic/solid/code
-- https://fontawesome.com/icons/classic/solid/robot
-License: CC BY 4.0
-https://creativecommons.org/licenses/by/4.0/
-Copyright 2026 Fonticons, Inc.
-
-Lucide Mail and Clipboard Check icons
+Lucide Mail icon
 Sources:
 - https://lucide.dev/icons/mail
-- https://lucide.dev/icons/clipboard-check
 
 ISC License
 Copyright (c) 2026 Lucide Icons and Contributors

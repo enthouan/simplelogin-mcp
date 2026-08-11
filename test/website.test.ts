@@ -241,6 +241,7 @@ describe('Starlight website', () => {
         '_redirects',
         'index.html',
         '404.html',
+        'client-icons.css',
         'llms.txt',
         'og-card.png',
         'request-flow.svg',
@@ -344,7 +345,7 @@ describe('Starlight website', () => {
     expect(socialCard).toContain('Independent');
     expect(socialCard).toContain('community project');
     expect(socialCard).toContain('--og-canvas: #fff4f9');
-    expect(notices).toContain('https://lucide.dev/icons/clipboard-check');
+    expect(notices).toContain('https://lucide.dev/icons/mail');
     expect(notices).toContain('Copyright (c) 2026 Lucide Icons and Contributors');
     expect(notices).toContain('Permission to use, copy, modify, and/or distribute this software');
   });
@@ -897,9 +898,13 @@ describe('Starlight website', () => {
   it('pairs homepage cards and detailed client sections with recognizable icons', async () => {
     const homepageSource = await readRepoFile('website/src/content/docs/index.mdx');
     const clientSetupSource = await readRepoFile('website/src/components/ClientSetup.astro');
+    const clientIconSource = await readRepoFile('website/src/pages/client-icons.css.ts');
     const customCss = await readRepoFile('website/src/styles/custom.css');
+    const astroConfig = await readRepoFile('website/astro.config.mjs');
     const notices = await readRepoFile('website/public/third-party-notices.txt');
+    const websitePackage = JSON.parse(await readRepoFile('website/package.json')) as PackageJson;
     const builtFiles = await listFiles(outputRoot);
+    const clientIconCss = await readOutputFile('client-icons.css');
     const builtCss = (
       await Promise.all(
         builtFiles.filter((path) => path.endsWith('.css')).map((path) => readOutputFile(path)),
@@ -912,8 +917,21 @@ describe('Starlight website', () => {
       opencode: 'opencode',
       'vs-code': 'vscode',
     } as const;
+    const iconSources = {
+      claude: ['fab', 'claude'],
+      evidence: ['fas', 'clipboard-check'],
+      openai: ['fab', 'openai'],
+      opencode: ['fas', 'robot'],
+      vscode: ['fas', 'code'],
+    } as const;
 
     expect(homeHtml.match(/data-client-icon=/g)).toHaveLength(6);
+    expect(homeHtml).toMatch(/<link rel="stylesheet" href="\/client-icons\.css"\s*\/>/);
+    expect(astroConfig).toContain("href: '/client-icons.css'");
+    expect(websitePackage.devDependencies).toMatchObject({
+      '@fortawesome/free-brands-svg-icons': '7.3.1',
+      '@fortawesome/free-solid-svg-icons': '7.3.1',
+    });
     for (const [client, icon] of Object.entries(clientIcons)) {
       expect(homepageSource).toMatch(
         new RegExp(`href="getting-started/clients/#${client}"\\s+data-client-icon="${icon}"`),
@@ -938,19 +956,23 @@ describe('Starlight website', () => {
     expect(clientSetupSource).toContain('tab.dataset.clientIcon = icon');
     expect(customCss).toMatch(/\[data-client-setups\] \[role='tab'\] \{[^}]*white-space: nowrap;/);
 
-    for (const icon of ['claude', 'openai', 'vscode', 'opencode', 'evidence']) {
-      const source = await readRepoFile(`website/src/assets/client-icons/${icon}.svg`);
-      expect(source).toContain('<svg');
-      expect(source).toContain('<title>');
-      if (icon === 'evidence') {
-        expect(source).toContain('Lucide Clipboard Check');
-      } else {
-        expect(source).toContain('Font Awesome Free 7.3.1');
-        expect(source).not.toContain('Simple Icons');
-      }
+    expect(clientIconSource).toContain("from '@fortawesome/free-brands-svg-icons'");
+    expect(clientIconSource).toContain("from '@fortawesome/free-solid-svg-icons'");
+    expect(clientIconCss).toContain('Font Awesome Free 7.3.1');
+    expect(clientIconCss).toContain('CC BY 4.0');
+    expect(clientIconCss).toContain('https://fontawesome.com/license/free');
+    expect(clientIconCss.match(/data:image\/svg\+xml/g)).toHaveLength(5);
+    expect(clientIconCss).not.toMatch(/url\(["']?https?:/);
+
+    for (const [icon, [prefix, iconName]] of Object.entries(iconSources)) {
       expect(customCss).toContain(`a[data-client-icon='${icon}']`);
-      expect(customCss).toContain(`url('../assets/client-icons/${icon}.svg')`);
+      expect(customCss).toContain(`var(--client-icon-${icon})`);
       expect(builtCss).toContain(`[data-client-icon=${icon}]`);
+      expect(clientIconCss).toContain(`/* ${icon}: ${prefix} ${iconName} */`);
+      expect(clientIconCss).toContain(`--client-icon-${icon}:`);
+      await expect(
+        stat(join(process.cwd(), `website/src/assets/client-icons/${icon}.svg`)),
+      ).rejects.toThrow();
     }
 
     expect(customCss).toContain('.sl-link-card a[data-client-icon] .title::before');
@@ -960,13 +982,12 @@ describe('Starlight website', () => {
     expect(customCss).toContain('mask: var(--client-heading-icon) center / contain no-repeat');
     expect(customCss).toContain('background-color: currentColor');
     expect(customCss).toContain('mask: var(--client-card-icon) center / contain no-repeat');
-    expect(builtCss.match(/--client-card-icon:url\("data:image\/svg\+xml,/g)).toHaveLength(5);
+    expect(builtFiles.some((path) => path.startsWith('client-icons/'))).toBe(false);
     expect(builtCss).not.toContain("url('/client-icons/");
     expect(builtCss).not.toContain('url("/client-icons/');
-    expect(notices).toContain('Font Awesome Free 7.3.1 client icons');
-    expect(notices).toContain('Icons: OpenAI, Claude, Code, Robot');
-    expect(notices).toContain('Copyright 2026 Fonticons, Inc.');
-    expect(notices).toContain('Lucide Mail and Clipboard Check icons');
+    expect(notices).not.toContain('Font Awesome');
+    expect(notices).toContain('Lucide Mail icon');
+    expect(notices).not.toContain('Clipboard Check');
   });
 
   it('ships the tested OpenCode stdio setup using an environment reference', () => {
@@ -1575,7 +1596,14 @@ describe('Starlight website', () => {
 
     expect(dockerIgnore.split('\n')).toContain('website');
     expect(packageJson.files).not.toContain('website');
-    for (const dependency of ['@astrojs/check', '@astrojs/starlight', 'astro', 'sharp']) {
+    for (const dependency of [
+      '@astrojs/check',
+      '@astrojs/starlight',
+      '@fortawesome/free-brands-svg-icons',
+      '@fortawesome/free-solid-svg-icons',
+      'astro',
+      'sharp',
+    ]) {
       expect(packageJson.dependencies).not.toHaveProperty(dependency);
       expect(packageJson.devDependencies).not.toHaveProperty(dependency);
       expect(websitePackageJson.devDependencies).toHaveProperty(dependency);

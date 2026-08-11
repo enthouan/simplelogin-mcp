@@ -93,6 +93,13 @@ export default defineConfig({
       ],
       head: [
         {
+          tag: 'link',
+          attrs: {
+            rel: 'stylesheet',
+            href: '/client-icons.css',
+          },
+        },
+        {
           tag: 'meta',
           attrs: {
             name: 'robots',

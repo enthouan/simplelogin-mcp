@@ -59,26 +59,26 @@ html[data-has-hero] .card-grid:first-of-type > .card:first-child {
 
 .sl-link-card a[data-client-icon='claude'],
 [data-client-setups] [role='tab'][data-client-icon='claude'] {
-  --client-card-icon: url('../assets/client-icons/claude.svg');
+  --client-card-icon: var(--client-icon-claude);
 }
 
 .sl-link-card a[data-client-icon='openai'],
 [data-client-setups] [role='tab'][data-client-icon='openai'] {
-  --client-card-icon: url('../assets/client-icons/openai.svg');
+  --client-card-icon: var(--client-icon-openai);
 }
 
 .sl-link-card a[data-client-icon='vscode'],
 [data-client-setups] [role='tab'][data-client-icon='vscode'] {
-  --client-card-icon: url('../assets/client-icons/vscode.svg');
+  --client-card-icon: var(--client-icon-vscode);
 }
 
 .sl-link-card a[data-client-icon='opencode'],
 [data-client-setups] [role='tab'][data-client-icon='opencode'] {
-  --client-card-icon: url('../assets/client-icons/opencode.svg');
+  --client-card-icon: var(--client-icon-opencode);
 }
 
 .sl-link-card a[data-client-icon='evidence'] {
-  --client-card-icon: url('../assets/client-icons/evidence.svg');
+  --client-card-icon: var(--client-icon-evidence);
 }
 
 [data-client-setups] [role='tab'] {
@@ -109,19 +109,19 @@ html[data-has-hero] .card-grid:first-of-type > .card:first-child {
 }
 
 .sl-markdown-content h2:is(#claude-code, #claude-desktop) {
-  --client-heading-icon: url('../assets/client-icons/claude.svg');
+  --client-heading-icon: var(--client-icon-claude);
 }
 
 .sl-markdown-content h2#codex {
-  --client-heading-icon: url('../assets/client-icons/openai.svg');
+  --client-heading-icon: var(--client-icon-openai);
 }
 
 .sl-markdown-content h2#vs-code {
-  --client-heading-icon: url('../assets/client-icons/vscode.svg');
+  --client-heading-icon: var(--client-icon-vscode);
 }
 
 .sl-markdown-content h2#opencode {
-  --client-heading-icon: url('../assets/client-icons/opencode.svg');
+  --client-heading-icon: var(--client-icon-opencode);
 }
 
 .sl-markdown-content h2:is(#codex, #claude-code, #claude-desktop, #vs-code, #opencode)::before {
