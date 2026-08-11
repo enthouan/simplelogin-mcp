@@ -206,6 +206,70 @@ test('the generated 404 is useful and unknown routes return 404', async ({
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
 });
 
+test('the skip link reaches the main content with a visible keyboard focus indicator', async ({
+  page,
+}) => {
+  await openPage(page, '/getting-started/', 'light');
+
+  const skipLink = page.getByRole('link', { name: 'Skip to content', exact: true });
+  await focusWithKeyboard(page, skipLink);
+  await expect(skipLink).toBeVisible();
+  await expectVisibleFocus(skipLink);
+
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#_top$/);
+  await expect(page.locator('main h1#_top')).toBeVisible();
+});
+
+test('code blocks copy their complete source and announce success', async ({ context, page }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openPage(page, '/getting-started/', 'light');
+
+  const copyButton = page.locator('main .expressive-code .copy button[data-code]').first();
+  const encodedSource = await copyButton.getAttribute('data-code');
+  expect(encodedSource, 'Copy control must expose its source code').toBeTruthy();
+
+  const liveRegion = copyButton.locator('xpath=..').locator('[aria-live]');
+  await copyButton.click();
+  await expect(liveRegion.getByText('Copied!', { exact: true })).toBeVisible();
+
+  const copiedSource = await page.evaluate(() => globalThis.navigator.clipboard.readText());
+  const normalize = (value) => value.replaceAll('\r\n', '\n').trimEnd();
+  expect(normalize(copiedSource)).toBe(normalize((encodedSource ?? '').replaceAll('\u007f', '\n')));
+  await expect(copyButton).not.toHaveAttribute('data-copy-error', 'true');
+});
+
+test('clipboard failures are announced once and then cleared', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new globalThis.DOMException('Clipboard write rejected', 'NotAllowedError');
+        },
+      },
+    });
+    Object.defineProperty(globalThis.Document.prototype, 'execCommand', {
+      configurable: true,
+      value: () => false,
+    });
+  });
+  await openPage(page, '/getting-started/', 'light');
+
+  const copyButton = page.locator('main .expressive-code .copy button[data-code]').first();
+  const liveRegion = copyButton.locator('xpath=..').locator('[aria-live]');
+  await copyButton.click();
+
+  const failure = liveRegion.locator('.feedback.copy-error');
+  await expect(failure).toHaveCount(1);
+  await expect(failure).toHaveText('Copy failed. Select the code and copy it manually.');
+  await expect(failure).toBeVisible();
+  await expect(copyButton).toHaveAttribute('data-copy-error', 'true');
+
+  await expect(failure).toHaveCount(0, { timeout: 6_000 });
+  await expect(copyButton).not.toHaveAttribute('data-copy-error', 'true');
+});
+
 test('native mobile menu is keyboard operable @mobile', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'This check requires mobile navigation.');
 

@@ -179,17 +179,6 @@ html[data-has-hero] .hero {
   font-size: var(--sl-text-sm);
 }
 
-.expressive-code .copy button[data-copy-error='true'] {
-  outline: 2px solid var(--sl-color-red-high);
-  outline-offset: 2px;
-}
-
-.expressive-code .copy .copy-error {
-  width: max-content;
-  max-width: min(22rem, 80vw);
-  color: var(--sl-color-red-high);
-}
-
 @media (max-width: 42rem) {
   html[data-has-hero] .hero {
     padding-block: 1.75rem 2.25rem;

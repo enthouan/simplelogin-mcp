@@ -1226,6 +1226,9 @@ describe('Starlight website', () => {
       'website/src/content/docs/getting-started/clients.mdx',
     );
     const footerSource = await readRepoFile('website/src/components/Footer.astro');
+    const codeBlockEnhancementsSource = await readRepoFile(
+      'website/src/components/CodeBlockEnhancements.astro',
+    );
     const routeDataSource = await readRepoFile('website/src/starlightRouteData.ts');
     const astroConfig = await readRepoFile('website/astro.config.mjs');
 
@@ -1266,10 +1269,19 @@ describe('Starlight website', () => {
     expect(
       detailedClientSource.match(/^## (?:Codex|Claude Code|Claude Desktop|VS Code|OpenCode)$/gm),
     ).toHaveLength(CLIENT_SETUPS.length);
-    expect(footerSource).toContain('Copy failed. Select the code and copy it manually.');
-    expect(footerSource).toContain("querySelector<HTMLElement>('[aria-live]')");
-    expect(footerSource).toContain('{ capture: true }');
-    expect(footerSource).toContain("querySelectorAll('.feedback')");
+    expect(footerSource).toContain(
+      "import CodeBlockEnhancements from './CodeBlockEnhancements.astro'",
+    );
+    expect(footerSource).toContain('<CodeBlockEnhancements />');
+    expect(footerSource).not.toContain('Copy failed. Select the code and copy it manually.');
+    expect(codeBlockEnhancementsSource).toContain(
+      'Copy failed. Select the code and copy it manually.',
+    );
+    expect(codeBlockEnhancementsSource).toContain("querySelector<HTMLElement>('[aria-live]')");
+    expect(codeBlockEnhancementsSource).toContain('{ capture: true }');
+    expect(codeBlockEnhancementsSource).toContain("querySelectorAll('.feedback')");
+    expect(codeBlockEnhancementsSource).toContain('<style is:global>');
+    expect(codeBlockEnhancementsSource).toContain("button[data-copy-error='true']");
     expect(astroConfig).toContain("routeMiddleware: './src/starlightRouteData.ts'");
     expect(astroConfig).not.toContain('Head:');
     expect(astroConfig).not.toContain('PageSidebar:');

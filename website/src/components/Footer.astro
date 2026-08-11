@@ -2,6 +2,7 @@
 import LastUpdated from '@astrojs/starlight/components/LastUpdated.astro';
 import Pagination from '@astrojs/starlight/components/Pagination.astro';
 import { REPOSITORY_URL } from '../data/repository.js';
+import CodeBlockEnhancements from './CodeBlockEnhancements.astro';
 
 const base = import.meta.env.BASE_URL;
 ---
@@ -46,61 +47,7 @@ const base = import.meta.env.BASE_URL;
   </div>
 </footer>
 
-<script>
-  const copyFailureRoot = document.documentElement;
-
-  function initializeFocusableCodeBlocks() {
-    document
-      .querySelectorAll<HTMLElement>('.expressive-code pre:not([tabindex])')
-      .forEach((codeBlock) => (codeBlock.tabIndex = 0));
-  }
-
-  initializeFocusableCodeBlocks();
-
-  if (copyFailureRoot.dataset.copyFailureFeedback !== 'true') {
-    copyFailureRoot.dataset.copyFailureFeedback = 'true';
-    let copyAttemptSequence = 0;
-
-    document.addEventListener('astro:page-load', initializeFocusableCodeBlocks);
-
-    document.addEventListener(
-      'click',
-      (event) => {
-        if (!(event.target instanceof Element)) return;
-
-        const button = event.target.closest<HTMLButtonElement>(
-          '.expressive-code .copy button[data-code]',
-        );
-        const liveRegion = button?.parentElement?.querySelector<HTMLElement>('[aria-live]');
-        if (!button || !liveRegion) return;
-
-        const attempt = String(++copyAttemptSequence);
-        button.dataset.copyAttempt = attempt;
-        delete button.dataset.copyError;
-        liveRegion.querySelectorAll('.feedback').forEach((feedback) => feedback.remove());
-
-        window.setTimeout(() => {
-          if (button.dataset.copyAttempt !== attempt || liveRegion.querySelector('.feedback')) {
-            return;
-          }
-
-          const feedback = document.createElement('div');
-          feedback.className = 'feedback copy-error show';
-          feedback.textContent = 'Copy failed. Select the code and copy it manually.';
-          liveRegion.replaceChildren(feedback);
-          button.dataset.copyError = 'true';
-
-          window.setTimeout(() => {
-            if (button.dataset.copyAttempt !== attempt) return;
-            feedback.remove();
-            delete button.dataset.copyError;
-          }, 4_000);
-        }, 1_000);
-      },
-      { capture: true },
-    );
-  }
-</script>
+<CodeBlockEnhancements />
 
 <style>
   @layer starlight.core {
