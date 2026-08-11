@@ -1,5 +1,6 @@
 import { getCollection } from 'astro:content';
 import type { APIRoute } from 'astro';
+import { REPOSITORY_URL } from '../data/repository.js';
 
 export const prerender = true;
 
@@ -39,9 +40,14 @@ simplelogin-mcp lets an MCP client manage aliases, contacts, mailboxes, custom d
 ## Documentation
 
 ${links}
+
+## Source
+
+- [GitHub repository](${REPOSITORY_URL})
+- [SimpleLogin](https://simplelogin.io/)
 `;
 
   return new Response(body, {
-    headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   });
 };

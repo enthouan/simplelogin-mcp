@@ -46,6 +46,7 @@ const keyboardAccessibleTables = {
 export default defineConfig({
   output: 'static',
   site: CANONICAL_WEBSITE_URL,
+  trailingSlash: 'always',
   markdown: {
     processor: satteri({ hastPlugins: [keyboardAccessibleTables] }),
   },
@@ -76,6 +77,7 @@ export default defineConfig({
         alt: '',
         replacesTitle: false,
       },
+      lastUpdated: true,
       credits: false,
       customCss: ['./src/styles/custom.css'],
       routeMiddleware: './src/starlightRouteData.ts',
@@ -98,7 +100,6 @@ export default defineConfig({
           },
         },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#ea319f' } },
-        { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
         {
           tag: 'meta',
           attrs: {

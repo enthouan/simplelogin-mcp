@@ -57,11 +57,6 @@ project does not create, recover, rotate, or revoke the key for you.
    Under **New API Key**, enter a recognizable name such as `simplelogin-mcp on my Mac` or
    `simplelogin-mcp Docker`, then select **Create**.
 
-   Before creating another key, review the existing entries. If an account already exceeds its
-   server's API-key limit, SimpleLogin's [current dashboard
-   logic at the audited upstream revision](https://github.com/simple-login/app/blob/f8ee0eb1c5258d008bf9b162b31febdbbb81d758/app/dashboard/views/api_key.py) removes
-   the oldest unused keys and then the oldest used keys before it creates a new one.
-
 4. **Copy the new key immediately.**
 
    The creation screen initially masks the value and provides an eye control plus a **Copy** button.
@@ -151,6 +146,15 @@ SimpleLogin, not by simplelogin-mcp.
 
 Existing keys are deliberately masked. Return to the API Keys page, delete the unusable entry, and
 create a replacement. Do not try to recover the value from logs, browser storage, or screenshots.
+
+### Creating a key may remove older keys
+
+Review the existing entries before creating another key. At the audited upstream revision,
+SimpleLogin's [dashboard
+logic](https://github.com/simple-login/app/blob/f8ee0eb1c5258d008bf9b162b31febdbbb81d758/app/dashboard/views/api_key.py)
+removes the oldest unused keys and then the oldest used keys when an account already exceeds its
+server's API-key limit. This is implementation evidence, not a stable product contract: the current
+dashboard and, for self-hosted users, the behavior of that instance remain authoritative.
 
 ### simplelogin-mcp reports `401`, `403`, or “Invalid API key”
 

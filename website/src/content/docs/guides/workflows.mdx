@@ -8,6 +8,30 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 These workflows combine small, typed tools into reviewable operations. Read first, keep mutations
 explicit, and treat permanent deletion as a separate decision.
 
+## The five-stage pattern
+
+Apply the same sequence to each workflow:
+
+<Steps>
+
+1. **Discover.** Find the exact alias, contact, mailbox, domain, or setting with a bounded list or
+   lookup call. Do not guess an identifier from a display name.
+
+2. **Inspect.** Read the current SimpleLogin state needed for the decision before proposing a
+   change. Keep list and activity requests bounded.
+
+3. **Propose.** State the exact tool, target, inputs, expected effect, and whether the change is
+   reversible.
+
+4. **Approve.** Let the user review the proposed write in the MCP client. Client approval is
+   separate from server validation; permanent deletion also requires the tool's explicit
+   confirmation input.
+
+5. **Verify.** Read the affected resource again after a write. SimpleLogin remains the source of
+   truth for account state and email routing.
+
+</Steps>
+
 ## Create and tune an alias
 
 <Steps>

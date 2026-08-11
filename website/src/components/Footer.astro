@@ -1,4 +1,5 @@
 ---
+import LastUpdated from '@astrojs/starlight/components/LastUpdated.astro';
 import Pagination from '@astrojs/starlight/components/Pagination.astro';
 import { REPOSITORY_URL } from '../data/repository.js';
 
@@ -6,6 +7,10 @@ const base = import.meta.env.BASE_URL;
 ---
 
 <footer class="site-footer sl-flex">
+  <div class="meta sl-flex">
+    <LastUpdated />
+  </div>
+
   <Pagination />
 
   <div class="project-footer">
@@ -102,7 +107,19 @@ const base = import.meta.env.BASE_URL;
     .site-footer {
       flex-direction: column;
       gap: 1.5rem;
-      padding-block-start: 4.5rem;
+    }
+
+    .meta {
+      gap: 0.75rem 3rem;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-top: 3rem;
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+    }
+
+    .meta > :global(p:only-child) {
+      margin-inline-start: auto;
     }
 
     .project-footer {

@@ -492,7 +492,11 @@ describe('Starlight website', () => {
   });
 
   it('adds the independent project footer to every documentation page', async () => {
-    const footerSource = await readRepoFile('website/src/components/Footer.astro');
+    const [footerSource, astroConfig, homepageSource] = await Promise.all([
+      readRepoFile('website/src/components/Footer.astro'),
+      readRepoFile('website/astro.config.mjs'),
+      readRepoFile('website/src/content/docs/index.mdx'),
+    ]);
 
     for (const page of [homeHtml, installHtml, securityHtml, toolsHtml]) {
       expect(page).toMatch(/class="project-footer(?:\s|")/);
@@ -513,10 +517,12 @@ describe('Starlight website', () => {
     }
 
     expect(footerSource).not.toContain('@astrojs/starlight/components/EditLink.astro');
-    expect(footerSource).not.toContain('@astrojs/starlight/components/LastUpdated.astro');
+    expect(footerSource).toContain('@astrojs/starlight/components/LastUpdated.astro');
     expect(footerSource).toContain('@astrojs/starlight/components/Pagination.astro');
-    expect(footerSource).not.toContain('<div class="meta sl-flex">');
-    expect(footerSource).toContain('padding-block-start: 4.5rem');
+    expect(footerSource).toContain('<div class="meta sl-flex">');
+    expect(footerSource).not.toContain('padding-block-start: 4.5rem');
+    expect(astroConfig).toContain('lastUpdated: true');
+    expect(homepageSource).toContain('lastUpdated: false');
     expect(footerSource).toContain('<div class="project-footer__bar">');
     expect(footerSource).toContain('justify-content: space-between');
     expect(footerSource).not.toContain('max-width: 46rem');
@@ -558,7 +564,13 @@ describe('Starlight website', () => {
     expect(stepItemCounts(dockerHtml)).toEqual([4]);
     expect(stepItemCounts(httpHtml)).toEqual([4]);
     expect(stepItemCounts(stdioHtml)).toEqual([4]);
-    expect(stepItemCounts(workflowsHtml)).toEqual([4, 3, 4, 3]);
+    expect(stepItemCounts(workflowsHtml)).toEqual([5, 4, 3, 4, 3]);
+    expect(workflowsHtml).toContain('The five-stage pattern');
+    expect(workflowsHtml).toContain('Discover');
+    expect(workflowsHtml).toContain('Inspect');
+    expect(workflowsHtml).toContain('Propose');
+    expect(workflowsHtml).toContain('Approve');
+    expect(workflowsHtml).toContain('Verify');
     expect(dockerHtml).toContain('Pin long-lived deployments');
     expect(dockerHtml).toContain('The quick start uses the moving');
     expect(dockerHtml).toContain('>latest</code> image tag');
@@ -1029,6 +1041,11 @@ describe('Starlight website', () => {
     expect(apiKeyHtml).toContain('Before you begin');
     expect(apiKeyHtml).toContain('New API Key');
     expect(apiKeyHtml).toContain('the oldest unused keys and then the oldest used keys');
+    expect(apiKeyHtml).toContain('Creating a key may remove older keys');
+    expect(apiKeyHtml.indexOf('Creating a key may remove older keys')).toBeGreaterThan(
+      apiKeyHtml.indexOf('Troubleshooting'),
+    );
+    expect(apiKeyHtml).toContain('implementation evidence, not a stable product contract');
     expect(apiKeyHtml).toContain('Copy the new key immediately');
     expect(apiKeyHtml).toContain('only makes the complete key available on this screen');
     expect(apiKeyHtml).toContain('SL_API_KEY');
@@ -1406,6 +1423,19 @@ describe('Starlight website', () => {
     expect(homeHtml).toMatch(/<meta\s+name="description"/);
     expect(homeHtml).toContain('<meta property="og:type" content="website"/>');
     expect(homeHtml.match(/<meta property="og:type"/g)).toHaveLength(1);
+    expect(installHtml).toContain('<meta property="og:type" content="article"/>');
+    expect(installHtml.match(/<meta property="og:type"/g)).toHaveLength(1);
+    const structuredData = /<script type="application\/ld\+json">([^<]+)<\/script>/.exec(homeHtml);
+    expect(structuredData).not.toBeNull();
+    expect(JSON.parse(structuredData![1]!)).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'simplelogin-mcp',
+      url: CANONICAL_WEBSITE_URL,
+      description:
+        'An independent MCP server for existing SimpleLogin users to create aliases, inspect alias activity metadata, manage routing, and use reverse aliases.',
+    });
+    expect(installHtml).not.toContain('type="application/ld+json"');
     expect(homeHtml).toContain('<meta name="twitter:card" content="summary_large_image"/>');
     expect(homeHtml.match(/<meta name="twitter:card"/g)).toHaveLength(1);
     expect(homeHtml).toContain('<meta property="og:title"');
@@ -1451,6 +1481,7 @@ describe('Starlight website', () => {
 
   it('publishes machine-readable documentation discovery at the canonical origin', async () => {
     const llms = await readOutputFile('llms.txt');
+    const llmsSource = await readRepoFile('website/src/pages/llms.txt.ts');
     const canonicalRoutes = [
       'getting-started/clients',
       'getting-started/compatibility',
@@ -1495,6 +1526,10 @@ describe('Starlight website', () => {
       expect(llms).not.toContain(`](${CANONICAL_WEBSITE_URL}${legacyRoute}/)`);
     }
     expect(llms).toContain('must never be placed in a prompt');
+    expect(llms).toContain('## Source');
+    expect(llms).toContain(`- [GitHub repository](${REPOSITORY_URL})`);
+    expect(llms).toContain('- [SimpleLogin](https://simplelogin.io/)');
+    expect(llmsSource).toContain("'Content-Type': 'text/plain; charset=utf-8'");
   });
 
   it('uses Astro dev and build without custom publication modes', async () => {
@@ -1521,6 +1556,7 @@ describe('Starlight website', () => {
     expect(websitePackageJson.scripts['dev']).toBe('astro dev --host 127.0.0.1 --port 4173');
     expect(websitePackageJson.scripts).not.toHaveProperty(`build${':production'}`);
     expect(astroConfig).toContain('site: CANONICAL_WEBSITE_URL');
+    expect(astroConfig).toContain("trailingSlash: 'always'");
     expect(astroConfig).not.toContain("from 'node:process'");
     expect(robotsSource).toContain('CANONICAL_WEBSITE_URL');
     expect(websiteReadme).toContain('No website publication or base-URL environment variable');

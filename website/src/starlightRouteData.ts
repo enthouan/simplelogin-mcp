@@ -5,6 +5,7 @@ import { getHeadings as getSupportHeadings } from '../../SUPPORT.md';
 import { getHeadings as getApiCoverageHeadings } from '../../docs/api-coverage.md';
 import { CATEGORY_ENTRIES } from './data/catalog.js';
 
+const WEBSITE_NAME = 'simplelogin-mcp';
 const canonicalHeadings = new Map([
   ['reference/api-coverage', getApiCoverageHeadings],
   ['reference/contributing', getContributingHeadings],
@@ -26,11 +27,10 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
       }
       return [entry];
     });
+    return;
   }
 
-  if (!route.toc) return;
-
-  if (route.id === 'reference/tools') {
+  if (route.id === 'reference/tools' && route.toc) {
     const categorySlugs = new Set(CATEGORY_ENTRIES.map(({ category }) => `tool-group-${category}`));
 
     route.toc.items = [
@@ -45,7 +45,7 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
   }
 
   const getCanonicalHeadings = canonicalHeadings.get(route.id);
-  if (getCanonicalHeadings) {
+  if (getCanonicalHeadings && route.toc) {
     const headings = getCanonicalHeadings()
       .filter(({ depth }) => depth === 2)
       .map((heading) => ({ ...heading, children: [] }));
@@ -55,5 +55,32 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
       ...route.toc.items.filter(({ slug }) => !headingSlugs.has(slug)),
       ...headings,
     ];
+  }
+
+  if (route.entry.id !== '') return;
+
+  const canonicalHref = route.head.find(
+    (entry) => entry.tag === 'link' && entry.attrs?.rel === 'canonical',
+  )?.attrs?.href;
+
+  route.head = route.head.map((entry) => {
+    if (entry.tag !== 'meta' || entry.attrs?.property !== 'og:type') return entry;
+    return { ...entry, attrs: { ...entry.attrs, content: 'website' } };
+  });
+
+  if (typeof canonicalHref === 'string') {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: WEBSITE_NAME,
+      url: canonicalHref,
+      description: route.entry.data.description,
+    };
+
+    route.head.push({
+      tag: 'script',
+      attrs: { type: 'application/ld+json' },
+      content: JSON.stringify(schema).replaceAll('<', '\\u003c'),
+    });
   }
 });
