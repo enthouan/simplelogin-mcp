@@ -213,7 +213,7 @@ Use a separate clean checkout and an exact release tag when reproducibility matt
 git clone --branch vX.Y.Z --depth 1 https://github.com/enthouan/simplelogin-mcp.git simplelogin-mcp-X.Y.Z
 cd simplelogin-mcp-X.Y.Z
 corepack enable
-pnpm install --frozen-lockfile
+pnpm install --filter simplelogin-mcp --frozen-lockfile
 pnpm build
 ```
 

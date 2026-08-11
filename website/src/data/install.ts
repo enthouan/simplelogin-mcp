@@ -36,7 +36,7 @@ curl http://localhost:3000/health`,
     code: `git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
 corepack enable
-pnpm install --frozen-lockfile
+pnpm install --filter simplelogin-mcp --frozen-lockfile
 cp .env.example .env
 # Keep TRANSPORT=http, HOST=127.0.0.1, and PORT=3000; set SL_API_KEY in .env
 \${EDITOR:-vi} .env

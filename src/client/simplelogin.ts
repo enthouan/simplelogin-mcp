@@ -783,6 +783,9 @@ export class SimpleLoginClient {
         headers,
         body: bodyInit,
         signal,
+        // The API key uses a custom Authentication header, which fetch may forward
+        // across origins. Reject redirects so it can only reach the configured origin.
+        redirect: 'error',
       });
     } catch (error) {
       const apiError = this.toTransportError(error, options.endpoint, signal?.aborted ?? false);

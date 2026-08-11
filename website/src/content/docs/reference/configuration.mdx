@@ -27,7 +27,8 @@ self-hosted SimpleLogin instance must be used with that same instance's `SL_API_
 <Aside type="danger" title="Protect the outbound API key in transit">
   Keep `SL_API_URL` on HTTPS. Every outbound SimpleLogin request sends the full-control key in an
   `Authentication` header. An `http://` self-hosted origin therefore carries that key unencrypted
-  and is appropriate only across a separately protected private boundary; prefer TLS even there.
+  and is appropriate only across a separately protected private boundary; prefer TLS even there. API
+  redirects are rejected, so configure the canonical origin that serves the API directly.
 </Aside>
 
 ## Server runtime

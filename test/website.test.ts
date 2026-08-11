@@ -1015,6 +1015,7 @@ describe('Starlight website', () => {
     expect(configurationHtml).toContain('SL_API_KEY');
     expect(configurationHtml).toContain('MCP_AUTH_TOKEN');
     expect(configurationHtml).toContain('Keep <code dir="auto">SL_API_URL</code> on HTTPS');
+    expect(configurationHtml).toMatch(/API\s+redirects are rejected/);
     expect(securityHtml).toContain('Use HTTPS for the SimpleLogin API');
     expect(faqHtml).toContain('Plain HTTP leaves it unencrypted');
     expect(troubleshootingHtml).toContain('Unauthorized');
@@ -1124,7 +1125,7 @@ describe('Starlight website', () => {
       'docker compose up -d',
       'docker compose ps',
       'curl http://localhost:3000/health',
-      'pnpm install --frozen-lockfile',
+      'pnpm install --filter simplelogin-mcp --frozen-lockfile',
       'pnpm build',
       'TRANSPORT=http',
       'HOST=127.0.0.1',

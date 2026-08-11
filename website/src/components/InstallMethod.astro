@@ -40,7 +40,8 @@ const clientGuideHref = `${base}getting-started/clients/`;
     method.key === 'stdio' && (
       <p>
         This JSON illustrates Claude Desktop's stdio shape; other clients use different
-        configuration formats. Run <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code>{' '}
+        configuration formats. Run{' '}
+        <code>pnpm install --filter simplelogin-mcp --frozen-lockfile &amp;&amp; pnpm build</code>{' '}
         first. Stdio does not use <code>MCP_AUTH_TOKEN</code>; keep the client config private
         because it contains your API key.{' '}
         <a href={clientGuideHref}>Use the recipe for your MCP client</a>.

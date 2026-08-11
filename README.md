@@ -104,7 +104,7 @@ Local stdio is the recommended starting point when the client and server run on 
 git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
 corepack enable
-pnpm install --frozen-lockfile
+pnpm install --filter simplelogin-mcp --frozen-lockfile
 pnpm build
 ```
 
@@ -147,7 +147,7 @@ the ignored file only into a subshell:
 
 ```bash
 corepack enable
-pnpm install --frozen-lockfile
+pnpm install --filter simplelogin-mcp --frozen-lockfile
 cp .env.example .env
 pnpm build
 (
