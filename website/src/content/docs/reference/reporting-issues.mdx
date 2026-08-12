@@ -1,0 +1,22 @@
+---
+title: Reporting issues and support
+description: Choose the right support channel and prepare a safe, reproducible simplelogin-mcp report.
+lastUpdated: false
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import PolicyContent from '../../../components/PolicyContent.astro';
+import RepositoryLink from '../../../components/RepositoryLink.astro';
+
+<Aside type="caution" title="Sanitize every report">
+  Never include `SL_API_KEY`, `MCP_AUTH_TOKEN`, authorization headers, private account data, real
+  alias addresses, or an unredacted configuration file in an issue, discussion, screenshot, log, or
+  reproduction.
+</Aside>
+
+<PolicyContent source="support" />
+
+Start with [Troubleshooting](../../guides/troubleshooting/) and the [FAQ](../../guides/faq/) before
+opening an issue.
+
+<RepositoryLink showIssueLink />

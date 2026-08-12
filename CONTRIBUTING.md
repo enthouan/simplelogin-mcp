@@ -6,6 +6,7 @@ without explicit documentation and tests.
 
 ## Requirements
 
+- Git.
 - Node.js 24.x.
 - pnpm, preferably through Corepack (`corepack enable`).
 - Docker and Docker Compose when changing container behavior.
@@ -21,6 +22,7 @@ git clone https://github.com/enthouan/simplelogin-mcp.git
 cd simplelogin-mcp
 corepack enable
 pnpm install --frozen-lockfile
+pnpm exec playwright install chromium webkit
 ```
 
 Local `pnpm` commands do not automatically load `.env`. Export environment variables in your shell
@@ -33,6 +35,7 @@ pnpm typecheck      # TypeScript without emit
 pnpm lint           # ESLint
 pnpm build          # compile TypeScript to dist/
 pnpm test           # Vitest unit tests, no live network required
+pnpm website:check  # Astro diagnostics, one build, then static and browser checks
 pnpm format         # Prettier write
 pnpm format:check   # Prettier check
 pnpm smoke:live     # manual live SimpleLogin smoke test; opt-in only
@@ -45,6 +48,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm test
+pnpm website:check
 pnpm format:check
 ```
 
@@ -109,7 +113,7 @@ Prefer read-only or locally guarded behavior first. Permanent deletes require ex
 confirmation inputs, and mail-routing changes that can stop future delivery must be documented as
 destructive.
 
-## Tool Catalog And README Drift
+## Tool Catalog And Documentation Drift
 
 [src/tools/catalog.ts](src/tools/catalog.ts) is the source for registered tool order, annotation
 expectations, bounds, and generated catalog text. [TOOL_CATALOG.md](TOOL_CATALOG.md) is the public
@@ -118,11 +122,11 @@ rendering of that source, and [test/tools.test.ts](test/tools.test.ts) checks th
 - registered tool names exactly match the catalog order;
 - tool annotations match the catalog;
 - bounded reads document `page_id`, limits, and defaults;
-- the README tool table stays in registered-tool order;
+- the concise README points readers to the generated catalog instead of duplicating it;
 - `TOOL_CATALOG.md` matches the formatted output of `renderToolCatalogMarkdown()`.
 
-When a tool changes, update the catalog source and the public docs together. Do not hand-edit tool
-names in the README without confirming `pnpm test` still passes.
+When a tool changes, update the catalog source and the public docs together, regenerate
+`TOOL_CATALOG.md`, and confirm `pnpm test` still passes.
 
 ## Branch And Pull Request Hygiene
 

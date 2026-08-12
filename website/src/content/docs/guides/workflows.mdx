@@ -1,0 +1,98 @@
+---
+title: Workflows
+description: Follow practical SimpleLogin workflows expressed through the MCP tool catalog.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+These workflows combine small, typed tools into reviewable operations. Read first, keep mutations
+explicit, and treat permanent deletion as a separate decision.
+
+## The five-stage pattern
+
+Apply the same sequence to each workflow:
+
+<Steps>
+
+1. **Discover.** Find the exact alias, contact, mailbox, domain, or setting with a bounded list or
+   lookup call. Do not guess an identifier from a display name.
+
+2. **Inspect.** Read the current SimpleLogin state needed for the decision before proposing a
+   change. Keep list and activity requests bounded.
+
+3. **Propose.** State the exact tool, target, inputs, expected effect, and whether the change is
+   reversible.
+
+4. **Approve.** Let the user review the proposed write in the MCP client. Client approval is
+   separate from server validation; permanent deletion also requires the tool's explicit
+   confirmation input.
+
+5. **Verify.** Read the affected resource again after a write. SimpleLogin remains the source of
+   truth for account state and email routing.
+
+</Steps>
+
+## Create and tune an alias
+
+<Steps>
+
+1. **Find existing aliases.** Use `alias_list` with bounded pages and optional filters.
+
+2. **Create only when needed.** Choose `alias_create_random` or inspect `alias_options_get` before
+   `alias_create_custom`.
+
+3. **Update supported fields.** `alias_update` changes note, name, mailboxes, PGP, or pinned state.
+
+4. **Set enabled state explicitly.** Use `alias_set_enabled`; `alias_update` does not toggle it.
+
+</Steps>
+
+## Review recent alias activity
+
+<Steps>
+
+1. **Read the alias.** `alias_get` returns details for one known alias id.
+
+2. **Inspect bounded activity-metadata pages.** `alias_activity_list` covers forwards, replies,
+   blocks, and bounces. It does not read message bodies.
+
+3. **Decide separately.** Activity inspection is read-only; any routing or state change uses a
+   dedicated write tool.
+
+</Steps>
+
+## Create a reverse alias for sending
+
+<Steps>
+
+1. **List existing reverse aliases.** `contact_list` checks recipients already attached to an alias.
+
+2. **Create or reuse one.** `contact_create` returns an existing contact when appropriate.
+
+3. **Send from the owning mailbox.** Address the actual message to the returned reverse-alias
+   address from a real mailbox that owns the alias. simplelogin-mcp creates the routing address; it
+   does not compose or send the email.
+
+4. **Block before deleting.** `contact_set_blocked` is reversible; `contact_delete` is permanent
+   and requires `confirm=true`.
+
+</Steps>
+
+## Maintain routing and settings
+
+<Steps>
+
+1. **Inspect mailbox destinations.** `mailbox_list` reports verification and default state.
+
+2. **Inspect custom domains.** `custom_domain_list` reports existing domains; the server does not
+   claim domain creation or DNS management.
+
+3. **Review account settings.** Read with `settings_get` before applying supported changes through
+   `settings_update`.
+
+</Steps>
+
+<Aside type="caution" title="Permanent operations require a deliberate final step">
+  Alias, contact, and mailbox deletion tools are destructive and guarded. Prefer reversible state
+  changes while investigating, and supply confirmation only after reviewing the exact target.
+</Aside>

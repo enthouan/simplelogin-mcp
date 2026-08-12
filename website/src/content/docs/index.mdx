@@ -1,0 +1,237 @@
+---
+title: Manage SimpleLogin from your MCP client.
+description: An independent MCP server for existing SimpleLogin users to create aliases, inspect alias activity metadata, manage routing, and use reverse aliases.
+template: splash
+lastUpdated: false
+hero:
+  tagline: A self-hosted Model Context Protocol (MCP) server for existing SimpleLogin users. Create aliases, inspect alias activity metadata, manage routing, and use reverse aliases from a server you run.
+  image:
+    file: ../../assets/simplelogin-mcp-mark.svg
+    alt: simplelogin-mcp mailbox mark
+  actions:
+    - text: Get started
+      link: getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/enthouan/simplelogin-mcp
+      icon: github
+      variant: secondary
+      attrs:
+        data-github-action: true
+        data-repository-action: true
+        iconPlacement: start
+        rel: external
+        referrerpolicy: no-referrer
+---
+
+import {
+  Aside,
+  Card,
+  CardGrid,
+  Code,
+  LinkButton,
+  LinkCard,
+  Steps,
+} from '@astrojs/starlight/components';
+import { TOOL_CATALOG } from '../../../../src/tools/catalog.js';
+import ToolCatalogPreview from '../../components/ToolCatalogPreview.astro';
+
+<Aside type="note" title="Independent integration for SimpleLogin">
+  simplelogin-mcp is an independent, open-source project. It is not an official SimpleLogin or
+  Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or
+  sponsored by SimpleLogin or Proton AG.
+
+Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
+
+</Aside>
+
+<CardGrid>
+  <Card title={`${TOOL_CATALOG.length} catalog-backed tools`} icon="puzzle">
+    Aliases, contacts, mailboxes, custom domains, and account settings are documented from the same
+    source as the server.
+
+    Some reverse-alias, additional-mailbox, and custom-domain capabilities [depend on your
+    SimpleLogin plan](guides/faq/#do-all-tools-work-on-every-simplelogin-plan).
+
+    <a href="reference/tools/">See all {TOOL_CATALOG.length} tools</a>
+
+  </Card>
+  <Card title="Local by default" icon="laptop">
+    Local stdio opens no listener. Direct Node.js — Streamable HTTP binds to loopback unless you
+    deliberately configure a wider boundary.
+  </Card>
+  <Card title="API keys stay out of MCP messages" icon="padlock">
+    The server reads `SL_API_KEY` from its environment and never includes it in MCP requests or
+    results. Do not put the key in prompts. When HTTP authentication is enabled, the client sends a
+    separate server token only to simplelogin-mcp.
+  </Card>
+  <Card title="Guarded permanent changes" icon="approve-check-circle">
+    Tools that can stop delivery or delete data are labeled <strong>Destructive</strong>. Permanent
+    deletion requires <code>confirm: true</code>; mailbox deletion also requires an explicit
+    transfer-or-delete decision for its aliases.
+  </Card>
+</CardGrid>
+
+<h2 id="see-it-work">Let your MCP client create an alias for you</h2>
+
+Once simplelogin-mcp is connected, this example creates one real random alias in your SimpleLogin
+account. It uses your account's default alias style, so you do not need to choose an address or
+configure any inputs.
+
+<Code
+  code="Can you create a new random SimpleLogin alias for me?"
+  lang="text"
+  meta='title="Alias creation example prompt"'
+/>
+
+<Steps>
+
+1. **Review the proposed call.** Confirm that the client proposes `alias_create_random`. It is a
+   write action that creates one persistent alias; this prompt requires no inputs.
+
+2. **Create the alias.** simplelogin-mcp asks SimpleLogin to generate one address using your
+   account's default alias style and routing.
+
+3. **Use the new address.** The client shows the created alias so you can copy it into a signup. The
+   address also appears in your SimpleLogin account.
+
+</Steps>
+
+<h2 id="get-started">Pick your MCP client</h2>
+
+The documented local stdio recipes connected, discovered all 27 tools, and completed the read-only
+account-usage check. See the current [compatibility evidence](getting-started/compatibility/) for
+scope and limitations.
+
+First time connecting? [Create a dedicated SimpleLogin API key](getting-started/simplelogin-api-key/) before
+configuring your client.
+
+<CardGrid>
+  <LinkCard
+    title="Codex"
+    description="Tested local stdio through the shared TOML configuration."
+    href="getting-started/clients/#codex"
+    data-client-icon="openai"
+  />
+  <LinkCard
+    title="Claude Code"
+    description="Tested local stdio through a project-scoped configuration."
+    href="getting-started/clients/#claude-code"
+    data-client-icon="claude"
+  />
+  <LinkCard
+    title="Claude Desktop"
+    description="Tested local stdio through the desktop client configuration."
+    href="getting-started/clients/#claude-desktop"
+    data-client-icon="claude"
+  />
+  <LinkCard
+    title="VS Code"
+    description="Tested local stdio through the user-profile configuration."
+    href="getting-started/clients/#vs-code"
+    data-client-icon="vscode"
+  />
+  <LinkCard
+    title="OpenCode"
+    description="Tested local stdio through an environment-backed configuration."
+    href="getting-started/clients/#opencode"
+    data-client-icon="opencode"
+  />
+  <LinkCard
+    title="All compatibility evidence"
+    description="See the review levels, tested routes, transport requirements, and current limitations."
+    href="getting-started/compatibility/"
+    data-client-icon="evidence"
+  />
+</CardGrid>
+
+Need another client or deployment route? Open the [complete client setup
+guide](getting-started/clients/), use the [generic transport
+requirements](getting-started/compatibility/#transport-requirements), or choose a [different
+deployment shape](getting-started/).
+
+<Aside type="danger" title="Protect both credentials">
+  **`SL_API_KEY` grants full control of your SimpleLogin account.** `MCP_AUTH_TOKEN` is a separate
+  credential that protects HTTP access to this server. The startup guard normally requires it for
+  Docker and every non-loopback bind; bypassing that guard requires the explicit unsafe override.
+  Supported public or LAN HTTP deployments keep the token and belong behind TLS. [Read the complete
+  security model](guides/security/).
+</Aside>
+
+## Useful by design
+
+<CardGrid>
+  <Card title="Create and tune aliases" icon="random">
+    Find an alias, create a random or custom one, update its routing, then explicitly enable or
+    disable it.
+
+    `alias_list → alias_create_random → alias_update → alias_set_enabled`
+
+  </Card>
+  <Card title="Review recent alias activity" icon="magnifier">
+    Inspect one alias, then page through activity metadata for recent forwards, replies, blocks,
+    and bounces. Message bodies are not read.
+
+    `alias_get → alias_activity_list`
+
+  </Card>
+  <Card title="Create a reverse alias for sending" icon="email">
+    Create or reuse a reverse alias for a recipient. Send the actual message from a mailbox that
+    owns the alias; simplelogin-mcp does not compose or send email.
+
+    `contact_list → contact_create`
+
+  </Card>
+  <Card title="Maintain account routing" icon="setting">
+    Review mailbox verification, inspect custom domains, and review or change supported account-wide
+    alias settings.
+
+    `mailbox_list → custom_domain_list → settings_get → settings_update`
+
+  </Card>
+</CardGrid>
+
+<LinkButton href="guides/workflows/" variant="primary" icon="right-arrow">
+  Follow the workflow guide
+</LinkButton>
+
+## One canonical, searchable tool catalog
+
+Search every supported tool by name, purpose, input, category, or behavior. Each result explains
+what the tool does, what it needs, whether it changes account state, and what it returns. The
+reference stays current because it reads from the same catalog and schemas used by the server.
+
+<ToolCatalogPreview />
+
+<LinkButton href="reference/tools/" variant="primary" icon="right-arrow">
+  Browse all {TOOL_CATALOG.length} tools
+</LinkButton>
+
+## Know when to use it
+
+Use simplelogin-mcp for reviewable alias workflows from a compatible MCP client. Use SimpleLogin
+directly for sign-in, MFA, billing, account security, API-key creation, DNS verification, or any
+action you prefer to inspect and complete in the official interface.
+
+<CardGrid>
+  <LinkCard
+    title="Security & Data"
+    description="Follow requests, credentials, and account data across every trust boundary."
+    href="guides/security/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="Review every environment setting and its safe default."
+    href="reference/configuration/"
+  />
+  <LinkCard
+    title="Troubleshooting"
+    description="Diagnose Local stdio, Streamable HTTP, Docker Compose, and upstream API failures."
+    href="guides/troubleshooting/"
+  />
+  <LinkCard
+    title="FAQ"
+    description="Understand project scope, privacy, plans, and when to use SimpleLogin directly."
+    href="guides/faq/"
+  />
+</CardGrid>

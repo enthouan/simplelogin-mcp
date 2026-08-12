@@ -1,0 +1,91 @@
+---
+title: Install and run
+description: Create an API key, prepare the server, configure your MCP client, then verify the connection.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import ClientSetup from '../../../components/ClientSetup.astro';
+import InstallMethods from '../../../components/InstallMethods.astro';
+
+<Aside type="note" title="Independent integration for SimpleLogin">
+  simplelogin-mcp is an independent, open-source project. It is not an official SimpleLogin or
+  Proton AG product, service, or MCP implementation, and it is not affiliated with, endorsed by, or
+  sponsored by SimpleLogin or Proton AG.
+
+Looking for SimpleLogin's official service? Visit [SimpleLogin](https://simplelogin.io/).
+
+</Aside>
+
+Start with the MCP client you already use. For a client and server on the same machine, local stdio
+is the smallest trust boundary and does not open a network listener. Direct Node.js — Streamable
+HTTP and Docker Compose — Streamable HTTP remain available when you need a persistent service.
+
+## Prerequisites
+
+- A SimpleLogin account with a [dedicated API key](simplelogin-api-key/).
+- Git, which the installation commands use to clone the repository.
+- Docker with Docker Compose, or Node.js 24.x with Corepack and pnpm 11.5.1.
+- An MCP client that supports local stdio or Streamable HTTP.
+
+<Aside type="caution" title="Treat the API key like a password">
+  `SL_API_KEY` grants full SimpleLogin account control. Create a dedicated key, never commit it, and
+  revoke it at SimpleLogin if it leaks.
+</Aside>
+
+## Common path
+
+Follow these steps in order. The detailed installation and client recipes appear below.
+
+<Steps>
+
+1. **Create the API key.** [Create a dedicated SimpleLogin API key](simplelogin-api-key/) for this
+   server. Keep it private and separate from prompts or source control.
+
+2. **Build or start the server.** For Local stdio, clone the repository, install dependencies, and
+   run `pnpm build` before writing the client configuration. For Direct Node.js — Streamable HTTP
+   or Docker Compose — Streamable HTTP, follow the matching installation below and start the
+   service first.
+
+3. **Configure the client.** Choose its recipe below. Point Local stdio clients at the absolute path
+   to the built `dist/index.js`; point Streamable HTTP clients at the running `/mcp` endpoint.
+
+4. **Restart and verify.** Reload the MCP client, confirm that simplelogin-mcp connects and its tools
+   are discovered, then use the supplied read-only account-usage prompt to verify the complete
+   path.
+
+</Steps>
+
+<Aside type="caution" title="Protect Streamable HTTP">
+  The startup guard refuses Docker Compose and non-loopback binds without `MCP_AUTH_TOKEN` unless
+  the explicit unsafe override is enabled. Supported deployments keep the token rather than
+  bypassing the guard.
+</Aside>
+
+## Choose a deployment shape
+
+All three shapes expose the same catalog. Choose based on where the client and server should live,
+not on which tools you need.
+
+<InstallMethods />
+
+## Configure your client
+
+These recipes configure Codex, Claude Code, Claude Desktop, VS Code, or OpenCode. Each includes the
+same low-data, read-only verification prompt.
+
+<ClientSetup />
+
+The local stdio recipes are maintainer-tested for connection, complete tool discovery, and the
+read-only account-usage check. The Streamable HTTP examples remain documentation-reviewed. See the
+[compatibility matrix](compatibility/) for the exact scope.
+
+## Next
+
+- [Docker Compose — Streamable HTTP](docker/) for the published-image operator path.
+- [Direct Node.js — Streamable HTTP](http/) for a persistent loopback service.
+- [Local stdio](stdio/) for desktop and command-line MCP clients.
+- [Get a SimpleLogin API key](simplelogin-api-key/) before configuring any installation.
+- [Client setup](clients/) for the full recipes and official documentation links.
+- [Operations](../guides/operations/) for inspection, upgrades, rollback, credential rotation, and
+  shutdown.
+- [Security & Data](../guides/security/) before widening network access.

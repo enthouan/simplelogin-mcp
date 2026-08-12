@@ -1,4 +1,7 @@
 # pnpm settings (pnpm 11 reads these here, not from package.json).
+packages:
+  - website
+
 # Allow esbuild — a transitive dependency of tsx (used by `pnpm dev`) — to run its
 # install script, which links the prebuilt platform binary.
 allowBuilds:

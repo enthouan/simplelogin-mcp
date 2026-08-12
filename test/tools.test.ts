@@ -14,13 +14,17 @@ import {
   LIST_PAGE_SIZE,
   TOOL_CATALOG,
   TOOL_NAMES,
+  loadToolInputArguments,
+  loadRegisteredToolMetadata,
   renderToolCatalogMarkdown,
   type ToolAnnotations,
+  type ToolName,
 } from '../src/tools/catalog.js';
 import { registerAllTools } from '../src/tools/index.js';
 
 interface SchemaWithDescription {
   description?: string;
+  safeParse(value: unknown): { success: boolean };
 }
 
 interface RegisteredToolOptions {
@@ -65,11 +69,6 @@ function textOf(result: CallToolResult): string {
 
 function readRepoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
-}
-
-function extractReadmeToolNames(markdown: string): string[] {
-  const table = markdown.split('## Tools')[1]?.split('## Common workflows')[0] ?? '';
-  return [...table.matchAll(/\| `([^`]+)`\s+\|/g)].map((match) => match[1]!);
 }
 
 describe('registered tool surface', () => {
@@ -126,6 +125,33 @@ describe('registered tool surface', () => {
       'notification_mark_read',
       'settings_update',
     ]);
+  });
+
+  it('derives public input summaries from the registered Zod schemas', async () => {
+    const tools = captureRegisteredTools();
+    const inputsByName = await loadToolInputArguments();
+
+    expect([...inputsByName.keys()]).toEqual(TOOL_NAMES);
+    for (const tool of tools) {
+      const expected = Object.entries(tool.options.inputSchema ?? {}).map(([name, schema]) => ({
+        name,
+        required: !schema.safeParse(undefined).success,
+        description: schema.description?.trim(),
+      }));
+      expect(inputsByName.get(tool.name as ToolName), tool.name).toEqual(expected);
+    }
+  });
+
+  it('derives public usage details from the registered tool descriptions', async () => {
+    const tools = captureRegisteredTools();
+    const metadataByName = await loadRegisteredToolMetadata();
+
+    expect([...metadataByName.keys()]).toEqual(TOOL_NAMES);
+    for (const tool of tools) {
+      expect(metadataByName.get(tool.name as ToolName)?.description, tool.name).toBe(
+        tool.options.description?.trim(),
+      );
+    }
   });
 });
 
@@ -276,13 +302,16 @@ describe('paginated and bounded reads', () => {
 });
 
 describe('public docs coverage', () => {
-  it('keeps the README tool table in registered-tool order', () => {
-    expect(extractReadmeToolNames(readRepoFile('README.md'))).toEqual(TOOL_NAMES);
+  it('keeps the README concise and points to the generated tool catalog', () => {
+    const readme = readRepoFile('README.md');
+
+    expect(readme).toContain('[TOOL_CATALOG.md](TOOL_CATALOG.md)');
+    expect(readme).not.toMatch(/\| `alias_[^`]+`\s+\|/);
   });
 
   it('keeps the generated tool catalog deterministic and in sync', async () => {
-    const rendered = renderToolCatalogMarkdown();
-    expect(renderToolCatalogMarkdown()).toBe(rendered);
+    const rendered = await renderToolCatalogMarkdown();
+    expect(await renderToolCatalogMarkdown()).toBe(rendered);
 
     const formatted = await prettier.format(rendered, { parser: 'markdown' });
     expect(readRepoFile('TOOL_CATALOG.md')).toBe(formatted);

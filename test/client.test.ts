@@ -21,6 +21,7 @@ interface RecordedCall {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  redirect: unknown;
 }
 
 /** A minimal valid alias payload satisfying AliasSchema. */
@@ -67,7 +68,13 @@ function stubClient(
     const url = input instanceof URL ? input : new URL(input);
     const headers = (init.headers ?? {}) as Record<string, string>;
     const body = typeof init.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined;
-    const call: RecordedCall = { url, method: init.method ?? 'GET', headers, body };
+    const call: RecordedCall = {
+      url,
+      method: init.method ?? 'GET',
+      headers,
+      body,
+      redirect: init.redirect,
+    };
     calls.push(call);
     return Promise.resolve(typeof respond === 'function' ? respond(call) : respond);
   };
@@ -93,6 +100,7 @@ describe('request construction', () => {
     expect(call.headers['Accept']).toBe('application/json');
     expect(call.headers['Content-Type']).toBeUndefined();
     expect(call.body).toBeUndefined();
+    expect(call.redirect).toBe('error');
   });
 
   it('strips a trailing slash from the base URL exactly once', async () => {

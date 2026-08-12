@@ -9,8 +9,9 @@ report a vulnerability.
 Please report security issues privately. Do not open a public issue for anything
 exploitable.
 
-- Preferred: open a private advisory via the repository's **Security → Report a
-  vulnerability** tab (GitHub private vulnerability reporting).
+- Preferred when available: open a private advisory via the repository's **Security → Report a
+  vulnerability** tab (GitHub private vulnerability reporting). If that action is not visible, do
+  not publish the report or its details in an issue or discussion.
 - Include the version (or commit), your configuration (transport, `HOST`, whether
   `MCP_AUTH_TOKEN` is set), and reproduction steps.
 

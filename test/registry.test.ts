@@ -31,7 +31,9 @@ interface RegistryPackage {
 
 interface RegistryMetadata {
   name: string;
+  title?: string;
   version: string;
+  websiteUrl?: string;
   repository?: {
     url?: string;
     source?: string;
@@ -61,6 +63,8 @@ describe('MCP registry metadata', () => {
     const [ociPackage] = metadata.packages ?? [];
 
     expect(metadata.name).toBe(REGISTRY_NAME);
+    expect(metadata.title).toBe('simplelogin-mcp');
+    expect(metadata.websiteUrl).toBe('https://simplelogin-mcp.com/');
     expect(metadata.version).toBe(packageJson.version);
     expect(metadata.repository).toEqual({
       url: 'https://github.com/enthouan/simplelogin-mcp',
@@ -124,6 +128,10 @@ describe('Docker MCP Registry staging metadata', () => {
     expect(serverYaml).toContain('env: SL_API_KEY');
     expect(serverYaml).toContain('name: TRANSPORT\n      value: stdio');
     expect(serverYaml).toContain('project: https://github.com/enthouan/simplelogin-mcp');
+    expect(serverYaml).toContain('icon: https://simplelogin-mcp.com/favicon.svg');
+    expect(readRepoFile('registry/docker-mcp/readme.md')).toContain(
+      'Full documentation: https://simplelogin-mcp.com/',
+    );
   });
 
   it('keeps staged Docker tools in sync with the source tool catalog summaries', () => {

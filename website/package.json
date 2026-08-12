@@ -1,0 +1,21 @@
+{
+  "name": "simplelogin-mcp-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4173",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1 --port 4173",
+    "sync": "astro sync",
+    "typecheck": "astro check --minimumFailingSeverity warning"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/markdown-satteri": "^0.3.5",
+    "@astrojs/starlight": "^0.41.7",
+    "@fortawesome/free-brands-svg-icons": "7.3.1",
+    "@fortawesome/free-solid-svg-icons": "7.3.1",
+    "astro": "^7.2.0",
+    "sharp": "^0.35.3"
+  }
+}

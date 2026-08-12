@@ -1,0 +1,84 @@
+---
+import { compiledContent as compileContributing } from '../../../CONTRIBUTING.md';
+import { compiledContent as compileSecurity } from '../../../SECURITY.md';
+import { compiledContent as compileSupport } from '../../../SUPPORT.md';
+import { REPOSITORY_URL } from '../data/repository.js';
+
+type PolicySource = 'contributing' | 'security' | 'support';
+
+interface Props {
+  source: PolicySource;
+}
+
+const { source } = Astro.props;
+const base = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const repositoryDocumentOrigin = 'https://repository-document.invalid';
+const canonicalWebsiteRoutes = new Map([
+  ['CONTRIBUTING.md', 'reference/contributing/'],
+  ['README.md', 'getting-started/'],
+  ['SECURITY.md', 'reference/security-policy/'],
+  ['SUPPORT.md', 'reference/reporting-issues/'],
+  ['TOOL_CATALOG.md', 'reference/tools/'],
+  ['docs/api-coverage.md', 'reference/api-coverage/'],
+]);
+const compilePolicy = {
+  contributing: compileContributing,
+  security: compileSecurity,
+  support: compileSupport,
+} satisfies Record<PolicySource, () => Promise<string>>;
+
+function websiteHref(route: string, suffix: string): string {
+  return `${base}${route}${suffix}`.replace(/\/{2,}/g, '/');
+}
+
+function repositoryHref(path: string, suffix: string): string {
+  const segments = path.split('/');
+  const basename = segments.at(-1) ?? '';
+  const repositoryView = path.endsWith('/') || !basename.includes('.') ? 'tree' : 'blob';
+  const encodedPath = segments.map((segment) => encodeURIComponent(segment)).join('/');
+  return `${REPOSITORY_URL}/${repositoryView}/main/${encodedPath}${suffix}`;
+}
+
+function rewriteCanonicalHref(href: string): { external: boolean; href: string } {
+  if (href.startsWith('#')) return { external: false, href };
+
+  const parsed = new URL(href, `${repositoryDocumentOrigin}/`);
+  if (parsed.origin !== repositoryDocumentOrigin) {
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+      throw new Error(`Unsupported link protocol in canonical policy document: ${parsed.protocol}`);
+    }
+    return { external: true, href };
+  }
+
+  const rawPath = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  const segments = rawPath.split('/');
+  if (
+    rawPath.includes('\\') ||
+    segments.some((segment) => segment === '' || segment === '.' || segment === '..')
+  ) {
+    throw new Error(`Unsafe repository-relative policy link: ${href}`);
+  }
+
+  const suffix = `${parsed.search}${parsed.hash}`;
+  const websiteRoute = canonicalWebsiteRoutes.get(rawPath);
+  if (websiteRoute) return { external: false, href: websiteHref(websiteRoute, suffix) };
+
+  return { external: true, href: repositoryHref(rawPath, suffix) };
+}
+
+const canonicalHeading = /^<h1\b[^>]*>.*?<\/h1>\s*/s;
+const anchor = /<a\b([^>]*?)href="([^"]+)"([^>]*)>/g;
+const sourceHtml = (await compilePolicy[source]())
+  .replace(canonicalHeading, '')
+  .replace(anchor, (_match, before, href, after) => {
+    const rewritten = rewriteCanonicalHref(href);
+    const attributes = `${before}href="${rewritten.href}"${after}`;
+    const externalRelationship =
+      rewritten.external && !/\brel=/.test(attributes) ? ' rel="external"' : '';
+    return `<a${attributes}${externalRelationship}>`;
+  });
+---
+
+<div class="policy-content" data-policy-source={source} set:html={sourceHtml} />

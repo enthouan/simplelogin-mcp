@@ -1,0 +1,23 @@
+---
+title: Tool catalog
+description: Search the complete catalog-backed SimpleLogin MCP tool reference.
+lastUpdated: false
+---
+
+import { TOOL_CATALOG } from '../../../../../src/tools/catalog.js';
+import ToolCatalog from '../../../components/ToolCatalog.astro';
+
+Search **{TOOL_CATALOG.length} supported tools across five focused areas** by name, purpose, or
+input, or narrow the results by category and behavior. Each tool explains its inputs, bounds,
+account impact, and documented output. Every tool name is a permanent link you can bookmark or
+share, and every example uses placeholder values rather than credentials or account data.
+
+“Destructive” identifies writes that can interrupt mail delivery as well as irreversible deletion.
+Permanent delete tools also require explicit confirmation. “Idempotent” means repeating a call has
+the same intended effect; check the first result before retrying a tool marked “Not idempotent.”
+
+This page stays aligned with the server by reading tool names, descriptions, schemas, annotations,
+and bounds from the project's canonical catalog and registered definitions. Tests compare that
+catalog with the actual tool registration rather than maintaining a second hand-written reference.
+
+<ToolCatalog />

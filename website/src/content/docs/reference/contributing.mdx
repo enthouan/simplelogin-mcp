@@ -1,0 +1,18 @@
+---
+title: Contributing
+description: Set up simplelogin-mcp locally, make focused changes, and validate them without exposing credentials.
+lastUpdated: false
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import PolicyContent from '../../../components/PolicyContent.astro';
+import RepositoryLink from '../../../components/RepositoryLink.astro';
+
+<Aside type="caution" title="Keep live credentials out of contribution artifacts">
+  Never put `SL_API_KEY`, `MCP_AUTH_TOKEN`, authorization headers, or SimpleLogin account data in
+  tests, fixtures, logs, screenshots, commits, issues, or pull requests. Keep `.env` untracked.
+</Aside>
+
+<PolicyContent source="contributing" />
+
+<RepositoryLink />

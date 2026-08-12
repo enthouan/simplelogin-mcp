@@ -1,0 +1,92 @@
+---
+title: Reference
+description: Technical reference, contribution guidance, issue reporting, and security policies for simplelogin-mcp.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import RepositoryLink from '../../../components/RepositoryLink.astro';
+
+`simplelogin-mcp` is a self-hostable, MIT-licensed open source project. It provides an MCP server
+for the SimpleLogin API that runs through Local stdio, Direct Node.js — Streamable HTTP, or Docker
+Compose — Streamable HTTP.
+
+<Aside type="note" title="Pre-1.0, with a carefully managed tool surface">
+  Tool names, response bounds, MCP annotations, and safety behavior are treated as public contracts.
+  Changes to that surface should be documented and tested together.
+</Aside>
+
+## Technical reference
+
+<CardGrid>
+  <LinkCard
+    title="Configuration"
+    description="Review every environment setting, default, and deployment boundary."
+    href="configuration/"
+  />
+  <LinkCard
+    title="Tool catalog"
+    description="Browse every registered tool, input schema, annotation, and result bound."
+    href="tools/"
+  />
+  <LinkCard
+    title="API coverage"
+    description="See which SimpleLogin API areas are supported, deferred, or intentionally excluded."
+    href="api-coverage/"
+  />
+</CardGrid>
+
+## Repository policies
+
+<CardGrid>
+  <LinkCard
+    title="Contributing"
+    description="Set up a checkout, follow the catalog-backed tool pattern, and run the project checks."
+    href="contributing/"
+  />
+  <LinkCard
+    title="Reporting issues and support"
+    description="Choose the right support channel and prepare a safe, reproducible report."
+    href="reporting-issues/"
+  />
+  <LinkCard
+    title="Security policy"
+    description="See supported versions and report vulnerabilities through the private channel."
+    href="security-policy/"
+  />
+</CardGrid>
+
+## Documentation contracts
+
+- The [tool catalog](tools/) is generated from the same catalog and schemas used by the server.
+- [API coverage](api-coverage/) records supported, deferred, and intentionally excluded
+  SimpleLogin API areas.
+- [Client compatibility](../getting-started/compatibility/) records the tested local stdio routes,
+  evidence scope, and documentation-reviewed alternatives.
+
+The server catalog is the source of truth for registered tool order, behavior annotations, bounds,
+and generated reference content. API coverage is tracked separately so the documentation does not
+imply that every SimpleLogin API endpoint is exposed.
+
+Normal tests run without live SimpleLogin credentials. The live smoke test is an explicit, opt-in
+workflow and is not required for ordinary first-run verification.
+
+## Documentation and support
+
+- [Published container package](https://github.com/enthouan/simplelogin-mcp/pkgs/container/simplelogin-mcp)
+  provides the GHCR image used by the operator Compose file.
+- [`llms.txt`](../llms.txt) provides a machine-readable index of this documentation.
+- [Troubleshooting](../guides/troubleshooting/) covers startup, transport, Docker, and upstream API
+  failures.
+- [Operations](../guides/operations/) covers inspection, exact-version upgrades, rollback,
+  credential rotation, and shutdown.
+- [FAQ](../guides/faq/) explains project scope, privacy, plan limitations, and when to use
+  SimpleLogin directly.
+- [Reporting issues and support](reporting-issues/) explains what to include in a public issue and
+  what must instead be reported privately.
+
+## License
+
+The project is available under the MIT License. The source repository also contains the changelog,
+support policy, contribution guide, security policy, and release documentation.
+
+<RepositoryLink />

@@ -1,0 +1,109 @@
+---
+title: Security & Data
+description: Understand how simplelogin-mcp handles credentials, requests, transports, network exposure, and account-changing tools.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Start with [How it works](../how-it-works/) for the request lifecycle, component ownership, and
+transport shapes. This page covers credentials, account data, guardrails, and deployment security.
+
+<Aside type="caution" title="Your deployment is the security boundary">
+  The server can read and change the SimpleLogin account available to its API key. Your MCP client,
+  host, process environment, network, reverse proxy, logs, and backups are all part of the trust
+  boundary.
+</Aside>
+
+## Credential boundaries
+
+The SimpleLogin API key and the optional MCP server token protect different boundaries and are not
+interchangeable.
+
+| Boundary                                 | Credential               | Where it is used                                                                                 |
+| ---------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| simplelogin-mcp → SimpleLogin            | `SL_API_KEY`             | Held in the server process environment and sent on outbound SimpleLogin API calls.               |
+| HTTP MCP client → simplelogin-mcp        | `MCP_AUTH_TOKEN`         | Held by both the HTTP client and server; checked on `POST /mcp`.                                 |
+| Local stdio MCP client → simplelogin-mcp | No separate server token | Process launch and local configuration form the boundary; the child still receives `SL_API_KEY`. |
+
+[Create a dedicated `SL_API_KEY`](../../getting-started/simplelogin-api-key/), keep it out of source and logs, and
+revoke it in SimpleLogin if it leaks. Generate a strong server token with `openssl rand -hex 32`;
+rotate it by restarting the server with a new value.
+
+<Aside type="danger" title="Use HTTPS for the SimpleLogin API">
+  `SL_API_URL` receives the full-control key in the `Authentication` header on every request. Keep
+  the origin on HTTPS. Plain `http://` is suitable only across a separately protected private
+  boundary, such as an isolated network or trusted tunnel, and TLS is still preferred.
+</Aside>
+
+<Aside type="caution" title="The MCP client is part of the trust boundary">
+  Tool results can contain alias addresses, mailbox routing, contacts, activity metadata, and
+  account settings. Review the client's approval, privacy, and retention behavior before giving it
+  access, even when simplelogin-mcp itself runs locally.
+</Aside>
+
+<Aside type="caution" title="Treat account text as untrusted data">
+  Sender names, alias notes, contact values, activity details, and notifications can contain text
+  supplied by other people. Treat that content as data, not instructions. Keep write tools behind
+  user approval and verify the target and arguments before approving a change.
+</Aside>
+
+## Safety behavior
+
+- Every registered tool publishes MCP annotations describing read-only, destructive, idempotent,
+  and external-world behavior.
+- All permanent deletion tools require `confirm: true`; mailbox deletion additionally requires an
+  explicit choice to transfer or delete owned aliases.
+- Enable/disable and block/unblock tools read current state first so asking for an already-current
+  state is a no-op.
+- Routing changes that can stop future mail are marked destructive even when they are not permanent.
+- Logs go to stderr and omit API keys, bearer tokens, authorization headers, and request bodies.
+
+These are server-side guardrails, not a replacement for the MCP client's user-approval interface.
+Review the exact target and arguments before allowing a write.
+
+## Network exposure
+
+| Bind                       | Reachable from    | Requirement                                                       |
+| -------------------------- | ----------------- | ----------------------------------------------------------------- |
+| `127.0.0.1`                | This machine only | No token required for a direct run.                               |
+| `0.0.0.0` or a LAN address | LAN or internet   | `MCP_AUTH_TOKEN` required unless the unsafe override is explicit. |
+
+The server refuses to start on a non-loopback address without `MCP_AUTH_TOKEN` unless
+`ALLOW_UNAUTHENTICATED_EXPOSURE=true` is deliberately set.
+
+<Aside type="danger" title="Never send a bearer token over public plain HTTP">
+  For LAN or public exposure, keep `MCP_AUTH_TOKEN` set and terminate TLS at a reverse proxy. The
+  server speaks plain HTTP and should not face the public internet directly.
+</Aside>
+
+## Browser origin validation
+
+`POST /mcp` rejects browser requests with a disallowed `Origin`. Loopback origins are allowed;
+others must be listed exactly in `MCP_ALLOWED_ORIGINS`.
+
+`MCP_ALLOWED_ORIGINS` is an origin allowlist, **not CORS configuration and not authentication**. A
+browser-facing proxy must still handle CORS response headers and preflight requests, and clients
+must still authenticate when `MCP_AUTH_TOKEN` is set.
+
+## Recommended deployment patterns
+
+- **Direct Node.js — Streamable HTTP:** keep `HOST=127.0.0.1`, or reach it through an SSH tunnel.
+- **Docker Compose — Streamable HTTP:** the app binds `0.0.0.0` inside the container, while Compose
+  publishes to host loopback by default. Keep `MCP_AUTH_TOKEN` set because the app sees the
+  internal non-loopback bind.
+- **LAN or public use:** set the server token, restrict the host bind intentionally, and put the
+  endpoint behind TLS.
+- **Local stdio:** no HTTP server or `MCP_AUTH_TOKEN` is involved, but the client process
+  environment still contains the full-control `SL_API_KEY`.
+
+## Credential handling
+
+- Keep `.env` ignored and use a deployment secret store where available.
+- Never bake either secret into a container image, website, screenshot, or diagnostic output.
+- A leaked `MCP_AUTH_TOKEN` requires rotation; a leaked `SL_API_KEY` requires revocation at
+  SimpleLogin.
+- All server diagnostics go to stderr and omit request headers and credentials.
+
+See [Configuration](../../reference/configuration/) for every environment setting and
+[Operations](../operations/#rotate-credentials) for safe credential rotation. Use
+[Troubleshooting](../troubleshooting/) for connection, TLS, proxy, and certificate problems.

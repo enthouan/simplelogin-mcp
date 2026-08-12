@@ -1,0 +1,183 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import { TOOL_CATALOG } from '../../../src/tools/catalog.js';
+import { CATEGORY_ENTRIES } from '../data/catalog.js';
+---
+
+<figure class="catalog-preview not-content" data-tool-count={TOOL_CATALOG.length}>
+  <div class="catalog-preview__bar" aria-hidden="true">
+    <span></span><span></span><span></span>
+    <strong>MCP request</strong>
+  </div>
+  <div class="catalog-preview__body">
+    <p>MCP method: <code>tools/list</code></p>
+    <p class="catalog-preview__success">
+      <Icon name="puzzle" size="1.1rem" />
+      <span>{TOOL_CATALOG.length} tools loaded from the project catalog</span>
+    </p>
+    <dl>
+      {
+        CATEGORY_ENTRIES.map(({ category, label, tools }) => (
+          <div>
+            <dt>
+              <a href={`reference/tools/#tool-group-${category}`}>{label}</a>
+            </dt>
+            <dd>
+              <strong>{tools.length}</strong>{' '}
+              {tools
+                .slice(0, 4)
+                .map((tool) => tool.name)
+                .join(', ')}
+              {tools.length > 4 ? ', …' : ''}
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+  <figcaption>
+    Generated from the same catalog as the server. It contains no credentials or account data.
+  </figcaption>
+</figure>
+
+<style>
+  .catalog-preview {
+    --catalog-preview-bg: #15121d;
+    --catalog-preview-surface: var(--sl-color-gray-7);
+    --catalog-preview-border: #4f455a;
+    --catalog-preview-text: var(--sl-color-white);
+    --catalog-preview-muted: var(--sl-color-gray-2);
+    --catalog-preview-success: #7adcf0;
+    --catalog-preview-dot: #8f8199;
+    --catalog-preview-code-bg: var(--catalog-preview-surface);
+    --catalog-preview-divider: #403649;
+    --catalog-preview-count-border: #566b77;
+    --catalog-preview-count-text: #d7f6fb;
+    margin-block: 1.5rem;
+    overflow: hidden;
+    border: 1px solid var(--catalog-preview-border);
+    border-radius: 0.5rem;
+    color: var(--catalog-preview-text);
+    background: var(--catalog-preview-bg);
+  }
+
+  :global(:root[data-theme='light']) .catalog-preview {
+    --catalog-preview-bg: #ffffff;
+    --catalog-preview-surface: #fdf0f7;
+    --catalog-preview-border: #d8b9ca;
+    --catalog-preview-text: var(--sl-color-gray-1);
+    --catalog-preview-muted: #62586c;
+    --catalog-preview-success: #176b78;
+    --catalog-preview-dot: #927f8c;
+    --catalog-preview-code-bg: var(--sl-color-accent-low);
+    --catalog-preview-divider: #ead7e2;
+    --catalog-preview-count-border: #c89bb3;
+    --catalog-preview-count-text: var(--sl-color-accent-high);
+  }
+
+  .catalog-preview__bar {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid var(--catalog-preview-border);
+    background: var(--catalog-preview-surface);
+  }
+
+  .catalog-preview__bar > span {
+    width: 0.55rem;
+    height: 0.55rem;
+    border: 1px solid var(--catalog-preview-dot);
+    border-radius: 50%;
+  }
+
+  .catalog-preview__bar strong {
+    margin-inline-start: 0.35rem;
+    color: var(--catalog-preview-muted);
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .catalog-preview__body {
+    padding: clamp(0.9rem, 2vw, 1.25rem);
+    font-family: var(--sl-font-mono);
+    font-size: clamp(0.72rem, 1.8vw, 0.88rem);
+  }
+
+  .catalog-preview__body > p {
+    margin: 0 0 0.65rem;
+  }
+
+  .catalog-preview__body code {
+    padding: 0.08rem 0.3rem;
+    border: 1px solid var(--catalog-preview-border);
+    border-radius: 0.25rem;
+    color: var(--sl-color-accent-high);
+    background: var(--catalog-preview-code-bg);
+    font: inherit;
+  }
+
+  .catalog-preview__success {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--catalog-preview-success);
+  }
+
+  .catalog-preview dl {
+    margin: 1rem 0 0;
+  }
+
+  .catalog-preview dl > div {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.45fr) minmax(0, 1fr);
+    gap: 1rem;
+    padding-block: 0.65rem;
+    border-top: 1px solid var(--catalog-preview-divider);
+  }
+
+  .catalog-preview dt {
+    color: var(--sl-color-text-accent);
+    font-weight: 700;
+  }
+
+  .catalog-preview dt a {
+    color: inherit;
+    text-underline-offset: 0.2em;
+  }
+
+  .catalog-preview dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--catalog-preview-muted);
+  }
+
+  .catalog-preview dd strong {
+    display: inline-grid;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    place-items: center;
+    margin-inline-end: 0.4rem;
+    border: 1px solid var(--catalog-preview-count-border);
+    border-radius: 0.25rem;
+    color: var(--catalog-preview-count-text);
+  }
+
+  .catalog-preview figcaption {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--catalog-preview-border);
+    color: var(--catalog-preview-muted);
+    background: var(--catalog-preview-surface);
+    font-size: 0.78rem;
+  }
+
+  @media (max-width: 42rem) {
+    .catalog-preview dl > div {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+  }
+</style>

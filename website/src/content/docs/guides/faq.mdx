@@ -1,0 +1,158 @@
+---
+title: FAQ
+description: Project scope, privacy, hosting, credentials, plans, and when to use SimpleLogin directly.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Is this an official SimpleLogin or Proton AG project?
+
+No. simplelogin-mcp is an independent, open-source project maintained by [Antoine
+Ménard](https://www.antoinemenard.com). It is not affiliated with, endorsed by, sponsored by, or
+supported by [SimpleLogin](https://simplelogin.io/) or [Proton AG](https://proton.me/).
+
+The project uses SimpleLogin's API; the official SimpleLogin product remains the service that owns
+the account, aliases, mail routing, and API key.
+
+## When should I use simplelogin-mcp?
+
+Use it when you already use SimpleLogin and want a compatible MCP client to perform reviewable
+alias workflows—for example, finding disabled aliases, creating an alias, inspecting recent alias
+activity, managing reverse aliases, or reviewing mailbox routing.
+
+It is a good fit when you are comfortable running the bridge yourself and giving the chosen MCP
+client access to SimpleLogin account data and actions.
+
+## When should I use SimpleLogin directly?
+
+Use the SimpleLogin web app or official support for:
+
+- signing in, MFA, password reset, and API-key creation;
+- billing, subscription, plan, or payment questions;
+- account deletion and account-security changes;
+- adding or deleting custom domains and completing DNS/MX verification;
+- email-delivery decisions made by SimpleLogin or recipient providers; and
+- any task where you prefer to review and execute the action directly in SimpleLogin.
+
+Those areas are either intentionally out of scope or unavailable through the API surface this
+project supports.
+
+<Aside type="note" title="MCP is an additional control path">
+  simplelogin-mcp does not replace SimpleLogin. It gives an MCP client another way to call a
+  documented subset of the SimpleLogin API using your credential.
+</Aside>
+
+## Do I need an existing SimpleLogin account?
+
+Yes. The server requires a SimpleLogin API key. Follow the [dedicated API key
+guide](../../getting-started/simplelogin-api-key/) for the hosted service or the self-hosted instance you intend
+to use.
+
+## Is simplelogin-mcp hosted for me?
+
+The documented deployment paths are self-managed: Local stdio, Direct Node.js — Streamable HTTP,
+or Docker Compose — Streamable HTTP. The project website is documentation, not an MCP endpoint and
+not a hosted SimpleLogin account service.
+
+## Which installation should I choose?
+
+- Choose **Local stdio** when one desktop or command-line MCP client should launch the server. It
+  opens no network listener and is the smallest trust boundary.
+- Choose **Direct Node.js — Streamable HTTP** when you need a persistent same-machine service or an
+  MCP client that uses Streamable HTTP.
+- Choose **Docker Compose — Streamable HTTP** when you want an operator-managed container
+  deployment. The bundled configuration publishes on host loopback by default.
+
+Start with [Client setup](../../getting-started/clients/) if you know the client you want to use, or
+[Install and run](../../getting-started/) if you are choosing a deployment shape.
+
+## How are `SL_API_KEY` and `MCP_AUTH_TOKEN` different?
+
+`SL_API_KEY` authenticates simplelogin-mcp **to SimpleLogin** and grants full control of the
+SimpleLogin account. `MCP_AUTH_TOKEN` authenticates an HTTP MCP client **to this server**, which can
+then use the SimpleLogin key indirectly.
+
+They are separate bearer credentials. `MCP_AUTH_TOKEN` is not needed for stdio, and rotating it
+does not revoke a leaked `SL_API_KEY`.
+
+## Where does my SimpleLogin data go?
+
+simplelogin-mcp sends API requests to the configured `SL_API_URL` and returns tool results to the
+connected MCP client. The server does not choose how that client or its model provider stores or
+uses tool inputs and results.
+
+simplelogin-mcp has no account database and does not persist tool inputs or results. It writes
+sanitized diagnostics to stderr; your MCP client, model provider, shell, and deployment logs may
+have their own retention behavior.
+
+Review the MCP client's privacy and retention settings before connecting it. Alias addresses,
+mailbox routes, contacts, activity metadata, and account settings can be sensitive even when no
+message body is exposed.
+
+## Can it read my email?
+
+It is not an inbox client and does not expose mailbox message bodies. It can read the SimpleLogin
+metadata covered by its tools, including alias details and bounded alias activity entries such as
+action, sender, recipient, timestamp, and reverse-alias information.
+
+Use the [tool catalog](../../reference/tools/) to review the exact supported surface before
+connecting a client.
+
+## Can it delete aliases or change routing?
+
+Yes. Some tools write data, change delivery behavior, or permanently delete records. Permanent
+alias and contact deletion require `confirm: true`; mailbox deletion requires confirmation plus an
+explicit alias transfer-or-delete choice. Several routing changes are marked destructive even when
+they are reversible because they can stop future delivery.
+
+The server exposes MCP behavior annotations and local precondition checks, but the MCP client is
+responsible for how it presents approval and confirmation to the user.
+
+## Does it work with a self-hosted SimpleLogin instance?
+
+Set `SL_API_URL` to the instance's web-app origin and create `SL_API_KEY` on that same instance. Do
+not append `/api`; simplelogin-mcp adds endpoint paths. Use an HTTPS origin because the key is sent
+in the outbound `Authentication` header. Plain HTTP leaves it unencrypted and is appropriate only
+across a separately protected private boundary.
+
+Compatibility depends on the instance exposing the same API paths and response shapes as the
+upstream service. Older releases and forks may return validation errors rather than being guessed
+at silently. Private CAs and outbound proxies are covered in the
+[configuration reference](../../reference/configuration/).
+
+## Do all tools work on every SimpleLogin plan?
+
+Not necessarily. SimpleLogin controls plan and API availability. Reverse-alias creation,
+additional mailboxes, and custom-domain capabilities can depend on the account plan. The server
+surfaces upstream errors; it does not bypass plan limits.
+
+## Which MCP clients are supported?
+
+The site provides client-tested local stdio recipes for Codex, Claude Code, Claude Desktop, VS Code,
+and OpenCode, plus documentation-reviewed Streamable HTTP examples and generic transport
+requirements. A point-in-time client test does not guarantee every client release or deployment
+shape. See the [compatibility matrix](../../getting-started/compatibility/) for the current scope.
+
+## Why does HTTP return `401`, `403`, or `405`?
+
+- `401 Unauthorized` means the server expects `Authorization: Bearer <token>` and the credential is
+  absent or does not match.
+- `403 Forbidden origin` means a browser sent an `Origin` that is neither loopback nor explicitly
+  allowed.
+- `405 Method Not Allowed` from `GET /mcp` is expected because MCP uses `POST /mcp`. Use
+  `GET /health` for process health.
+
+See [Troubleshooting](../troubleshooting/) for the diagnostic sequence.
+
+## Is the project open source?
+
+The source is MIT-licensed, and the website links directly to its GitHub repository. Repository
+cards show only static project facts; published versions and release notes live in the repository.
+
+## Where should I ask for help?
+
+Use the project's issue tracker for reproducible usage, documentation, and server bugs. Include
+sanitized versions and configuration shapes, never secret values or account data. Follow
+[Reporting issues and support](../../reference/reporting-issues/) for the full checklist. Report
+vulnerabilities privately using the process described on the [Security
+policy](../../reference/security-policy/) page.

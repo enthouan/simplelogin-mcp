@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Add an Astro Starlight project website with transport setup guides, prominent security guidance,
+  accessible install controls, and tool coverage generated from the canonical catalog.
+
 ## v0.8.1
 
 ### Changed

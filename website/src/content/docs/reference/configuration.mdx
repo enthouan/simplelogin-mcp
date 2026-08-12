@@ -1,0 +1,142 @@
+---
+title: Configuration
+description: Reference every simplelogin-mcp environment variable, its default, and the boundary it controls.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+`simplelogin-mcp` reads configuration from the process environment and validates the application
+settings at startup. A direct Node.js run does **not** load `.env` automatically; Docker Compose
+reads `.env` for interpolation and passes only the documented variables into the container.
+
+<Aside type="caution" title="Keep configuration files private">
+  `SL_API_KEY` grants full control of the SimpleLogin account. `MCP_AUTH_TOKEN` grants access to
+  every tool exposed by this server. Never commit either value, paste it into an issue, or put it in
+  a command that will be saved to shell history.
+</Aside>
+
+## Required setting
+
+| Variable     | Default | Applies to | Purpose                                                                                                                                    |
+| ------------ | ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SL_API_KEY` | —       | All modes  | SimpleLogin API key sent as the `Authentication` header on outbound API requests. The server refuses to start when it is missing or blank. |
+
+[Create a dedicated SimpleLogin API key](../../getting-started/simplelogin-api-key/). A key created on a
+self-hosted SimpleLogin instance must be used with that same instance's `SL_API_URL`.
+
+<Aside type="danger" title="Protect the outbound API key in transit">
+  Keep `SL_API_URL` on HTTPS. Every outbound SimpleLogin request sends the full-control key in an
+  `Authentication` header. An `http://` self-hosted origin therefore carries that key unencrypted
+  and is appropriate only across a separately protected private boundary; prefer TLS even there. API
+  redirects are rejected, so configure the canonical origin that serves the API directly.
+</Aside>
+
+## Server runtime
+
+| Variable                | Default                      | Applies to                       | Purpose                                                                                                      |
+| ----------------------- | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `TRANSPORT`             | `http`                       | Direct runs                      | Selects literal `http` or `stdio`. The bundled Compose files always use `http`.                              |
+| `HOST`                  | `127.0.0.1`                  | Direct Node.js — Streamable HTTP | Interface the Node.js HTTP server binds. Ignored for stdio; fixed to `0.0.0.0` inside the bundled container. |
+| `PORT`                  | `3000`                       | Direct Node.js — Streamable HTTP | HTTP listener port. Ignored for stdio; fixed to `3000` inside the bundled container.                         |
+| `SL_API_URL`            | `https://app.simplelogin.io` | All modes                        | SimpleLogin web-app origin. Do not add `/api`; the server appends API paths.                                 |
+| `SL_REQUEST_TIMEOUT_MS` | `15000`                      | All modes                        | Per-request timeout to SimpleLogin, from `1` to `2147483647` milliseconds.                                   |
+
+The HTTP server exposes `POST /mcp` for Streamable HTTP and `GET /health` for process health. A
+`GET` request to `/mcp` returns `405 Method Not Allowed` by design.
+
+## HTTP access and exposure
+
+| Variable                         | Default | Purpose                                                                                                                                                                |
+| -------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MCP_AUTH_TOKEN`                 | —       | Requires `Authorization: Bearer <token>` on `POST /mcp`. Mandatory for non-loopback HTTP binds unless the unsafe override is explicit.                                 |
+| `MCP_ALLOWED_ORIGINS`            | —       | Comma-separated additional browser origins allowed to call `POST /mcp`. Loopback origins are always accepted.                                                          |
+| `ALLOW_UNAUTHENTICATED_EXPOSURE` | `false` | Allows a non-loopback bind without `MCP_AUTH_TOKEN`. Accepts `true`, `false`, `1`, or `0`. Use only when another layer already authenticates or isolates the endpoint. |
+
+`MCP_ALLOWED_ORIGINS` performs an origin check. It does not add CORS response headers, answer
+preflight requests, encrypt traffic, or replace `MCP_AUTH_TOKEN`.
+
+<Aside type="danger" title="Public plain HTTP is not safe">
+  For LAN or internet access, keep `MCP_AUTH_TOKEN` enabled and terminate TLS at a reverse proxy.
+  The server itself speaks plain HTTP, so a bearer token sent directly over a public connection
+  would not be protected in transit.
+</Aside>
+
+## Docker Compose controls
+
+These variables control the bundled Compose deployment rather than the application listener inside
+the container.
+
+| Variable                       | Default     | Purpose                                                                                                 |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `SIMPLELOGIN_MCP_IMAGE_TAG`    | `latest`    | GHCR image tag used by `docker-compose.yml`. Pin a release tag for repeatable deployments.              |
+| `SIMPLELOGIN_MCP_HOST_BIND_IP` | `127.0.0.1` | Host interface on which Docker publishes the service. Keep loopback unless wider access is intentional. |
+| `SIMPLELOGIN_MCP_HOST_PORT`    | `3000`      | Host port mapped to the container's fixed port `3000`.                                                  |
+
+The application binds `0.0.0.0:3000` **inside** the container so Docker can forward the port.
+Consequently, the startup guard requires `MCP_AUTH_TOKEN` even when Compose publishes the port only
+on the host's loopback interface.
+
+To change only the host port:
+
+```dotenv
+SIMPLELOGIN_MCP_HOST_PORT=3001
+```
+
+Clients then use `http://localhost:3001/mcp`; leave the application `PORT` at `3000` for the bundled
+Compose files.
+
+## Private certificate authorities and proxies
+
+These are Node.js runtime settings. The application does not reinterpret them, and the bundled
+Compose files forward them explicitly.
+
+| Variable                      | Default | Purpose                                                                                          |
+| ----------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `NODE_EXTRA_CA_CERTS`         | —       | Path, inside the process or container, to an additional PEM CA file.                             |
+| `NODE_USE_ENV_PROXY`          | —       | Set to `1` to enable Node's environment-proxy support.                                           |
+| `NODE_OPTIONS`                | —       | Trusted Node.js runtime options; retained for deployments using `--use-env-proxy`.               |
+| `HTTP_PROXY` / `http_proxy`   | —       | Proxy URL for outbound HTTP requests. Lowercase takes precedence when both forms are set.        |
+| `HTTPS_PROXY` / `https_proxy` | —       | Proxy URL for outbound HTTPS requests. Lowercase takes precedence when both forms are set.       |
+| `NO_PROXY` / `no_proxy`       | —       | Comma-separated hosts that bypass the proxy. Lowercase takes precedence when both forms are set. |
+
+For Compose, mount a private CA file read-only and set `NODE_EXTRA_CA_CERTS` to the matching
+**container** path. Treat proxy URLs containing credentials as secrets.
+
+## Load a local `.env` safely
+
+<Steps>
+
+1. **Copy the example.** Run `cp .env.example .env` and keep the existing ignored filename.
+
+2. **Edit the file.** Set `SL_API_KEY` and only the optional settings your deployment needs.
+
+3. **Load it for one command.** Use a subshell so variables do not remain in the parent shell:
+
+   ```sh
+   (
+     set -a
+     . ./.env
+     set +a
+     pnpm start
+   )
+   ```
+
+4. **Check the intended boundary.** Confirm the selected transport, bind address, authentication,
+   and published Docker port before connecting a client.
+
+</Steps>
+
+## Which variables matter in each mode?
+
+| Setting group            | Local stdio |      Direct Node.js — Streamable HTTP       |    Docker Compose — Streamable HTTP    |
+| ------------------------ | :---------: | :-----------------------------------------: | :------------------------------------: |
+| `SL_API_KEY`             |     Yes     |                     Yes                     |                  Yes                   |
+| `TRANSPORT`              |     Yes     |                  Optional                   |            Fixed to `http`             |
+| `HOST` / `PORT`          |     No      |                  Optional                   |            Fixed internally            |
+| `MCP_AUTH_TOKEN`         |     No      | Optional on loopback; required off loopback | Required by internal non-loopback bind |
+| `MCP_ALLOWED_ORIGINS`    |     No      |            Browser clients only             |          Browser clients only          |
+| `SIMPLELOGIN_MCP_HOST_*` |     No      |                     No                      |                Optional                |
+| CA and proxy variables   |  Optional   |                  Optional                   |                Optional                |
+
+Continue with [Security & Data](../../guides/security/) before changing network exposure, or use
+[Troubleshooting](../../guides/troubleshooting/) when startup or client connection fails.

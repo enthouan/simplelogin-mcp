@@ -1,0 +1,19 @@
+---
+title: Security policy
+description: Supported versions, private vulnerability reporting, and the information to include in a report.
+lastUpdated: false
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import PolicyContent from '../../../components/PolicyContent.astro';
+
+<Aside type="danger" title="Do not open a public vulnerability report">
+  Do not publish exploitable details, live credentials, authorization headers, private account data,
+  or an unredacted proof of concept in an issue or discussion.
+</Aside>
+
+<PolicyContent source="security" />
+
+For the complete credential, request-flow, deployment, origin-validation, and logging model, see
+[Security & Data](../../guides/security/). Ordinary setup problems belong in [Reporting issues and
+support](../reporting-issues/).

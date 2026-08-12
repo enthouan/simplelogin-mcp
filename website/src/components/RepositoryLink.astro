@@ -1,0 +1,74 @@
+---
+import { Badge, Card, LinkButton } from '@astrojs/starlight/components';
+import packageJson from '../../../package.json';
+import { REPOSITORY_URL } from '../data/repository.js';
+
+interface Props {
+  showIssueLink?: boolean;
+}
+
+const { showIssueLink = false } = Astro.props;
+const minimumNode = /^>=(\d+)/.exec(packageJson.engines.node)?.[1];
+---
+
+<div class="repository-link not-content">
+  <Card title="Open source and independently maintained" icon="github">
+    <p>Browse the source, report an issue, or follow the project on GitHub.</p>
+    <div class="repository-link__actions">
+      <LinkButton
+        href={REPOSITORY_URL}
+        icon="github"
+        iconPlacement="start"
+        variant="secondary"
+        data-github-action
+        rel="external"
+        referrerpolicy="no-referrer"
+      >
+        Star on GitHub
+      </LinkButton>
+      {
+        showIssueLink && (
+          <LinkButton
+            href={`${REPOSITORY_URL}/issues/new/choose`}
+            icon="github"
+            iconPlacement="start"
+            variant="secondary"
+            rel="external"
+            referrerpolicy="no-referrer"
+          >
+            Open an issue
+          </LinkButton>
+        )
+      }
+      <Badge text="MIT licensed" variant="success" size="small" />
+      <Badge text="Self-hostable" size="small" />
+      {minimumNode && <Badge text={`Node ${minimumNode}`} size="small" />}
+    </div>
+  </Card>
+</div>
+
+<style>
+  .repository-link {
+    margin-block: 1.25rem 2rem;
+  }
+
+  .repository-link p {
+    margin-block: 0 0.85rem;
+  }
+
+  .repository-link :global(.card) {
+    --sl-card-border: var(--sl-color-gray-5);
+    --sl-card-bg: var(--sl-color-gray-6);
+  }
+
+  .repository-link__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .repository-link__actions :global(.sl-link-button) {
+    margin-inline-end: 0.25rem;
+  }
+</style>
