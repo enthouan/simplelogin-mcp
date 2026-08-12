@@ -37,18 +37,18 @@ export const CLIENT_SETUPS = [
     icon: 'openai',
     label: 'Codex',
     description:
-      'Codex reads MCP servers from its TOML configuration and shares that configuration across the desktop app, CLI, and IDE extension on the same host.',
-    configLocation: 'Add this table to ~/.codex/config.toml.',
+      'Codex reads MCP servers from its TOML configuration and can forward an already exported API key without storing its value in that shared file.',
+    configLocation: 'Export SL_API_KEY, then add this table to ~/.codex/config.toml.',
     configTitle: '~/.codex/config.toml',
     language: 'toml',
     code: `[mcp_servers.simplelogin]
 command = "node"
 args = ["/absolute/path/to/simplelogin-mcp/dist/index.js"]
 default_tools_approval_mode = "writes"
+env_vars = ["SL_API_KEY"]
 
 [mcp_servers.simplelogin.env]
-TRANSPORT = "stdio"
-SL_API_KEY = "sl-your-key-here"`,
+TRANSPORT = "stdio"`,
     http: {
       configTitle: '~/.codex/config.toml',
       language: 'toml',
@@ -60,7 +60,7 @@ bearer_token_env_var = "SIMPLELOGIN_MCP_BEARER_TOKEN"`,
     reload:
       'Restart the Codex client, then open the MCP server list or use /mcp to confirm that simplelogin is connected.',
     secretNote:
-      'This configuration contains the SimpleLogin API key. Keep it private. The writes approval mode asks before tools that are not marked read-only.',
+      'Export SL_API_KEY before launching Codex. env_vars forwards it to the child process without storing its value in TOML. The writes approval mode asks before tools that are not marked read-only.',
     docsLabel: 'Codex MCP documentation',
     docsUrl: 'https://learn.chatgpt.com/docs/extend/mcp',
   },

@@ -1055,6 +1055,15 @@ describe('Starlight website', () => {
     });
   });
 
+  it('keeps the tested Codex stdio setup free of a stored API key', () => {
+    const codex = CLIENT_SETUPS.find((client) => client.key === 'codex');
+
+    expect(codex).toBeDefined();
+    expect(codex?.code).toContain('env_vars = ["SL_API_KEY"]');
+    expect(codex?.code).not.toContain('SL_API_KEY =');
+    expect(codex?.secretNote).toContain('without storing its value in TOML');
+  });
+
   it('ships the supporting architecture, configuration, troubleshooting, and FAQ content', () => {
     expect(howItWorksHtml).toContain('MCP client');
     expect(howItWorksHtml).toContain('simplelogin-mcp');
