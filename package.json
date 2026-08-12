@@ -24,6 +24,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:runtime": "vitest run --exclude test/website.test.ts",
+    "test:workflow-pinning": "vitest run test/workflow-actions.test.ts",
     "test:watch": "vitest",
     "website:dev": "pnpm --dir website dev",
     "website:build": "pnpm --dir website build",
@@ -69,6 +70,7 @@
     "tsx": "^4.23.11",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.66.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.0"
   }
 }
