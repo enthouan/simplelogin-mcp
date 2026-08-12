@@ -28,9 +28,10 @@ For setup or runtime issues, include:
 - The sanitized error message, HTTP status, or tool error.
 - Whether you use `app.simplelogin.io` or a self-hosted SimpleLogin instance.
 
-For live smoke-test cleanup warnings, include the sanitized smoke output fields for the run id,
-temporary alias/contact ids, failed cleanup status, and suggested issue notes. Inspect and clean up
-leftover SimpleLogin artifacts before rerunning.
+For live smoke-test cleanup warnings, include only the affected artifact type, failed cleanup
+status, and whether manual cleanup was verified. Keep the run id, temporary alias/contact ids,
+addresses, contacts, account responses, and error details private. Inspect and clean up leftover
+SimpleLogin artifacts before rerunning.
 
 ## Security Reports
 

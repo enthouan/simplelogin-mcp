@@ -254,7 +254,7 @@ bearer_token_env_var = "SIMPLELOGIN_MCP_BEARER_TOKEN"`,
     reload:
       'Relaunch OpenCode and run opencode2 mcp list. OpenCode does not currently promise hot reload after direct configuration edits.',
     secretNote:
-      'Keep the environment that supplies SL_API_KEY private. The local stdio recipe has been maintainer-tested; the Streamable HTTP example remains documentation-reviewed.',
+      'Keep the environment that supplies SL_API_KEY private. Configuration guidance is not a live interoperability claim; check the compatibility matrix for current evidence.',
     docsLabel: 'OpenCode MCP documentation',
     docsUrl: 'https://opencode.ai/v2/docs/mcp-servers',
   },

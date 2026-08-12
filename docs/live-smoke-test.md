@@ -26,6 +26,10 @@ Optional:
 - `SMOKE_STEP_TIMEOUT_MS`: MCP request timeout for each step. Defaults to `60000`.
 - `SMOKE_MAX_LOOKUP_PAGES`: contact read-back/cleanup verification page bound. Defaults to `5`.
 - `SMOKE_STDIO_SERVER`: built server entry for stdio mode. Defaults to `dist/index.js`.
+- `SMOKE_PRIVATE_RECOVERY_FILE`: optional path reserved as a new mode-`0600` private recovery record
+  before any MCP connection or live mutation. The runner refuses to overwrite an existing file and
+  exits before the smoke if it cannot reserve the path. Keep it outside the repository and delete it
+  after any required manual cleanup.
 
 ## Stdio
 
@@ -80,7 +84,7 @@ sends it as `Authorization: Bearer ...` and redacts it from all output.
 
 For each selected transport, the smoke runner:
 
-1. Lists MCP tools and verifies the required smoke-test tools exist.
+1. Lists MCP tools and verifies the complete 27-tool catalog in its canonical order.
 2. Calls `account_get_info` to verify the configured SimpleLogin credentials.
 3. Calls `alias_list` with `page_id: 0` as a bounded read.
 4. Creates a random temporary alias with a note containing a unique run id.
@@ -113,16 +117,39 @@ On the first `SIGINT` or `SIGTERM`, the CLI asks the active smoke run to stop be
 steps, waits for cleanup, and exits with the conventional signal exit code. A second interrupt may
 still force the process down immediately.
 
+## Retaining Safe Evidence
+
+The CLI prints a deliberately limited evidence record: transport, overall status, the exact
+tool-discovery count/match, step names and statuses, contact attempted/skipped state, and cleanup
+statuses. It omits run ids, artifact fields, cleanup ids and errors, account responses, addresses,
+contact values, and failure messages. A successful release-candidate contact check requires
+`attempted: true`, `skipped: false`, and successful contact and alias cleanup; a premium/API skip
+does not satisfy that criterion.
+
+The in-process runner retains temporary artifact details only long enough to verify ownership and
+cleanup. For a release-candidate run, set `SMOKE_PRIVATE_RECOVERY_FILE` to a new path in a
+permission-restricted temporary directory. The runner reserves that file before connecting, and no
+recovery file remains after a successful run. On failure, it contains only the transport, run id,
+ownership-verified artifact ids, explicitly labeled unverified ids returned by create operations,
+and cleanup/manual-verification statuses. Unverified ids are private recovery clues only and are
+never used for automatic deletion. An abrupt process kill can leave an empty mode-`0600`
+reservation; inspect it, verify the live account is clean, and remove it before rerunning. Never
+publish that file; delete it after cleanup is verified.
+
 ## Reading Failures
 
-The command prints sanitized JSON. On failure, inspect:
+On failure, review the sanitized CLI evidence and, when created, the private recovery record:
 
 - `transport`: `stdio` or `http`.
 - `failure.step` and `failure.tool`: where the failure happened.
-- `artifacts`: temporary `alias_id` and `contact_id`, when creation reached those steps.
 - `cleanup`: separate status for alias and contact cleanup.
-- `failure.suggestedIssueNotes`: paste-ready notes for a follow-up GitHub issue.
+- `cleanup.manualVerificationRequired`: whether a create response returned an id whose ownership
+  could not be verified and which therefore was not deleted automatically.
 
-If cleanup status is `delete_failed` or `verification_failed`, manually inspect the exact artifact
-id in SimpleLogin before rerunning. Report the artifact id, run id, failed cleanup status, and the
-sanitized error text in a follow-up issue.
+If cleanup status is `delete_failed` or `verification_failed`, or a manual-verification flag is
+`true`, manually inspect the exact artifact id from the private recovery record in SimpleLogin before
+rerunning. When a manual-verification flag is true, use the corresponding `unverifiedCreateIds`
+entry only to locate the artifact, then prove ownership or absence from the private run marker; never
+delete from the returned id alone. Keep the artifact id, run id, and inspection result private;
+publish only the affected artifact type, cleanup status, and whether manual cleanup was verified,
+then delete the recovery record.

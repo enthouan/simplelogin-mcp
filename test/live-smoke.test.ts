@@ -1,25 +1,34 @@
-import { describe, expect, it } from 'vitest';
 import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { TOOL_NAMES } from '../src/tools/catalog.js';
+import {
+  buildSmokeEvidence,
+  buildSmokeRecoveryRecord,
   cleanupSmokeArtifacts,
   createSmokeRunNaming,
   parseCliConfig,
+  releaseSmokeRecoveryFile,
+  reserveSmokeRecoveryFile,
+  runSmokeCli,
   runSmokeTest,
   shouldStopSmokeTransportLoop,
+  writeSmokeRecoveryFile,
   type SmokeArtifacts,
   type SmokeMcpClient,
   type SmokeRunNaming,
 } from '../src/smoke/live.js';
 
-const ALL_TOOLS = [
-  'account_get_info',
-  'alias_list',
-  'alias_create_random',
-  'alias_get',
-  'alias_delete',
-  'contact_create',
-  'contact_list',
-  'contact_delete',
-];
+const ALL_TOOLS = [...TOOL_NAMES];
 
 class FakeSmokeClient implements SmokeMcpClient {
   readonly calls: { name: string; args?: Record<string, unknown> }[] = [];
@@ -121,10 +130,16 @@ describe('live smoke runner logic', () => {
     });
 
     expect(summary.ok).toBe(true);
+    expect(summary.toolDiscovery).toEqual({
+      expected: 27,
+      discovered: 27,
+      exactMatch: true,
+    });
     expect(summary.cleanup.contact.status).toBe('succeeded');
     expect(summary.cleanup.alias.status).toBe('succeeded');
     expect(summary.artifacts.alias?.id).toBe(101);
     expect(summary.artifacts.contact?.id).toBe(202);
+    expect(summary.recoveryCandidates).toEqual({});
     expect(client.closed).toBe(true);
     expect(client.calls.map((call) => call.name)).toEqual([
       'listTools',
@@ -250,8 +265,106 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('read temporary alias');
     expect(summary.artifacts.alias).toBeUndefined();
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 101 });
     expect(summary.cleanup.alias.status).toBe('not_needed');
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
     expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+  });
+
+  it('retains an alias id when later create-response validation and recovery fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_create_random', () => ({ id: 303 }));
+    client.setHandler('alias_list', (args) => {
+      if (args['query'] === runNaming.runId) throw new Error('alias recovery unavailable');
+      return { aliases: [] };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+    const evidence = buildSmokeEvidence(summary);
+    const recovery = buildSmokeRecoveryRecord(summary);
+
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 303 });
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+    expect(recovery.unverifiedCreateIds).toEqual({ aliasId: 303 });
+    expect(JSON.stringify(evidence)).not.toContain('303');
+    expect(JSON.stringify(evidence)).not.toContain(runNaming.runId);
+    expect(JSON.stringify(evidence)).not.toContain('recoveryCandidates');
+  });
+
+  it('retains a returned alias id when readback and bounded recovery both fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_get', () => {
+      throw new Error('alias read unavailable');
+    });
+    client.setHandler('alias_list', (args) => {
+      if (args['query'] === runNaming.runId) throw new Error('alias recovery unavailable');
+      return { aliases: [] };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 101 });
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+  });
+
+  it('keeps a mismatched returned alias id while cleaning a separately recovered run alias', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_create_random', () => ({
+      id: 303,
+      email: 'created@example.com',
+      note: runNaming.aliasNote,
+    }));
+    client.setHandler('alias_get', () => {
+      throw new Error('alias read unavailable');
+    });
+    client.setHandler('alias_list', (args) => ({
+      aliases:
+        args['query'] === runNaming.runId
+          ? [{ id: 404, email: 'recovered@example.com', note: runNaming.aliasNote }]
+          : [],
+    }));
+    client.setHandler('alias_delete', () => {
+      client.setHandler('alias_get', () => {
+        throw new Error('SimpleLogin API error (HTTP 404): not found');
+      });
+      return { deleted: true };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    expect(summary.artifacts.alias?.id).toBe(404);
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 303 });
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(
+      client.calls
+        .filter((call) => call.name === 'alias_delete')
+        .map((call) => call.args?.['alias_id']),
+    ).toEqual([404]);
   });
 
   it('reports cleanup delete failures separately', async () => {
@@ -309,9 +422,300 @@ describe('live smoke runner logic', () => {
     });
 
     const rendered = JSON.stringify(summary);
+    const issueNotes = summary.failure?.suggestedIssueNotes.join('\n') ?? '';
     expect(rendered).toContain('[REDACTED]');
     expect(rendered).not.toContain('sl-secret');
     expect(rendered).not.toContain('mcp-secret');
+    expect(issueNotes).not.toContain(naming().runId);
+    expect(issueNotes).not.toMatch(/(?:alias|contact)_id=/);
+    expect(issueNotes).not.toContain('Error:');
+    expect(issueNotes).toContain('keep run ids, artifact ids');
+  });
+
+  it('builds portable evidence without run ids, account data, artifact ids, or errors', async () => {
+    const runNaming = naming();
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+    });
+
+    const evidence = buildSmokeEvidence(summary);
+    const rendered = JSON.stringify(evidence);
+
+    expect(evidence.ok).toBe(true);
+    expect(evidence.toolDiscovery).toEqual({ expected: 27, discovered: 27, exactMatch: true });
+    expect(evidence.contact).toEqual({ attempted: true, skipped: false });
+    expect(evidence.cleanup).toEqual({
+      overall: 'succeeded',
+      alias: { status: 'succeeded', attempted: true },
+      contact: { status: 'succeeded', attempted: true },
+      manualVerificationRequired: { alias: false, contact: false },
+    });
+    expect(rendered).not.toContain(runNaming.runId);
+    expect(rendered).not.toContain('smoke@simplelogin.example');
+    expect(rendered).not.toContain('maintainer@example.com');
+    expect(rendered).not.toMatch(/"(?:id|artifacts|message|note|reason|suggestedIssueNotes)"/);
+  });
+
+  it('builds a minimal private recovery record without addresses, contacts, or errors', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_delete', () => {
+      throw new Error('private upstream detail');
+    });
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    const recovery = buildSmokeRecoveryRecord(summary);
+    const rendered = JSON.stringify(recovery);
+
+    expect(recovery).toEqual({
+      transport: 'stdio',
+      runId: runNaming.runId,
+      verifiedArtifacts: { aliasId: 101 },
+      unverifiedCreateIds: {},
+      cleanup: {
+        overall: 'failed',
+        alias: 'delete_failed',
+        contact: 'not_needed',
+        manualVerificationRequired: { alias: false, contact: false },
+      },
+    });
+    expect(rendered).not.toContain('smoke@simplelogin.example');
+    expect(rendered).not.toContain(runNaming.contact);
+    expect(rendered).not.toContain('private upstream detail');
+
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    try {
+      const reservation = reserveSmokeRecoveryFile(recoveryPath);
+      expect(() => reserveSmokeRecoveryFile(recoveryPath)).toThrow();
+      expect(statSync(recoveryPath).mode & 0o777).toBe(0o600);
+      expect(writeSmokeRecoveryFile(reservation, [summary])).toBe(true);
+      releaseSmokeRecoveryFile(reservation, true);
+      expect(readFileSync(recoveryPath, 'utf8')).toContain(runNaming.runId);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes a reserved private recovery file when the smoke succeeds', async () => {
+    const runNaming = naming();
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+    });
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    try {
+      const reservation = reserveSmokeRecoveryFile(recoveryPath);
+      expect(writeSmokeRecoveryFile(reservation, [summary])).toBe(false);
+      releaseSmokeRecoveryFile(reservation, false);
+      expect(existsSync(recoveryPath)).toBe(false);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects existing and symlink recovery paths without overwriting their targets', () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const existingPath = join(recoveryDirectory, 'existing.json');
+    const symlinkPath = join(recoveryDirectory, 'symlink.json');
+    try {
+      writeFileSync(existingPath, 'owner data', 'utf8');
+      symlinkSync(existingPath, symlinkPath);
+
+      expect(() => reserveSmokeRecoveryFile(existingPath)).toThrow();
+      expect(() => reserveSmokeRecoveryFile(symlinkPath)).toThrow();
+      expect(readFileSync(existingPath, 'utf8')).toBe('owner data');
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts recovery preflight before creating an MCP client', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const existingPath = join(recoveryDirectory, 'existing.json');
+    writeFileSync(existingPath, 'owner data', 'utf8');
+    let clientFactoryCalls = 0;
+    const stderr: string[] = [];
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_PRIVATE_RECOVERY_FILE: existingPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => {
+          clientFactoryCalls++;
+          return Promise.resolve(makeSuccessfulClient());
+        },
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: (output) => stderr.push(output),
+      });
+
+      expect(exitCode).toBe(1);
+      expect(clientFactoryCalls).toBe(0);
+      expect(readFileSync(existingPath, 'utf8')).toBe('owner data');
+      expect(stderr.join('')).not.toContain('private-api-key');
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts an invalid recovery parent before creating an MCP client', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    let clientFactoryCalls = 0;
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_PRIVATE_RECOVERY_FILE: join(recoveryDirectory, 'missing', 'recovery.json'),
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => {
+          clientFactoryCalls++;
+          return Promise.resolve(makeSuccessfulClient());
+        },
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      expect(exitCode).toBe(1);
+      expect(clientFactoryCalls).toBe(0);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes the preflight reservation after a successful CLI smoke', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      expect(exitCode).toBe(0);
+      expect(existsSync(recoveryPath)).toBe(false);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('prints sanitized evidence and exits nonzero when a late recovery write fails', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_delete', () => {
+      throw new Error('private-api-key late cleanup detail');
+    });
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => Promise.resolve(client),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        recoveryFileOperations: {
+          write: () => {
+            throw new Error('private write implementation detail');
+          },
+        },
+        writeStdout: (output) => stdout.push(output),
+        writeStderr: (output) => stderr.push(output),
+      });
+
+      expect(exitCode).toBe(1);
+      expect(JSON.parse(stdout.join(''))).toMatchObject({
+        ok: false,
+        summaries: [{ transport: 'stdio', cleanup: { overall: 'failed' } }],
+      });
+      expect(stdout.join('')).not.toContain('private-api-key');
+      expect(stdout.join('')).not.toContain(runNaming.runId);
+      expect(stderr.join('')).toContain('Private recovery record could not be completed');
+      expect(stderr.join('')).not.toContain('private write implementation detail');
+      expect(stderr.join('')).not.toContain('private-api-key');
+      expect(existsSync(recoveryPath)).toBe(true);
+      expect(statSync(recoveryPath).mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('shares one recovery reservation and retains only failed transport summaries', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    const stdioClient = makeSuccessfulClient(runNaming);
+    const httpClient = makeSuccessfulClient(runNaming);
+    httpClient.setHandler('account_get_info', () => {
+      throw new Error('HTTP read failed');
+    });
+    let reservationCount = 0;
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'all'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: (transport) =>
+          Promise.resolve(transport === 'stdio' ? stdioClient : httpClient),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        recoveryFileOperations: {
+          reserve: (filePath) => {
+            reservationCount++;
+            return reserveSmokeRecoveryFile(filePath);
+          },
+        },
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      const recovery = JSON.parse(readFileSync(recoveryPath, 'utf8')) as {
+        summaries: { transport: string }[];
+      };
+      expect(exitCode).toBe(1);
+      expect(reservationCount).toBe(1);
+      expect(recovery.summaries).toHaveLength(1);
+      expect(recovery.summaries[0]?.transport).toBe('http');
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
   });
 
   it('uses unique, recognizable temporary names', () => {
@@ -407,12 +811,75 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('read temporary contact');
     expect(summary.artifacts.contact).toBeUndefined();
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 202, aliasId: 101 });
     expect(summary.cleanup.contact.status).toBe('not_needed');
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
     expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
 
-  it('fails when requested contact tools are missing', async () => {
+  it('retains a contact id when readback and bounded recovery both fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('contact_list', () => {
+      throw new Error('contact reads unavailable');
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+    const recovery = buildSmokeRecoveryRecord(summary);
+
+    expect(summary.artifacts.contact).toBeUndefined();
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 202, aliasId: 101 });
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.contact.status).toBe('not_needed');
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
+    expect(recovery.unverifiedCreateIds.contact).toEqual({ id: 202, aliasId: 101 });
+  });
+
+  it('keeps a mismatched returned contact id while cleaning a separately recovered contact', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    let recoveredContactVisible = true;
+    client.setHandler('contact_create', () => ({
+      id: 303,
+      contact: runNaming.contact,
+      existed: false,
+    }));
+    client.setHandler('contact_list', () => ({
+      contacts: recoveredContactVisible ? [{ id: 404, contact: runNaming.contact }] : [],
+    }));
+    client.setHandler('contact_delete', (args) => {
+      expect(args['contact_id']).toBe(404);
+      recoveredContactVisible = false;
+      return { deleted: true };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.artifacts.contact?.id).toBe(404);
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 303, aliasId: 101 });
+    expect(summary.cleanup.contact.status).toBe('succeeded');
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(
+      client.calls
+        .filter((call) => call.name === 'contact_delete')
+        .map((call) => call.args?.['contact_id']),
+    ).toEqual([404]);
+  });
+
+  it('fails when the discovered tool catalog is incomplete', async () => {
     const client = makeSuccessfulClient();
     const toolsWithoutContacts = ALL_TOOLS.filter((tool) => !tool.startsWith('contact_'));
     const missingContactClient = new FakeSmokeClient(toolsWithoutContacts, client.handlers);
@@ -424,9 +891,14 @@ describe('live smoke runner logic', () => {
     });
 
     expect(summary.ok).toBe(false);
-    expect(summary.failure?.step).toBe('check contact tools');
-    expect(summary.failure?.message).toContain('contact_create');
-    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.failure?.step).toBe('list MCP tools');
+    expect(summary.failure?.message).toContain('27-tool public contract');
+    expect(summary.toolDiscovery).toEqual({
+      expected: 27,
+      discovered: toolsWithoutContacts.length,
+      exactMatch: false,
+    });
+    expect(summary.cleanup.alias.status).toBe('not_needed');
   });
 
   it('fails when a unique smoke contact already exists', async () => {
@@ -446,6 +918,7 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('create temporary contact');
     expect(summary.failure?.message).toContain('existing contact');
+    expect(summary.recoveryCandidates.contact).toBeUndefined();
     expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
@@ -491,12 +964,14 @@ describe('live smoke runner logic', () => {
   it('allows HTTP-only config without a local SimpleLogin API key', () => {
     const config = parseCliConfig(['--transport', 'http'], {
       MCP_AUTH_TOKEN: 'mcp-secret',
+      SMOKE_PRIVATE_RECOVERY_FILE: '/private/recovery.json',
     });
 
     expect(config.transports).toEqual(['http']);
     expect(config.apiKey).toBeUndefined();
     expect(config.serverEnv).toEqual({});
     expect(config.secrets).toEqual(['mcp-secret']);
+    expect(config.privateRecoveryFile).toBe('/private/recovery.json');
   });
 
   it('still requires a SimpleLogin API key when stdio is selected', () => {

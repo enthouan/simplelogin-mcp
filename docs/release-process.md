@@ -8,13 +8,13 @@ protected `main` branch, pull-request validation, semver tags, GitHub Releases, 
 Before preparing a release:
 
 - Confirm the target milestone has no remaining required issues.
-- Confirm the intended version number, for example `v0.7.0`.
+- Confirm the intended version number, for example `vX.Y.Z`.
 - Review [CHANGELOG.md](../CHANGELOG.md) and make sure `## Unreleased` describes the changes that
   will ship.
 - Fetch current repository state:
 
 ```bash
-git fetch origin --tags --prune
+git fetch --all --tags --prune
 git status --short --branch
 gh issue list --repo enthouan/simplelogin-mcp --state all --limit 200 \
   --json number,title,state,milestone,url
@@ -48,14 +48,29 @@ Run the local validation gate:
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm test:workflow-pinning
 pnpm typecheck
 pnpm lint
 pnpm build
 pnpm test
+pnpm website:check
 pnpm format:check
+pnpm pack --dry-run --json
 SL_API_KEY=compose-validation docker compose --env-file .env.example config --no-env-resolution --quiet
 SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml config --no-env-resolution --quiet
+SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml build
+actionlint .github/workflows/*.yml
+git diff --check
 ```
+
+Before a release candidate is approved, run a redacted full-history secret scan across every fetched
+branch and tag with an approved Gitleaks binary. Do not silently substitute a current-tree scan:
+
+```bash
+gitleaks git --redact --log-opts="--all --full-history" .
+```
+
+Stop on a credible finding and report it privately without reproducing the secret value.
 
 When official MCP Registry metadata changes, also validate `server.json` against the current MCP
 Registry schema and confirm the official registry still has no stale entry for this server before
@@ -73,8 +88,8 @@ description. Do not push release metadata directly to `main`.
 
 ## Merge And Tag
 
-After the release PR is approved and required checks pass, merge it through the protected-branch
-flow. Fetch the merged `main` commit before tagging:
+Only after the owner explicitly approves merging that specific release PR and its required checks
+pass, merge it through the protected-branch flow. Fetch the merged `main` commit before tagging:
 
 ```bash
 git fetch origin main --tags --prune

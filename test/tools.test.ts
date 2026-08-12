@@ -2,13 +2,17 @@
  * Public tool surface checks: registered names, annotations, schema field
  * descriptions, bounded reads, and documentation/catalog drift protection.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import prettier from 'prettier';
 import { describe, expect, it } from 'vitest';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SimpleLoginClient } from '../src/client/simplelogin.js';
+import { buildServer } from '../src/server.js';
 import {
   CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT,
   LIST_PAGE_SIZE,
@@ -69,6 +73,40 @@ function textOf(result: CallToolResult): string {
 
 function readRepoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || ['boolean', 'number', 'string'].includes(typeof value)) {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(',')}}`;
+  }
+  throw new TypeError(`Cannot serialize ${typeof value} as canonical JSON`);
+}
+
+async function withMcpClient<T>(
+  simpleLoginClient: Record<string, unknown>,
+  run: (client: Client) => Promise<T>,
+): Promise<T> {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = buildServer(simpleLoginClient as unknown as SimpleLoginClient);
+  const client = new Client({ name: 'public-contract-test', version: '1.0.0' });
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    return await run(client);
+  } finally {
+    await client.close();
+  }
 }
 
 describe('registered tool surface', () => {
@@ -152,6 +190,73 @@ describe('registered tool surface', () => {
         tool.options.description?.trim(),
       );
     }
+  });
+
+  it('freezes the exact public listTools contract at the MCP protocol boundary', async () => {
+    const tools = await withMcpClient({}, async (client) => (await client.listTools()).tools);
+
+    expect(tools).toHaveLength(27);
+    expect(tools.map((tool) => tool.name)).toEqual(TOOL_NAMES);
+
+    const publicContract = tools.map((tool) => ({
+      name: tool.name,
+      title: tool.title ?? null,
+      description: tool.description ?? null,
+      annotations: tool.annotations ?? null,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema ?? null,
+    }));
+    const digest = createHash('sha256').update(stableJson(publicContract)).digest('hex');
+
+    // Update only after reviewing the complete listTools contract as an intentional public change.
+    expect(digest).toBe('4bcaea46f6441372455b557dddbb44c36be1f13af926ccb8a7cc2f6437e120f9');
+  });
+
+  it('enforces literal confirm=true for every permanent-delete tool over MCP', async () => {
+    const deleteCalls: string[] = [];
+    const fakeClient = {
+      deleteAlias: () => {
+        deleteCalls.push('alias_delete');
+        return Promise.resolve({ deleted: true });
+      },
+      deleteContact: () => {
+        deleteCalls.push('contact_delete');
+        return Promise.resolve({ deleted: true });
+      },
+      deleteMailbox: () => {
+        deleteCalls.push('mailbox_delete');
+        return Promise.resolve({ deleted: true });
+      },
+    };
+    const deletionCases = [
+      { name: 'alias_delete', arguments: { alias_id: 1 } },
+      { name: 'contact_delete', arguments: { contact_id: 1 } },
+      {
+        name: 'mailbox_delete',
+        arguments: { mailbox_id: 1, transfer_aliases_to: 2 },
+      },
+    ] as const;
+
+    await withMcpClient(fakeClient, async (client) => {
+      for (const deletion of deletionCases) {
+        const missing = await client.callTool(deletion);
+        expect(missing.isError, `${deletion.name} missing confirm`).toBe(true);
+
+        const rejected = await client.callTool({
+          ...deletion,
+          arguments: { ...deletion.arguments, confirm: false },
+        });
+        expect(rejected.isError, `${deletion.name} confirm=false`).toBe(true);
+
+        const accepted = await client.callTool({
+          ...deletion,
+          arguments: { ...deletion.arguments, confirm: true },
+        });
+        expect(accepted.isError, `${deletion.name} confirm=true`).not.toBe(true);
+      }
+    });
+
+    expect(deleteCalls).toEqual(['alias_delete', 'contact_delete', 'mailbox_delete']);
   });
 });
 

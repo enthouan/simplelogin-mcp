@@ -5,9 +5,9 @@ description: Compatibility routes and the evidence currently available for each 
 
 import { Badge } from '@astrojs/starlight/components';
 
-Compatibility claims are separated from setup instructions here. The named local stdio recipes
-below have been exercised end to end, but a point-in-time test does not guarantee compatibility
-with every past or future client release.
+Compatibility claims are separated from setup instructions here. The configuration recipes remain
+available even when a current, reproducible client test has not been retained. A route marked
+**Not retested** or **Unavailable** is not represented as a live interoperability result.
 
 ## Review levels
 
@@ -16,27 +16,29 @@ with every past or future client release.
 | **Protocol implemented**   | The server implements the transport with the official MCP SDK and the repository contains transport, configuration, authentication, and origin checks. This is not a named-client certification. |
 | **Configuration reviewed** | The setup shape was checked against the client's published configuration documentation and this server's runtime requirements. It has not been represented as a live interoperability test.      |
 | **Client tested**          | The documented route connected to simplelogin-mcp, discovered the expected tool catalog, and completed the standard read-only account-usage check. This is point-in-time evidence.               |
+| **Not retested**           | The client or route is available, but the current release candidate has not completed the full retained-evidence check. No current connection, discovery, or account-read result is claimed.     |
+| **Unavailable**            | The client or route was not available for the current release-candidate audit. It was not tested.                                                                                                |
 
 ## Named-client matrix
 
 <div className="compatibility-matrix">
 
-| MCP client     | Tested route                   | Current evidence                                                                                                                                         | Test scope                                                                                                           |
-| -------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Codex          | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The shared-TOML recipe connected, discovered all 27 tools, and completed the read-only account-usage check.          |
-| Claude Code    | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The project-scoped recipe connected, discovered all 27 tools, and completed the read-only account-usage check.       |
-| Claude Desktop | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The local Node.js recipe connected, discovered all 27 tools, and completed the read-only account-usage check.        |
-| VS Code        | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The user-profile recipe connected, discovered all 27 tools, and completed the read-only account-usage check.         |
-| OpenCode       | Local stdio                    | <Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success" size="small" style={{ whiteSpace: 'nowrap' }} />                 | The environment-backed recipe connected, discovered all 27 tools, and completed the read-only account-usage check.   |
-| Generic MCP    | Local stdio or Streamable HTTP | <Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} /> | Compatibility depends on the host supporting the selected transport and, for protected HTTP, a custom bearer header. |
+| MCP client     | Documented route               | Current evidence                                                                                                                                         | Evidence scope                                                                                                             |
+| -------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Codex          | Local stdio                    | <Badge text="Not retested" aria-label="Not retested" title="Not retested" variant="caution" size="small" style={{ whiteSpace: 'nowrap' }} />             | Installed during the release-candidate audit, but not reconnected to the exact candidate. No current result is claimed.    |
+| Claude Code    | Local stdio                    | <Badge text="Not retested" aria-label="Not retested" title="Not retested" variant="caution" size="small" style={{ whiteSpace: 'nowrap' }} />             | Installed during the release-candidate audit, but not reconnected to the exact candidate. No current result is claimed.    |
+| Claude Desktop | Local stdio                    | <Badge text="Not retested" aria-label="Not retested" title="Not retested" variant="caution" size="small" style={{ whiteSpace: 'nowrap' }} />             | Installed during the release-candidate audit, but not restarted against the exact candidate. No current result is claimed. |
+| VS Code        | Local stdio                    | <Badge text="Not retested" aria-label="Not retested" title="Not retested" variant="caution" size="small" style={{ whiteSpace: 'nowrap' }} />             | Installed but not configured for this server during the release-candidate audit. No current result is claimed.             |
+| OpenCode       | Local stdio                    | <Badge text="Unavailable" aria-label="Client unavailable" title="Client unavailable" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} />     | No OpenCode installation was available during the release-candidate audit, so this route was not tested.                   |
+| Generic MCP    | Local stdio or Streamable HTTP | <Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: 'nowrap' }} /> | Compatibility depends on the host supporting the selected transport and, for protected HTTP, a custom bearer header.       |
 
 </div>
 
-These results were confirmed by the maintainer for the documented local stdio routes. Exact client
-and platform versions were not retained, so treat them as point-in-time interoperability checks,
-not version support guarantees. The Streamable HTTP examples remain documentation-reviewed routes.
+Earlier maintainer checks did not retain exact client version, platform, date, or server commit, so
+they are not carried forward as current test claims. The Streamable HTTP examples remain
+documentation-reviewed routes.
 
-Use [Client setup](../clients/) for the tested recipes. If a client's configuration format changes,
+Use [Client setup](../clients/) for the documented recipes. If a client's configuration format changes,
 its current documentation remains authoritative.
 
 ## Transport requirements
@@ -71,14 +73,14 @@ Browser clients have an additional deployment requirement. The server checks `Or
 same-origin deployment or a reverse proxy that handles CORS, then add the exact browser origin to
 `MCP_ALLOWED_ORIGINS` when it is not loopback.
 
-## What the client tests covered
+## Evidence required for a Tested row
 
-The maintainer confirmed that each named local stdio recipe:
+For each row marked **Tested**, retain a sanitized record of:
 
-1. launched the current simplelogin-mcp development build;
-2. established an MCP connection over local stdio;
-3. discovered the complete 27-tool catalog; and
-4. completed a read-only `account_get_stats` call without changing the SimpleLogin account.
+1. the exact client version, platform, architecture, and test date;
+2. the transport and exact committed simplelogin-mcp server SHA;
+3. a successful MCP connection and discovery of the complete 27-tool catalog; and
+4. a successful read-only `account_get_stats` call without retaining account counts or data.
 
-Future refreshes should also record the exact client version, simplelogin-mcp release or commit,
-platform, and test date. Never include credentials or account data in the evidence.
+Never include credentials, private configuration, account data, or screenshots containing unrelated
+servers in the evidence.
