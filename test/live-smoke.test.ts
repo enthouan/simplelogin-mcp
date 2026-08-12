@@ -139,6 +139,7 @@ describe('live smoke runner logic', () => {
     expect(summary.cleanup.alias.status).toBe('succeeded');
     expect(summary.artifacts.alias?.id).toBe(101);
     expect(summary.artifacts.contact?.id).toBe(202);
+    expect(summary.recoveryCandidates).toEqual({});
     expect(client.closed).toBe(true);
     expect(client.calls.map((call) => call.name)).toEqual([
       'listTools',
@@ -264,8 +265,106 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('read temporary alias');
     expect(summary.artifacts.alias).toBeUndefined();
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 101 });
     expect(summary.cleanup.alias.status).toBe('not_needed');
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
     expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+  });
+
+  it('retains an alias id when later create-response validation and recovery fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_create_random', () => ({ id: 303 }));
+    client.setHandler('alias_list', (args) => {
+      if (args['query'] === runNaming.runId) throw new Error('alias recovery unavailable');
+      return { aliases: [] };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+    const evidence = buildSmokeEvidence(summary);
+    const recovery = buildSmokeRecoveryRecord(summary);
+
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 303 });
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+    expect(recovery.unverifiedCreateIds).toEqual({ aliasId: 303 });
+    expect(JSON.stringify(evidence)).not.toContain('303');
+    expect(JSON.stringify(evidence)).not.toContain(runNaming.runId);
+    expect(JSON.stringify(evidence)).not.toContain('recoveryCandidates');
+  });
+
+  it('retains a returned alias id when readback and bounded recovery both fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_get', () => {
+      throw new Error('alias read unavailable');
+    });
+    client.setHandler('alias_list', (args) => {
+      if (args['query'] === runNaming.runId) throw new Error('alias recovery unavailable');
+      return { aliases: [] };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 101 });
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'alias_delete')).toBe(false);
+  });
+
+  it('keeps a mismatched returned alias id while cleaning a separately recovered run alias', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_create_random', () => ({
+      id: 303,
+      email: 'created@example.com',
+      note: runNaming.aliasNote,
+    }));
+    client.setHandler('alias_get', () => {
+      throw new Error('alias read unavailable');
+    });
+    client.setHandler('alias_list', (args) => ({
+      aliases:
+        args['query'] === runNaming.runId
+          ? [{ id: 404, email: 'recovered@example.com', note: runNaming.aliasNote }]
+          : [],
+    }));
+    client.setHandler('alias_delete', () => {
+      client.setHandler('alias_get', () => {
+        throw new Error('SimpleLogin API error (HTTP 404): not found');
+      });
+      return { deleted: true };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    expect(summary.artifacts.alias?.id).toBe(404);
+    expect(summary.recoveryCandidates.alias).toEqual({ id: 303 });
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.cleanup.manualVerificationRequired.alias).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(
+      client.calls
+        .filter((call) => call.name === 'alias_delete')
+        .map((call) => call.args?.['alias_id']),
+    ).toEqual([404]);
   });
 
   it('reports cleanup delete failures separately', async () => {
@@ -351,6 +450,7 @@ describe('live smoke runner logic', () => {
       overall: 'succeeded',
       alias: { status: 'succeeded', attempted: true },
       contact: { status: 'succeeded', attempted: true },
+      manualVerificationRequired: { alias: false, contact: false },
     });
     expect(rendered).not.toContain(runNaming.runId);
     expect(rendered).not.toContain('smoke@simplelogin.example');
@@ -377,11 +477,13 @@ describe('live smoke runner logic', () => {
     expect(recovery).toEqual({
       transport: 'stdio',
       runId: runNaming.runId,
-      artifacts: { aliasId: 101 },
+      verifiedArtifacts: { aliasId: 101 },
+      unverifiedCreateIds: {},
       cleanup: {
         overall: 'failed',
         alias: 'delete_failed',
         contact: 'not_needed',
+        manualVerificationRequired: { alias: false, contact: false },
       },
     });
     expect(rendered).not.toContain('smoke@simplelogin.example');
@@ -709,9 +811,72 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('read temporary contact');
     expect(summary.artifacts.contact).toBeUndefined();
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 202, aliasId: 101 });
     expect(summary.cleanup.contact.status).toBe('not_needed');
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
     expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
     expect(summary.cleanup.alias.status).toBe('succeeded');
+  });
+
+  it('retains a contact id when readback and bounded recovery both fail', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('contact_list', () => {
+      throw new Error('contact reads unavailable');
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+    const recovery = buildSmokeRecoveryRecord(summary);
+
+    expect(summary.artifacts.contact).toBeUndefined();
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 202, aliasId: 101 });
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.contact.status).toBe('not_needed');
+    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
+    expect(recovery.unverifiedCreateIds.contact).toEqual({ id: 202, aliasId: 101 });
+  });
+
+  it('keeps a mismatched returned contact id while cleaning a separately recovered contact', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    let recoveredContactVisible = true;
+    client.setHandler('contact_create', () => ({
+      id: 303,
+      contact: runNaming.contact,
+      existed: false,
+    }));
+    client.setHandler('contact_list', () => ({
+      contacts: recoveredContactVisible ? [{ id: 404, contact: runNaming.contact }] : [],
+    }));
+    client.setHandler('contact_delete', (args) => {
+      expect(args['contact_id']).toBe(404);
+      recoveredContactVisible = false;
+      return { deleted: true };
+    });
+
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+    });
+
+    expect(summary.artifacts.contact?.id).toBe(404);
+    expect(summary.recoveryCandidates.contact).toEqual({ id: 303, aliasId: 101 });
+    expect(summary.cleanup.contact.status).toBe('succeeded');
+    expect(summary.cleanup.manualVerificationRequired.contact).toBe(true);
+    expect(summary.cleanup.overall).toBe('failed');
+    expect(
+      client.calls
+        .filter((call) => call.name === 'contact_delete')
+        .map((call) => call.args?.['contact_id']),
+    ).toEqual([404]);
   });
 
   it('fails when the discovered tool catalog is incomplete', async () => {
@@ -753,6 +918,7 @@ describe('live smoke runner logic', () => {
     expect(summary.ok).toBe(false);
     expect(summary.failure?.step).toBe('create temporary contact');
     expect(summary.failure?.message).toContain('existing contact');
+    expect(summary.recoveryCandidates.contact).toBeUndefined();
     expect(client.calls.some((call) => call.name === 'contact_delete')).toBe(false);
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });

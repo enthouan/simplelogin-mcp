@@ -76,6 +76,11 @@ export interface SmokeArtifacts {
   contact?: SmokeContactArtifact;
 }
 
+export interface SmokeRecoveryCandidates {
+  alias?: { id: number };
+  contact?: { id: number; aliasId: number };
+}
+
 export interface SmokeRecoveryFileReservation {
   filePath: string;
   fileDescriptor: number;
@@ -100,6 +105,10 @@ interface SmokeCleanupSummary {
   overall: 'not_needed' | 'succeeded' | 'failed';
   alias: CleanupRecord;
   contact: CleanupRecord;
+  manualVerificationRequired: {
+    alias: boolean;
+    contact: boolean;
+  };
 }
 
 interface SmokeFailure {
@@ -120,6 +129,7 @@ export interface SmokeRunSummary {
   };
   steps: SmokeStep[];
   artifacts: SmokeArtifacts;
+  recoveryCandidates: SmokeRecoveryCandidates;
   cleanup: SmokeCleanupSummary;
   contact: {
     attempted: boolean;
@@ -138,6 +148,7 @@ export interface SmokeRunEvidence {
     overall: SmokeCleanupSummary['overall'];
     alias: Pick<CleanupRecord, 'status' | 'attempted'>;
     contact: Pick<CleanupRecord, 'status' | 'attempted'>;
+    manualVerificationRequired: SmokeCleanupSummary['manualVerificationRequired'];
   };
   contact: Pick<SmokeRunSummary['contact'], 'attempted' | 'skipped'>;
   failure?: Pick<SmokeFailure, 'step' | 'tool'>;
@@ -146,14 +157,19 @@ export interface SmokeRunEvidence {
 export interface SmokeRecoveryRecord {
   transport: SmokeTransport;
   runId: string;
-  artifacts: {
+  verifiedArtifacts: {
     aliasId?: number;
-    contactId?: number;
+    contact?: { id: number; aliasId: number };
+  };
+  unverifiedCreateIds: {
+    aliasId?: number;
+    contact?: { id: number; aliasId: number };
   };
   cleanup: {
     overall: SmokeCleanupSummary['overall'];
     alias: CleanupStatus;
     contact: CleanupStatus;
+    manualVerificationRequired: SmokeCleanupSummary['manualVerificationRequired'];
   };
 }
 
@@ -276,6 +292,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
   const naming = options.naming ?? createSmokeRunNaming();
   const maxLookupPages = options.maxLookupPages ?? DEFAULT_MAX_LOOKUP_PAGES;
   const artifacts: SmokeArtifacts = {};
+  const recoveryCandidates: SmokeRecoveryCandidates = {};
   const summary: SmokeRunSummary = {
     ok: false,
     transport: options.transport,
@@ -283,6 +300,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     toolDiscovery: { expected: TOOL_NAMES.length, exactMatch: false },
     steps: [],
     artifacts,
+    recoveryCandidates,
     cleanup: emptyCleanupSummary(),
     contact: { attempted: options.attemptContact ?? true, skipped: false },
   };
@@ -319,7 +337,9 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
           note: naming.aliasNote,
           hostname: naming.hostname,
         });
-        requireInteger(createdAlias, 'id', 'alias_create_random');
+        recoveryCandidates.alias = {
+          id: requireInteger(createdAlias, 'id', 'alias_create_random'),
+        };
         requireString(createdAlias, 'email', 'alias_create_random');
         return createdAlias;
       },
@@ -341,6 +361,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
         runId: naming.runId,
         createdByRun: true,
       };
+      clearVerifiedAliasRecoveryCandidate(summary, aliasId);
       return readAlias;
     });
 
@@ -377,6 +398,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
         maxLookupPages,
         secrets,
       });
+      markUnverifiedRecoveryCandidates(summary.cleanup, recoveryCandidates);
       await client.close().catch((error: unknown) => {
         summary.failure ??= normalizeFailure(
           new SmokeStepError('close MCP client', undefined, error, secrets),
@@ -454,6 +476,7 @@ export function buildSmokeEvidence(summary: SmokeRunSummary): SmokeRunEvidence {
         status: summary.cleanup.contact.status,
         attempted: summary.cleanup.contact.attempted,
       },
+      manualVerificationRequired: { ...summary.cleanup.manualVerificationRequired },
     },
     contact: {
       attempted: summary.contact.attempted,
@@ -469,14 +492,28 @@ export function buildSmokeRecoveryRecord(summary: SmokeRunSummary): SmokeRecover
   return {
     transport: summary.transport,
     runId: summary.runId,
-    artifacts: {
+    verifiedArtifacts: {
       ...(summary.artifacts.alias ? { aliasId: summary.artifacts.alias.id } : {}),
-      ...(summary.artifacts.contact ? { contactId: summary.artifacts.contact.id } : {}),
+      ...(summary.artifacts.contact
+        ? {
+            contact: {
+              id: summary.artifacts.contact.id,
+              aliasId: summary.artifacts.contact.aliasId,
+            },
+          }
+        : {}),
+    },
+    unverifiedCreateIds: {
+      ...(summary.recoveryCandidates.alias ? { aliasId: summary.recoveryCandidates.alias.id } : {}),
+      ...(summary.recoveryCandidates.contact
+        ? { contact: { ...summary.recoveryCandidates.contact } }
+        : {}),
     },
     cleanup: {
       overall: summary.cleanup.overall,
       alias: summary.cleanup.alias.status,
       contact: summary.cleanup.contact.status,
+      manualVerificationRequired: { ...summary.cleanup.manualVerificationRequired },
     },
   };
 }
@@ -644,6 +681,7 @@ async function recoverAliasCreatedByFailedStep(
       runId: options.naming.runId,
       createdByRun: true,
     };
+    clearVerifiedAliasRecoveryCandidate(summary, id);
     record.status = 'ok';
     record.note = `recovered alias ${id} for cleanup`;
   } catch (error) {
@@ -687,6 +725,7 @@ async function recoverContactCreatedByFailedStep(
       runId: options.naming.runId,
       createdByRun: true,
     };
+    clearVerifiedContactRecoveryCandidate(summary, id, alias.id);
     record.status = 'ok';
     record.note = `recovered contact ${id} for cleanup`;
   } catch (error) {
@@ -737,6 +776,7 @@ async function maybeExerciseContact(options: {
     });
     if (contact['existed'] !== true) {
       contactId = requireInteger(contact, 'id', 'contact_create');
+      options.summary.recoveryCandidates.contact = { id: contactId, aliasId: alias.id };
     }
     createStep.status = 'ok';
   } catch (error) {
@@ -800,6 +840,7 @@ async function maybeExerciseContact(options: {
         runId: options.naming.runId,
         createdByRun: true,
       };
+      clearVerifiedContactRecoveryCandidate(options.summary, contactId, alias.id);
       return found;
     },
   );
@@ -1073,15 +1114,57 @@ function normalizeFailure(
 }
 
 function buildSuggestedIssueNotes(summary: SmokeRunSummary, failure: SmokeFailure): string[] {
+  const aliasState = artifactEvidenceState(
+    Boolean(summary.artifacts.alias),
+    Boolean(summary.recoveryCandidates.alias),
+  );
+  const contactState = artifactEvidenceState(
+    Boolean(summary.artifacts.contact),
+    Boolean(summary.recoveryCandidates.contact),
+  );
   return [
     `Transport: ${summary.transport}`,
     `Failed step: ${failure.step}`,
     `Tool: ${failure.tool ?? 'n/a'}`,
-    `Affected artifacts: alias=${summary.artifacts.alias ? 'temporary artifact created' : 'none'}; contact=${summary.artifacts.contact ? 'temporary artifact created' : 'none'}`,
+    `Affected artifacts: alias=${aliasState}; contact=${contactState}`,
     `Cleanup: alias=${summary.cleanup.alias.status}; contact=${summary.cleanup.contact.status}`,
     'Expected: live smoke should create only its temporary alias/contact and verify cleanup.',
     'Follow-up: include only the CLI evidence record; keep run ids, artifact ids, addresses, contacts, account data, raw errors, and server stderr private.',
   ];
+}
+
+function artifactEvidenceState(verified: boolean, unverified: boolean): string {
+  if (verified && unverified)
+    return 'verified temporary artifact plus unverified create-response id';
+  if (verified) return 'temporary artifact verified';
+  if (unverified) return 'create response returned an unverified temporary artifact id';
+  return 'none';
+}
+
+function clearVerifiedAliasRecoveryCandidate(summary: SmokeRunSummary, verifiedId: number): void {
+  if (summary.recoveryCandidates.alias?.id === verifiedId) {
+    delete summary.recoveryCandidates.alias;
+  }
+}
+
+function clearVerifiedContactRecoveryCandidate(
+  summary: SmokeRunSummary,
+  verifiedId: number,
+  verifiedAliasId: number,
+): void {
+  const candidate = summary.recoveryCandidates.contact;
+  if (candidate?.id === verifiedId && candidate.aliasId === verifiedAliasId) {
+    delete summary.recoveryCandidates.contact;
+  }
+}
+
+function markUnverifiedRecoveryCandidates(
+  cleanup: SmokeCleanupSummary,
+  candidates: SmokeRecoveryCandidates,
+): void {
+  cleanup.manualVerificationRequired.contact = Boolean(candidates.contact);
+  cleanup.manualVerificationRequired.alias = Boolean(candidates.alias);
+  cleanup.overall = summarizeCleanup(cleanup);
 }
 
 function emptyCleanupSummary(): SmokeCleanupSummary {
@@ -1089,11 +1172,14 @@ function emptyCleanupSummary(): SmokeCleanupSummary {
     overall: 'not_needed',
     alias: { status: 'not_needed', attempted: false },
     contact: { status: 'not_needed', attempted: false },
+    manualVerificationRequired: { alias: false, contact: false },
   };
 }
 
 function summarizeCleanup(cleanup: SmokeCleanupSummary): SmokeCleanupSummary['overall'] {
   if (
+    cleanup.manualVerificationRequired.alias ||
+    cleanup.manualVerificationRequired.contact ||
     cleanup.alias.status === 'delete_failed' ||
     cleanup.alias.status === 'verification_failed' ||
     cleanup.contact.status === 'delete_failed' ||

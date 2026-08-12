@@ -130,9 +130,11 @@ The in-process runner retains temporary artifact details only long enough to ver
 cleanup. For a release-candidate run, set `SMOKE_PRIVATE_RECOVERY_FILE` to a new path in a
 permission-restricted temporary directory. The runner reserves that file before connecting, and no
 recovery file remains after a successful run. On failure, it contains only the transport, run id,
-temporary artifact ids, and cleanup statuses needed for manual recovery. An abrupt process kill can
-leave an empty mode-`0600` reservation; inspect it, verify the live account is clean, and remove it
-before rerunning. Never publish that file; delete it after cleanup is verified.
+ownership-verified artifact ids, explicitly labeled unverified ids returned by create operations,
+and cleanup/manual-verification statuses. Unverified ids are private recovery clues only and are
+never used for automatic deletion. An abrupt process kill can leave an empty mode-`0600`
+reservation; inspect it, verify the live account is clean, and remove it before rerunning. Never
+publish that file; delete it after cleanup is verified.
 
 ## Reading Failures
 
@@ -141,8 +143,13 @@ On failure, review the sanitized CLI evidence and, when created, the private rec
 - `transport`: `stdio` or `http`.
 - `failure.step` and `failure.tool`: where the failure happened.
 - `cleanup`: separate status for alias and contact cleanup.
+- `cleanup.manualVerificationRequired`: whether a create response returned an id whose ownership
+  could not be verified and which therefore was not deleted automatically.
 
-If cleanup status is `delete_failed` or `verification_failed`, manually inspect the exact artifact
-id from the private recovery record in SimpleLogin before rerunning. Keep the artifact id and run id
-private; publish only the affected artifact type, cleanup status, and whether manual cleanup was
-verified, then delete the recovery record.
+If cleanup status is `delete_failed` or `verification_failed`, or a manual-verification flag is
+`true`, manually inspect the exact artifact id from the private recovery record in SimpleLogin before
+rerunning. When a manual-verification flag is true, use the corresponding `unverifiedCreateIds`
+entry only to locate the artifact, then prove ownership or absence from the private run marker; never
+delete from the returned id alone. Keep the artifact id, run id, and inspection result private;
+publish only the affected artifact type, cleanup status, and whether manual cleanup was verified,
+then delete the recovery record.
