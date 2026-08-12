@@ -10,10 +10,11 @@ secrets unless that publication step is explicitly approved.
 - Repository visibility: private, which blocks public registry publication and public source review.
 - Official MCP Registry lookup for `simplelogin`: no registered servers.
 - Glama API lookup for `enthouan/simplelogin-mcp`: `404` / server not found.
-- Current committed package version: `0.8.1`; registry metadata intentionally points at
-  `ghcr.io/enthouan/simplelogin-mcp:0.8.1`, not `latest`.
-- Authenticated inspection confirms the `0.8.1` and `latest` OCI manifests exist in GHCR, but
-  anonymous pull authorization currently fails. Package visibility, signed-out package-page access,
+- Current committed package version: `0.9.0`; registry metadata is staged for
+  `ghcr.io/enthouan/simplelogin-mcp:0.9.0`, not `latest`. The `0.9.0` image is not considered
+  available until the tag workflow publishes it and its manifest is verified.
+- Authenticated inspection previously confirmed the `0.8.1` and `latest` OCI manifests in GHCR,
+  but anonymous pull authorization failed. Package visibility, signed-out package-page access,
   anonymous pulls, and registry submission remain separate launch gates.
 - Registry server name: `io.github.enthouan/simplelogin-mcp`.
 - Local readiness drift checks are covered by `test/registry.test.ts`.
@@ -48,8 +49,8 @@ Release PRs should create or update these fields together:
 - `server.json` top-level `version`.
 - `server.json` OCI package `version`.
 - `server.json` OCI package identifier tag.
-- `registry/docker-mcp/server.yaml` image tag, with source commit filled in only after the
-  release merge/tag SHA exists.
+- `registry/docker-mcp/server.yaml` image tag; leave `source.commit` unset until a separately
+  approved registry submission can use the exact release-image source commit.
 
 ## Docker MCP Registry
 

@@ -2,10 +2,30 @@
 
 ## Unreleased
 
+## v0.9.0
+
 ### Added
 
 - Add an Astro Starlight project website with transport setup guides, prominent security guidance,
   accessible install controls, and tool coverage generated from the canonical catalog.
+- Strengthen release-candidate validation with package, Compose, local-image, MCP Registry,
+  compiled-startup, and redacted full-history secret checks.
+
+### Changed
+
+- Make Docker Compose pass only documented runtime settings into published and local-build
+  containers while preserving proxy and private-CA configuration.
+- Split website contract and browser validation into focused suites covering content, generated
+  output, publication safeguards, accessibility, navigation, and responsive behavior.
+- Pin third-party GitHub Actions to immutable commit SHAs and enforce the policy with an automated
+  workflow check.
+- Freeze the reviewed 27-tool MCP protocol contract in release validation, including tool order,
+  descriptions, schemas, annotations, and literal confirmation for permanent deletions.
+- Make live-smoke recovery safer by reserving a private recovery record before mutation, retaining
+  unverified create ids only for manual inspection, and requiring ownership evidence before
+  automatic cleanup.
+- Refresh the MCP SDK and Hono runtime stack, supported development dependencies, and GitHub Actions
+  tooling.
 
 ## v0.8.1
 
