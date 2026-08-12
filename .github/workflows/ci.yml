@@ -113,7 +113,7 @@ jobs:
         run: SL_API_KEY=compose-validation docker compose --env-file .env.example -f docker-compose.local.yml config --quiet
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
