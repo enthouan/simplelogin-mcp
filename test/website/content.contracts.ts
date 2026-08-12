@@ -187,7 +187,7 @@ export function registerContentContracts(): void {
     );
     expect(customCss).toContain('background-color: var(--simplelogin-mcp-info-bg)');
     expect(clientsHtml).toContain(
-      'aria-label="Client-tested stdio recipes" class="starlight-aside starlight-aside--note"',
+      'aria-label="Client configuration recipes" class="starlight-aside starlight-aside--note"',
     );
   });
 
@@ -501,14 +501,14 @@ export function registerContentContracts(): void {
     expect(homeHtml).not.toContain('Generic MCP');
     expect(clientsHtml).not.toContain('Generic MCP');
     expect(compatibilityHtml).toContain('Generic MCP');
-    expect(homeHtml).toContain('The documented local stdio recipes connected');
+    expect(homeHtml).toContain('The site documents local stdio recipes for all five named clients');
     expect(homeHtml).not.toContain('Client tested —');
-    expect(homeHtml).toContain('discovered all 27 tools');
+    expect(homeHtml).toContain('retained test results, unavailable');
     expect(homeHtml).not.toContain(VERIFY_PROMPT);
     expect(clientsHtml).toContain(VERIFY_PROMPT);
     expect(homeHtml).not.toContain('Do not call any other tool');
-    expect(clientsHtml).toContain('Client-tested stdio recipes');
-    expect(clientsHtml).toContain('The Streamable HTTP examples are');
+    expect(clientsHtml).toContain('Client configuration recipes');
+    expect(clientsHtml).toContain('do not by themselves prove a live');
     expect(compatibilityHtml).toContain('Configuration reviewed');
     expect(compatibilityHtml).toContain('It has not been represented as a live interoperability');
   });
@@ -822,12 +822,16 @@ export function registerContentContracts(): void {
       expect(homepageSource).toContain(`icon="${icon}"`);
     }
     expect(compatibilitySource).toContain("import { Badge } from '@astrojs/starlight/components'");
-    expect(compatibilitySource).not.toContain('Current evidence is intentionally conservative');
+    expect(compatibilitySource).toContain('Earlier maintainer checks did not retain');
     expect(
       compatibilitySource.match(
-        /<Badge text="Tested" aria-label="Client tested" title="Client tested" variant="success"/g,
+        /<Badge text="Not retested" aria-label="Not retested" title="Not retested" variant="caution"/g,
       ),
-    ).toHaveLength(5);
+    ).toHaveLength(4);
+    expect(compatibilitySource).toContain(
+      '<Badge text="Unavailable" aria-label="Client unavailable" title="Client unavailable" variant="note" size="small" style={{ whiteSpace: \'nowrap\' }} />',
+    );
+    expect(compatibilitySource).not.toContain('<Badge text="Tested"');
     expect(compatibilitySource).toContain(
       '<Badge text="Implemented" aria-label="Protocol implemented" title="Protocol implemented" variant="note" size="small" style={{ whiteSpace: \'nowrap\' }} />',
     );

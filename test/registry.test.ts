@@ -32,6 +32,7 @@ interface RegistryPackage {
 interface RegistryMetadata {
   name: string;
   title?: string;
+  description?: string;
   version: string;
   websiteUrl?: string;
   repository?: {
@@ -83,6 +84,13 @@ describe('MCP registry metadata', () => {
     expectSpecificVersion(ociPackage?.identifier.split(':').at(-1) ?? '');
   });
 
+  it('keeps the public description within the official registry limit', () => {
+    const metadata = readJson<RegistryMetadata>(SERVER_JSON_PATH);
+
+    expect(metadata.description).toBeTruthy();
+    expect(metadata.description?.length).toBeLessThanOrEqual(100);
+  });
+
   it('marks required secrets and static stdio environment without committed secret values', () => {
     const metadata = readJson<RegistryMetadata>(SERVER_JSON_PATH);
     const [ociPackage] = metadata.packages ?? [];
@@ -122,7 +130,7 @@ describe('Docker MCP Registry staging metadata', () => {
     expect(serverYaml).toContain(`image: ${GHCR_IMAGE}:${packageJson.version}`);
     expectSpecificVersion(imageTag);
     expect(serverYaml).toContain(
-      'Set commit to the merged main SHA after v0.8.1 is tagged so it matches the image source.',
+      'Set commit during the separately approved registry submission so it matches the image source.',
     );
     expect(serverYaml).not.toMatch(/^ {2}commit: [0-9a-f]{40}$/m);
     expect(serverYaml).toContain('env: SL_API_KEY');

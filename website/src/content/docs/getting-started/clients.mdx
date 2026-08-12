@@ -10,11 +10,10 @@ import VerifySetup from '../../../components/VerifySetup.astro';
 This is the detailed client setup guide. Choose one transport, keep credentials out of source
 control, and then follow the complete section for the client you already use.
 
-<Aside type="note" title="Client-tested stdio recipes">
-  Each local stdio configuration below has been maintainer-tested for connection, complete tool
-  discovery, and the read-only account-usage check. The Streamable HTTP examples are
-  documentation-reviewed but are not included in these named-client test claims. See the
-  [compatibility matrix](../compatibility/) for the exact scope.
+<Aside type="note" title="Client configuration recipes">
+  These recipes describe the expected configuration shape. They do not by themselves prove a live
+  connection, tool discovery, or an account read. See the [compatibility matrix](../compatibility/)
+  for the current retained evidence and unavailable routes.
 </Aside>
 
 ## Choose a transport
@@ -107,6 +106,6 @@ use the same low-data, read-only check for either transport.
 
 - Use [Troubleshooting](../../guides/troubleshooting/) for startup, configuration, authentication, and
   upstream API failures.
-- Use [Client compatibility](../compatibility/) to review the tested routes, evidence scope, and
+- Use [Client compatibility](../compatibility/) to review current evidence, unavailable routes, and
   transport requirements.
 - Review [Security & Data](../../guides/security/) before widening the HTTP network boundary.

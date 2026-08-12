@@ -137,8 +137,8 @@ export function registerCatalogAndRuntimeContracts(): void {
       },
     });
     expect(openCode.docsUrl).toBe('https://opencode.ai/v2/docs/mcp-servers');
-    expect(openCode.secretNote).toContain('local stdio recipe has been maintainer-tested');
-    expect(openCode.secretNote).toContain('HTTP example remains documentation-reviewed');
+    expect(openCode.secretNote).toContain('Configuration guidance is not a live interoperability');
+    expect(openCode.secretNote).toContain('compatibility matrix for current evidence');
 
     const httpConfig = JSON.parse(openCode.http.code) as {
       mcp: { servers: { simplelogin: unknown } };

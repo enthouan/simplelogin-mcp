@@ -1,25 +1,23 @@
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { TOOL_NAMES } from '../src/tools/catalog.js';
 import {
+  buildSmokeEvidence,
+  buildSmokeRecoveryRecord,
   cleanupSmokeArtifacts,
   createSmokeRunNaming,
   parseCliConfig,
   runSmokeTest,
   shouldStopSmokeTransportLoop,
+  writeSmokeRecoveryFile,
   type SmokeArtifacts,
   type SmokeMcpClient,
   type SmokeRunNaming,
 } from '../src/smoke/live.js';
 
-const ALL_TOOLS = [
-  'account_get_info',
-  'alias_list',
-  'alias_create_random',
-  'alias_get',
-  'alias_delete',
-  'contact_create',
-  'contact_list',
-  'contact_delete',
-];
+const ALL_TOOLS = [...TOOL_NAMES];
 
 class FakeSmokeClient implements SmokeMcpClient {
   readonly calls: { name: string; args?: Record<string, unknown> }[] = [];
@@ -121,6 +119,11 @@ describe('live smoke runner logic', () => {
     });
 
     expect(summary.ok).toBe(true);
+    expect(summary.toolDiscovery).toEqual({
+      expected: 27,
+      discovered: 27,
+      exactMatch: true,
+    });
     expect(summary.cleanup.contact.status).toBe('succeeded');
     expect(summary.cleanup.alias.status).toBe('succeeded');
     expect(summary.artifacts.alias?.id).toBe(101);
@@ -309,9 +312,81 @@ describe('live smoke runner logic', () => {
     });
 
     const rendered = JSON.stringify(summary);
+    const issueNotes = summary.failure?.suggestedIssueNotes.join('\n') ?? '';
     expect(rendered).toContain('[REDACTED]');
     expect(rendered).not.toContain('sl-secret');
     expect(rendered).not.toContain('mcp-secret');
+    expect(issueNotes).not.toContain(naming().runId);
+    expect(issueNotes).not.toMatch(/(?:alias|contact)_id=/);
+    expect(issueNotes).not.toContain('Error:');
+    expect(issueNotes).toContain('keep run ids, artifact ids');
+  });
+
+  it('builds portable evidence without run ids, account data, artifact ids, or errors', async () => {
+    const runNaming = naming();
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+    });
+
+    const evidence = buildSmokeEvidence(summary);
+    const rendered = JSON.stringify(evidence);
+
+    expect(evidence.ok).toBe(true);
+    expect(evidence.toolDiscovery).toEqual({ expected: 27, discovered: 27, exactMatch: true });
+    expect(evidence.contact).toEqual({ attempted: true, skipped: false });
+    expect(evidence.cleanup).toEqual({
+      overall: 'succeeded',
+      alias: { status: 'succeeded', attempted: true },
+      contact: { status: 'succeeded', attempted: true },
+    });
+    expect(rendered).not.toContain(runNaming.runId);
+    expect(rendered).not.toContain('smoke@simplelogin.example');
+    expect(rendered).not.toContain('maintainer@example.com');
+    expect(rendered).not.toMatch(/"(?:id|artifacts|message|note|reason|suggestedIssueNotes)"/);
+  });
+
+  it('builds a minimal private recovery record without addresses, contacts, or errors', async () => {
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_delete', () => {
+      throw new Error('private upstream detail');
+    });
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(client),
+      attemptContact: false,
+    });
+
+    const recovery = buildSmokeRecoveryRecord(summary);
+    const rendered = JSON.stringify(recovery);
+
+    expect(recovery).toEqual({
+      transport: 'stdio',
+      runId: runNaming.runId,
+      artifacts: { aliasId: 101 },
+      cleanup: {
+        overall: 'failed',
+        alias: 'delete_failed',
+        contact: 'not_needed',
+      },
+    });
+    expect(rendered).not.toContain('smoke@simplelogin.example');
+    expect(rendered).not.toContain(runNaming.contact);
+    expect(rendered).not.toContain('private upstream detail');
+
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    try {
+      expect(writeSmokeRecoveryFile(recoveryPath, [summary])).toBe(true);
+      expect(statSync(recoveryPath).mode & 0o777).toBe(0o600);
+      expect(readFileSync(recoveryPath, 'utf8')).toContain(runNaming.runId);
+      expect(() => writeSmokeRecoveryFile(recoveryPath, [summary])).toThrow();
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
   });
 
   it('uses unique, recognizable temporary names', () => {
@@ -412,7 +487,7 @@ describe('live smoke runner logic', () => {
     expect(summary.cleanup.alias.status).toBe('succeeded');
   });
 
-  it('fails when requested contact tools are missing', async () => {
+  it('fails when the discovered tool catalog is incomplete', async () => {
     const client = makeSuccessfulClient();
     const toolsWithoutContacts = ALL_TOOLS.filter((tool) => !tool.startsWith('contact_'));
     const missingContactClient = new FakeSmokeClient(toolsWithoutContacts, client.handlers);
@@ -424,9 +499,14 @@ describe('live smoke runner logic', () => {
     });
 
     expect(summary.ok).toBe(false);
-    expect(summary.failure?.step).toBe('check contact tools');
-    expect(summary.failure?.message).toContain('contact_create');
-    expect(summary.cleanup.alias.status).toBe('succeeded');
+    expect(summary.failure?.step).toBe('list MCP tools');
+    expect(summary.failure?.message).toContain('27-tool public contract');
+    expect(summary.toolDiscovery).toEqual({
+      expected: 27,
+      discovered: toolsWithoutContacts.length,
+      exactMatch: false,
+    });
+    expect(summary.cleanup.alias.status).toBe('not_needed');
   });
 
   it('fails when a unique smoke contact already exists', async () => {
@@ -491,12 +571,14 @@ describe('live smoke runner logic', () => {
   it('allows HTTP-only config without a local SimpleLogin API key', () => {
     const config = parseCliConfig(['--transport', 'http'], {
       MCP_AUTH_TOKEN: 'mcp-secret',
+      SMOKE_PRIVATE_RECOVERY_FILE: '/private/recovery.json',
     });
 
     expect(config.transports).toEqual(['http']);
     expect(config.apiKey).toBeUndefined();
     expect(config.serverEnv).toEqual({});
     expect(config.secrets).toEqual(['mcp-secret']);
+    expect(config.privateRecoveryFile).toBe('/private/recovery.json');
   });
 
   it('still requires a SimpleLogin API key when stdio is selected', () => {

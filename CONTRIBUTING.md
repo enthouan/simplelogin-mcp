@@ -120,7 +120,9 @@ expectations, bounds, and generated catalog text. [TOOL_CATALOG.md](TOOL_CATALOG
 rendering of that source, and [test/tools.test.ts](test/tools.test.ts) checks that:
 
 - registered tool names exactly match the catalog order;
+- the protocol-boundary digest freezes titles, descriptions, annotations, and input/output schemas;
 - tool annotations match the catalog;
+- permanent-delete tools require literal `confirm: true` over MCP;
 - bounded reads document `page_id`, limits, and defaults;
 - the concise README points readers to the generated catalog instead of duplicating it;
 - `TOOL_CATALOG.md` matches the formatted output of `renderToolCatalogMarkdown()`.

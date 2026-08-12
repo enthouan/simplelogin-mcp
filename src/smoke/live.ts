@@ -5,7 +5,7 @@
  * current run, and always attempts verified cleanup before reporting the result.
  */
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -16,6 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { redactSecrets } from '../logger.js';
+import { TOOL_NAMES } from '../tools/catalog.js';
 import { VERSION } from '../version.js';
 
 export type SmokeTransport = 'stdio' | 'http';
@@ -24,13 +25,6 @@ type StepStatus = 'ok' | 'failed' | 'skipped';
 type CleanupStatus =
   'not_needed' | 'skipped_foreign_artifact' | 'succeeded' | 'delete_failed' | 'verification_failed';
 
-const REQUIRED_TOOLS = [
-  'account_get_info',
-  'alias_list',
-  'alias_create_random',
-  'alias_get',
-  'alias_delete',
-] as const;
 const CONTACT_TOOLS = ['contact_create', 'contact_list', 'contact_delete'] as const;
 const DEFAULT_MAX_LOOKUP_PAGES = 5;
 const DEFAULT_STEP_TIMEOUT_MS = 60_000;
@@ -105,6 +99,11 @@ export interface SmokeRunSummary {
   ok: boolean;
   transport: SmokeTransport;
   runId: string;
+  toolDiscovery: {
+    expected: number;
+    discovered?: number;
+    exactMatch: boolean;
+  };
   steps: SmokeStep[];
   artifacts: SmokeArtifacts;
   cleanup: SmokeCleanupSummary;
@@ -114,6 +113,34 @@ export interface SmokeRunSummary {
     reason?: string;
   };
   failure?: SmokeFailure;
+}
+
+export interface SmokeRunEvidence {
+  ok: boolean;
+  transport: SmokeTransport;
+  toolDiscovery: SmokeRunSummary['toolDiscovery'];
+  steps: Pick<SmokeStep, 'step' | 'status' | 'tool'>[];
+  cleanup: {
+    overall: SmokeCleanupSummary['overall'];
+    alias: Pick<CleanupRecord, 'status' | 'attempted'>;
+    contact: Pick<CleanupRecord, 'status' | 'attempted'>;
+  };
+  contact: Pick<SmokeRunSummary['contact'], 'attempted' | 'skipped'>;
+  failure?: Pick<SmokeFailure, 'step' | 'tool'>;
+}
+
+export interface SmokeRecoveryRecord {
+  transport: SmokeTransport;
+  runId: string;
+  artifacts: {
+    aliasId?: number;
+    contactId?: number;
+  };
+  cleanup: {
+    overall: SmokeCleanupSummary['overall'];
+    alias: CleanupStatus;
+    contact: CleanupStatus;
+  };
 }
 
 export interface RunSmokeTestOptions {
@@ -137,6 +164,7 @@ interface CliConfig {
   mcpAuthToken?: string;
   stepTimeoutMs: number;
   maxLookupPages: number;
+  privateRecoveryFile?: string;
   serverEnv: Record<string, string>;
   secrets: string[];
 }
@@ -220,6 +248,7 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
     ok: false,
     transport: options.transport,
     runId: naming.runId,
+    toolDiscovery: { expected: TOOL_NAMES.length, exactMatch: false },
     steps: [],
     artifacts,
     cleanup: emptyCleanupSummary(),
@@ -233,7 +262,9 @@ export async function runSmokeTest(options: RunSmokeTestOptions): Promise<SmokeR
 
     const toolNames = await runStep(summary, 'list MCP tools', undefined, secrets, async () => {
       const names = await client!.listTools();
-      assertRequiredTools(names);
+      summary.toolDiscovery.discovered = names.length;
+      assertExactToolCatalog(names);
+      summary.toolDiscovery.exactMatch = true;
       return names;
     });
 
@@ -375,6 +406,64 @@ export function redactSmokeText(text: string, secrets: readonly string[] = []): 
   return redactSecrets(text, secrets);
 }
 
+export function buildSmokeEvidence(summary: SmokeRunSummary): SmokeRunEvidence {
+  return {
+    ok: summary.ok,
+    transport: summary.transport,
+    toolDiscovery: { ...summary.toolDiscovery },
+    steps: summary.steps.map(({ step, status, tool }) => ({ step, status, tool })),
+    cleanup: {
+      overall: summary.cleanup.overall,
+      alias: {
+        status: summary.cleanup.alias.status,
+        attempted: summary.cleanup.alias.attempted,
+      },
+      contact: {
+        status: summary.cleanup.contact.status,
+        attempted: summary.cleanup.contact.attempted,
+      },
+    },
+    contact: {
+      attempted: summary.contact.attempted,
+      skipped: summary.contact.skipped,
+    },
+    ...(summary.failure
+      ? { failure: { step: summary.failure.step, tool: summary.failure.tool } }
+      : {}),
+  };
+}
+
+export function buildSmokeRecoveryRecord(summary: SmokeRunSummary): SmokeRecoveryRecord {
+  return {
+    transport: summary.transport,
+    runId: summary.runId,
+    artifacts: {
+      ...(summary.artifacts.alias ? { aliasId: summary.artifacts.alias.id } : {}),
+      ...(summary.artifacts.contact ? { contactId: summary.artifacts.contact.id } : {}),
+    },
+    cleanup: {
+      overall: summary.cleanup.overall,
+      alias: summary.cleanup.alias.status,
+      contact: summary.cleanup.contact.status,
+    },
+  };
+}
+
+export function writeSmokeRecoveryFile(
+  filePath: string,
+  summaries: readonly SmokeRunSummary[],
+): boolean {
+  const failedSummaries = summaries.filter((summary) => !summary.ok);
+  if (failedSummaries.length === 0) return false;
+
+  writeFileSync(
+    filePath,
+    `${JSON.stringify({ summaries: failedSummaries.map(buildSmokeRecoveryRecord) }, null, 2)}\n`,
+    { encoding: 'utf8', flag: 'wx', mode: 0o600 },
+  );
+  return true;
+}
+
 export function shouldStopSmokeTransportLoop(
   summary: { cleanup: { overall: 'not_needed' | 'succeeded' | 'failed' } },
   receivedSignal?: NodeJS.Signals,
@@ -412,6 +501,7 @@ export function parseCliConfig(
   );
   const httpUrl = values['http-url'] ?? env['SMOKE_HTTP_URL'] ?? 'http://127.0.0.1:3000/mcp';
   const attemptContact = parseContactSetting(values, env);
+  const privateRecoveryFile = optionalEnv(env, 'SMOKE_PRIVATE_RECOVERY_FILE');
   const serverEnv = apiKey ? buildServerEnv(env, { apiKey, apiUrl }) : {};
   const secrets = [apiKey, mcpAuthToken].filter((value): value is string => Boolean(value));
 
@@ -426,6 +516,7 @@ export function parseCliConfig(
     mcpAuthToken,
     stepTimeoutMs,
     maxLookupPages,
+    privateRecoveryFile,
     serverEnv,
     secrets,
   };
@@ -844,10 +935,14 @@ function startStep(summary: SmokeRunSummary, step: string, tool?: string): Smoke
   return record;
 }
 
-function assertRequiredTools(toolNames: string[]): void {
-  const missing = REQUIRED_TOOLS.filter((tool) => !toolNames.includes(tool));
-  if (missing.length > 0) {
-    throw new Error(`MCP server is missing required smoke-test tools: ${missing.join(', ')}`);
+function assertExactToolCatalog(toolNames: string[]): void {
+  const exactMatch =
+    toolNames.length === TOOL_NAMES.length &&
+    toolNames.every((toolName, index) => toolName === TOOL_NAMES[index]);
+  if (!exactMatch) {
+    throw new Error(
+      `MCP tool catalog does not match the expected ${TOOL_NAMES.length}-tool public contract`,
+    );
   }
 }
 
@@ -915,18 +1010,14 @@ function normalizeFailure(
 }
 
 function buildSuggestedIssueNotes(summary: SmokeRunSummary, failure: SmokeFailure): string[] {
-  const aliasId = summary.artifacts.alias?.id ?? 'none';
-  const contactId = summary.artifacts.contact?.id ?? 'none';
   return [
     `Transport: ${summary.transport}`,
-    `Run id: ${summary.runId}`,
     `Failed step: ${failure.step}`,
     `Tool: ${failure.tool ?? 'n/a'}`,
-    `Error: ${failure.message}`,
-    `Artifacts: alias_id=${aliasId}; contact_id=${contactId}`,
+    `Affected artifacts: alias=${summary.artifacts.alias ? 'temporary artifact created' : 'none'}; contact=${summary.artifacts.contact ? 'temporary artifact created' : 'none'}`,
     `Cleanup: alias=${summary.cleanup.alias.status}; contact=${summary.cleanup.contact.status}`,
     'Expected: live smoke should create only its temporary alias/contact and verify cleanup.',
-    'Follow-up: include the sanitized smoke summary JSON and server stderr around this run.',
+    'Follow-up: include only the CLI evidence record; keep run ids, artifact ids, addresses, contacts, account data, raw errors, and server stderr private.',
   ];
 }
 
@@ -1096,7 +1187,17 @@ async function runCli(): Promise<void> {
     }
 
     const ok = !receivedSignal && summaries.every((summary) => summary.ok);
-    process.stdout.write(`${JSON.stringify({ ok, summaries }, null, 2)}\n`);
+    if (config.privateRecoveryFile) {
+      const recoveryPath = path.resolve(config.cwd, config.privateRecoveryFile);
+      if (writeSmokeRecoveryFile(recoveryPath, summaries)) {
+        process.stderr.write(
+          `Private recovery record written to ${recoveryPath}; delete it after manual cleanup.\n`,
+        );
+      }
+    }
+    process.stdout.write(
+      `${JSON.stringify({ ok, summaries: summaries.map(buildSmokeEvidence) }, null, 2)}\n`,
+    );
     process.exitCode = receivedSignal ? signalExitCode(receivedSignal) : ok ? 0 : 1;
   } catch (error) {
     const secrets = config?.secrets ?? [];

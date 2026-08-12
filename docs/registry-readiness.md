@@ -12,8 +12,9 @@ secrets unless that publication step is explicitly approved.
 - Glama API lookup for `enthouan/simplelogin-mcp`: `404` / server not found.
 - Current committed package version: `0.8.1`; registry metadata intentionally points at
   `ghcr.io/enthouan/simplelogin-mcp:0.8.1`, not `latest`.
-- The `0.8.1` and `latest` OCI manifests are anonymously pullable from GHCR. Repository visibility,
-  signed-out package-page access, and registry submission remain separate launch gates.
+- Authenticated inspection confirms the `0.8.1` and `latest` OCI manifests exist in GHCR, but
+  anonymous pull authorization currently fails. Package visibility, signed-out package-page access,
+  anonymous pulls, and registry submission remain separate launch gates.
 - Registry server name: `io.github.enthouan/simplelogin-mcp`.
 - Local readiness drift checks are covered by `test/registry.test.ts`.
 
@@ -36,7 +37,7 @@ Readiness checklist:
 - [ ] Verify that `https://simplelogin-mcp.com/` and
       `https://simplelogin-mcp.com/favicon.svg` both return `200` over HTTPS to a signed-out visitor
       before publishing registry metadata that links to them.
-- [x] Publish an anonymously pullable semver GHCR image for the target release before publishing
+- [ ] Publish an anonymously pullable semver GHCR image for the target release before publishing
       matching registry metadata.
 - [ ] Authenticate with `mcp-publisher` using GitHub auth or GitHub OIDC.
 - [ ] Run `mcp-publisher publish` only after the publication step is explicitly approved.
@@ -88,13 +89,15 @@ Current readiness:
   on `main` and semver tags.
 - Image labels and index annotations include source, revision, license, Actions run URL, and MCP
   server-name metadata.
+- Current multi-platform release images include per-platform SLSA provenance attestations.
 - CI pull requests validate the Docker metadata path without publishing.
 - The default Compose file pulls from GHCR, while `docker-compose.local.yml` builds from the local
   checkout for image validation.
 
 Remaining before public launch:
 
-- decide whether GHCR provenance, SBOM, or signing should be added before 1.0;
+- decide whether SBOMs or additional image signing should be added before 1.0, and document how to
+  verify the existing provenance attestations;
 - verify released image tags with `docker buildx imagetools inspect`;
 - keep public registry metadata on semver tags, not `latest`;
 - document any new registry authentication secret before adding it to GitHub Actions.
