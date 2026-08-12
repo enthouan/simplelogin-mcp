@@ -26,9 +26,10 @@ Optional:
 - `SMOKE_STEP_TIMEOUT_MS`: MCP request timeout for each step. Defaults to `60000`.
 - `SMOKE_MAX_LOOKUP_PAGES`: contact read-back/cleanup verification page bound. Defaults to `5`.
 - `SMOKE_STDIO_SERVER`: built server entry for stdio mode. Defaults to `dist/index.js`.
-- `SMOKE_PRIVATE_RECOVERY_FILE`: optional path for a new mode-`0600` private recovery record when a
-  run fails. The runner refuses to overwrite an existing file. Keep it outside the repository and
-  delete it after any required manual cleanup.
+- `SMOKE_PRIVATE_RECOVERY_FILE`: optional path reserved as a new mode-`0600` private recovery record
+  before any MCP connection or live mutation. The runner refuses to overwrite an existing file and
+  exits before the smoke if it cannot reserve the path. Keep it outside the repository and delete it
+  after any required manual cleanup.
 
 ## Stdio
 
@@ -127,9 +128,11 @@ does not satisfy that criterion.
 
 The in-process runner retains temporary artifact details only long enough to verify ownership and
 cleanup. For a release-candidate run, set `SMOKE_PRIVATE_RECOVERY_FILE` to a new path in a
-permission-restricted temporary directory. No recovery file is created on success. On failure, it
-contains only the transport, run id, temporary artifact ids, and cleanup statuses needed for manual
-recovery. Never publish that file; delete it after cleanup is verified.
+permission-restricted temporary directory. The runner reserves that file before connecting, and no
+recovery file remains after a successful run. On failure, it contains only the transport, run id,
+temporary artifact ids, and cleanup statuses needed for manual recovery. An abrupt process kill can
+leave an empty mode-`0600` reservation; inspect it, verify the live account is clean, and remove it
+before rerunning. Never publish that file; delete it after cleanup is verified.
 
 ## Reading Failures
 

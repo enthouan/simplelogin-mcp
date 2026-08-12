@@ -1,4 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +17,9 @@ import {
   cleanupSmokeArtifacts,
   createSmokeRunNaming,
   parseCliConfig,
+  releaseSmokeRecoveryFile,
+  reserveSmokeRecoveryFile,
+  runSmokeCli,
   runSmokeTest,
   shouldStopSmokeTransportLoop,
   writeSmokeRecoveryFile,
@@ -380,10 +391,226 @@ describe('live smoke runner logic', () => {
     const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
     const recoveryPath = join(recoveryDirectory, 'recovery.json');
     try {
-      expect(writeSmokeRecoveryFile(recoveryPath, [summary])).toBe(true);
+      const reservation = reserveSmokeRecoveryFile(recoveryPath);
+      expect(() => reserveSmokeRecoveryFile(recoveryPath)).toThrow();
       expect(statSync(recoveryPath).mode & 0o777).toBe(0o600);
+      expect(writeSmokeRecoveryFile(reservation, [summary])).toBe(true);
+      releaseSmokeRecoveryFile(reservation, true);
       expect(readFileSync(recoveryPath, 'utf8')).toContain(runNaming.runId);
-      expect(() => writeSmokeRecoveryFile(recoveryPath, [summary])).toThrow();
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes a reserved private recovery file when the smoke succeeds', async () => {
+    const runNaming = naming();
+    const summary = await runSmokeTest({
+      transport: 'stdio',
+      naming: runNaming,
+      clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+    });
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    try {
+      const reservation = reserveSmokeRecoveryFile(recoveryPath);
+      expect(writeSmokeRecoveryFile(reservation, [summary])).toBe(false);
+      releaseSmokeRecoveryFile(reservation, false);
+      expect(existsSync(recoveryPath)).toBe(false);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects existing and symlink recovery paths without overwriting their targets', () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const existingPath = join(recoveryDirectory, 'existing.json');
+    const symlinkPath = join(recoveryDirectory, 'symlink.json');
+    try {
+      writeFileSync(existingPath, 'owner data', 'utf8');
+      symlinkSync(existingPath, symlinkPath);
+
+      expect(() => reserveSmokeRecoveryFile(existingPath)).toThrow();
+      expect(() => reserveSmokeRecoveryFile(symlinkPath)).toThrow();
+      expect(readFileSync(existingPath, 'utf8')).toBe('owner data');
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts recovery preflight before creating an MCP client', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const existingPath = join(recoveryDirectory, 'existing.json');
+    writeFileSync(existingPath, 'owner data', 'utf8');
+    let clientFactoryCalls = 0;
+    const stderr: string[] = [];
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_PRIVATE_RECOVERY_FILE: existingPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => {
+          clientFactoryCalls++;
+          return Promise.resolve(makeSuccessfulClient());
+        },
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: (output) => stderr.push(output),
+      });
+
+      expect(exitCode).toBe(1);
+      expect(clientFactoryCalls).toBe(0);
+      expect(readFileSync(existingPath, 'utf8')).toBe('owner data');
+      expect(stderr.join('')).not.toContain('private-api-key');
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts an invalid recovery parent before creating an MCP client', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    let clientFactoryCalls = 0;
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_PRIVATE_RECOVERY_FILE: join(recoveryDirectory, 'missing', 'recovery.json'),
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => {
+          clientFactoryCalls++;
+          return Promise.resolve(makeSuccessfulClient());
+        },
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      expect(exitCode).toBe(1);
+      expect(clientFactoryCalls).toBe(0);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('removes the preflight reservation after a successful CLI smoke', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => Promise.resolve(makeSuccessfulClient(runNaming)),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      expect(exitCode).toBe(0);
+      expect(existsSync(recoveryPath)).toBe(false);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('prints sanitized evidence and exits nonzero when a late recovery write fails', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    const client = makeSuccessfulClient(runNaming);
+    client.setHandler('alias_delete', () => {
+      throw new Error('private-api-key late cleanup detail');
+    });
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'stdio'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: () => Promise.resolve(client),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        recoveryFileOperations: {
+          write: () => {
+            throw new Error('private write implementation detail');
+          },
+        },
+        writeStdout: (output) => stdout.push(output),
+        writeStderr: (output) => stderr.push(output),
+      });
+
+      expect(exitCode).toBe(1);
+      expect(JSON.parse(stdout.join(''))).toMatchObject({
+        ok: false,
+        summaries: [{ transport: 'stdio', cleanup: { overall: 'failed' } }],
+      });
+      expect(stdout.join('')).not.toContain('private-api-key');
+      expect(stdout.join('')).not.toContain(runNaming.runId);
+      expect(stderr.join('')).toContain('Private recovery record could not be completed');
+      expect(stderr.join('')).not.toContain('private write implementation detail');
+      expect(stderr.join('')).not.toContain('private-api-key');
+      expect(existsSync(recoveryPath)).toBe(true);
+      expect(statSync(recoveryPath).mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(recoveryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('shares one recovery reservation and retains only failed transport summaries', async () => {
+    const recoveryDirectory = mkdtempSync(join(tmpdir(), 'simplelogin-mcp-smoke-'));
+    const recoveryPath = join(recoveryDirectory, 'recovery.json');
+    const runNaming = naming();
+    const stdioClient = makeSuccessfulClient(runNaming);
+    const httpClient = makeSuccessfulClient(runNaming);
+    httpClient.setHandler('account_get_info', () => {
+      throw new Error('HTTP read failed');
+    });
+    let reservationCount = 0;
+    try {
+      const exitCode = await runSmokeCli({
+        argv: ['--transport', 'all'],
+        env: {
+          SL_API_KEY: 'private-api-key',
+          SMOKE_CONTACT: 'skip',
+          SMOKE_PRIVATE_RECOVERY_FILE: recoveryPath,
+        },
+        cwd: recoveryDirectory,
+        clientFactory: (transport) =>
+          Promise.resolve(transport === 'stdio' ? stdioClient : httpClient),
+        namingFactory: () => runNaming,
+        signalHandlerInstaller: () => () => undefined,
+        recoveryFileOperations: {
+          reserve: (filePath) => {
+            reservationCount++;
+            return reserveSmokeRecoveryFile(filePath);
+          },
+        },
+        writeStdout: () => undefined,
+        writeStderr: () => undefined,
+      });
+
+      const recovery = JSON.parse(readFileSync(recoveryPath, 'utf8')) as {
+        summaries: { transport: string }[];
+      };
+      expect(exitCode).toBe(1);
+      expect(reservationCount).toBe(1);
+      expect(recovery.summaries).toHaveLength(1);
+      expect(recovery.summaries[0]?.transport).toBe('http');
     } finally {
       rmSync(recoveryDirectory, { recursive: true, force: true });
     }

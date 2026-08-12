@@ -5,7 +5,15 @@
  * current run, and always attempts verified cleanup before reporting the result.
  */
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  fchmodSync,
+  fsyncSync,
+  openSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -66,6 +74,12 @@ export interface SmokeContactArtifact extends SmokeArtifact {
 export interface SmokeArtifacts {
   alias?: SmokeAliasArtifact;
   contact?: SmokeContactArtifact;
+}
+
+export interface SmokeRecoveryFileReservation {
+  filePath: string;
+  fileDescriptor: number;
+  released: boolean;
 }
 
 interface SmokeStep {
@@ -151,6 +165,24 @@ export interface RunSmokeTestOptions {
   maxLookupPages?: number;
   secrets?: readonly string[];
   abortSignal?: AbortSignal;
+}
+
+interface SmokeRecoveryFileOperations {
+  reserve: typeof reserveSmokeRecoveryFile;
+  write: typeof writeSmokeRecoveryFile;
+  release: typeof releaseSmokeRecoveryFile;
+}
+
+export interface RunSmokeCliOptions {
+  argv?: readonly string[];
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
+  clientFactory?: SmokeClientFactory;
+  namingFactory?: (transport: SmokeTransport) => SmokeRunNaming;
+  writeStdout?: (output: string) => void;
+  writeStderr?: (output: string) => void;
+  signalHandlerInstaller?: typeof installSignalHandlers;
+  recoveryFileOperations?: Partial<SmokeRecoveryFileOperations>;
 }
 
 interface CliConfig {
@@ -449,19 +481,50 @@ export function buildSmokeRecoveryRecord(summary: SmokeRunSummary): SmokeRecover
   };
 }
 
+export function reserveSmokeRecoveryFile(filePath: string): SmokeRecoveryFileReservation {
+  const fileDescriptor = openSync(filePath, 'wx', 0o600);
+  try {
+    fchmodSync(fileDescriptor, 0o600);
+  } catch (error) {
+    try {
+      closeSync(fileDescriptor);
+    } catch {
+      // Preserve the original preflight error.
+    }
+    try {
+      unlinkSync(filePath);
+    } catch {
+      // Preserve the original preflight error.
+    }
+    throw error;
+  }
+  return { filePath, fileDescriptor, released: false };
+}
+
 export function writeSmokeRecoveryFile(
-  filePath: string,
+  reservation: SmokeRecoveryFileReservation,
   summaries: readonly SmokeRunSummary[],
 ): boolean {
   const failedSummaries = summaries.filter((summary) => !summary.ok);
   if (failedSummaries.length === 0) return false;
 
   writeFileSync(
-    filePath,
+    reservation.fileDescriptor,
     `${JSON.stringify({ summaries: failedSummaries.map(buildSmokeRecoveryRecord) }, null, 2)}\n`,
-    { encoding: 'utf8', flag: 'wx', mode: 0o600 },
+    { encoding: 'utf8' },
   );
+  fsyncSync(reservation.fileDescriptor);
   return true;
+}
+
+export function releaseSmokeRecoveryFile(
+  reservation: SmokeRecoveryFileReservation,
+  keepFile: boolean,
+): void {
+  if (reservation.released) return;
+  closeSync(reservation.fileDescriptor);
+  reservation.released = true;
+  if (!keepFile) unlinkSync(reservation.filePath);
 }
 
 export function shouldStopSmokeTransportLoop(
@@ -1156,20 +1219,38 @@ function buildServerEnv(
   return serverEnv;
 }
 
-async function runCli(): Promise<void> {
+export async function runSmokeCli(options: RunSmokeCliOptions = {}): Promise<number> {
   let config: CliConfig | undefined;
   let receivedSignal: NodeJS.Signals | undefined;
   let removeSignalHandlers: (() => void) | undefined;
+  let recoveryReservation: SmokeRecoveryFileReservation | undefined;
+  let keepRecoveryFile = true;
+  let recoveryOperationFailed = false;
+  let exitCode: number | undefined;
+  const writeStdout = options.writeStdout ?? ((output: string) => process.stdout.write(output));
+  const writeStderr = options.writeStderr ?? ((output: string) => process.stderr.write(output));
+  const recoveryFileOperations: SmokeRecoveryFileOperations = {
+    reserve: reserveSmokeRecoveryFile,
+    write: writeSmokeRecoveryFile,
+    release: releaseSmokeRecoveryFile,
+    ...options.recoveryFileOperations,
+  };
   try {
-    config = parseCliConfig(process.argv.slice(2));
+    config = parseCliConfig(
+      options.argv ?? process.argv.slice(2),
+      options.env ?? process.env,
+      options.cwd ?? process.cwd(),
+    );
+    if (config.privateRecoveryFile) {
+      recoveryReservation = recoveryFileOperations.reserve(
+        path.resolve(config.cwd, config.privateRecoveryFile),
+      );
+    }
     const abortController = new AbortController();
-    removeSignalHandlers = installSignalHandlers((signal) => {
+    removeSignalHandlers = (options.signalHandlerInstaller ?? installSignalHandlers)((signal) => {
       receivedSignal = signal;
       abortController.abort(signal);
-      process.exitCode = signalExitCode(signal);
-      process.stderr.write(
-        `Received ${signal}; waiting for active smoke run cleanup before exiting.\n`,
-      );
+      writeStderr(`Received ${signal}; waiting for active smoke run cleanup before exiting.\n`);
     });
     const summaries: SmokeRunSummary[] = [];
     for (const transport of config.transports) {
@@ -1180,34 +1261,58 @@ async function runCli(): Promise<void> {
         maxLookupPages: config.maxLookupPages,
         secrets: config.secrets,
         abortSignal: abortController.signal,
-        clientFactory: (selectedTransport) => connectMcpSmokeClient(selectedTransport, config!),
+        naming: options.namingFactory?.(transport),
+        clientFactory:
+          options.clientFactory ??
+          ((selectedTransport) => connectMcpSmokeClient(selectedTransport, config!)),
       });
       summaries.push(summary);
       if (shouldStopSmokeTransportLoop(summary, receivedSignal)) break;
     }
 
     const ok = !receivedSignal && summaries.every((summary) => summary.ok);
-    if (config.privateRecoveryFile) {
-      const recoveryPath = path.resolve(config.cwd, config.privateRecoveryFile);
-      if (writeSmokeRecoveryFile(recoveryPath, summaries)) {
-        process.stderr.write(
-          `Private recovery record written to ${recoveryPath}; delete it after manual cleanup.\n`,
-        );
-      }
-    }
-    process.stdout.write(
+    writeStdout(
       `${JSON.stringify({ ok, summaries: summaries.map(buildSmokeEvidence) }, null, 2)}\n`,
     );
-    process.exitCode = receivedSignal ? signalExitCode(receivedSignal) : ok ? 0 : 1;
+    if (recoveryReservation) {
+      try {
+        keepRecoveryFile = recoveryFileOperations.write(recoveryReservation, summaries);
+        if (keepRecoveryFile) {
+          writeStderr(
+            `Private recovery record written to ${recoveryReservation.filePath}; delete it after manual cleanup.\n`,
+          );
+        }
+      } catch {
+        keepRecoveryFile = true;
+        recoveryOperationFailed = true;
+      }
+    }
+    exitCode = receivedSignal ? signalExitCode(receivedSignal) : ok ? 0 : 1;
   } catch (error) {
     const secrets = config?.secrets ?? [];
-    process.stderr.write(
-      `Live smoke test failed: ${redactSmokeText(errorMessage(error), secrets)}\n`,
-    );
-    process.exitCode = 1;
+    writeStderr(`Live smoke test failed: ${redactSmokeText(errorMessage(error), secrets)}\n`);
+    exitCode = 1;
   } finally {
     removeSignalHandlers?.();
+    if (recoveryReservation) {
+      try {
+        recoveryFileOperations.release(recoveryReservation, keepRecoveryFile);
+      } catch {
+        recoveryOperationFailed = true;
+      }
+    }
+    if (recoveryOperationFailed) {
+      writeStderr(
+        'Private recovery record could not be completed; inspect the reserved file and live account before rerunning.\n',
+      );
+      exitCode = 1;
+    }
   }
+  return exitCode ?? 1;
+}
+
+async function runCli(): Promise<void> {
+  process.exitCode = await runSmokeCli();
 }
 
 function installSignalHandlers(onSignal: (signal: NodeJS.Signals) => void): () => void {
