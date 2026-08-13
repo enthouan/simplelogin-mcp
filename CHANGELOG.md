@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## v1.0.0
+
+### Added
+
+- Display the public GitHub repository's star count in the website's desktop and mobile navigation,
+  using one bounded build-time request with an accessible count-free fallback when GitHub is
+  unavailable.
+
+### Fixed
+
+- Harden GitHub Actions pinning tests against malformed slash-separated action references and
+  replace the CodeQL-flagged generic HTML tag matcher in website contracts with a direct rendered
+  disclaimer assertion.
+
 ## v0.9.0
 
 ### Added
