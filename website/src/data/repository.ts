@@ -1,7 +1,6 @@
 export const REPOSITORY_URL = 'https://github.com/enthouan/simplelogin-mcp';
 export const REPOSITORY_API_URL = 'https://api.github.com/repos/enthouan/simplelogin-mcp';
 
-const REPOSITORY_ACTION_TEXT = 'View on GitHub';
 const REPOSITORY_METADATA_TIMEOUT_MS = 2_000;
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -25,12 +24,6 @@ export type RepositoryFetch = (
     signal: AbortSignal;
   },
 ) => Promise<RepositoryResponse>;
-
-interface RepositoryHeroAction {
-  text: string;
-  link: string;
-  attrs?: Record<string, string | number | boolean> | undefined;
-}
 
 function isRepositoryStarCount(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0 && !Object.is(value, -0);
@@ -88,26 +81,17 @@ export function createRepositoryStarCountLoader(
   return () => (request ??= fetchRepositoryStarCount(fetchImpl, timeoutMs));
 }
 
-export function formatRepositoryActionText(starCount: number | undefined): string {
-  if (!isRepositoryStarCount(starCount)) return REPOSITORY_ACTION_TEXT;
+export function formatRepositoryStarCount(starCount: number | undefined): string | undefined {
+  if (!isRepositoryStarCount(starCount)) return undefined;
 
-  const unit = starCount === 1 ? 'star' : 'stars';
-  return `${REPOSITORY_ACTION_TEXT} · ${compactNumberFormatter.format(starCount)} ${unit}`;
+  return compactNumberFormatter.format(starCount);
 }
 
-export function populateRepositoryHeroAction<Action extends RepositoryHeroAction>(
-  action: Action,
-  starCount: number | undefined,
-): Action {
-  if (
-    action.link !== REPOSITORY_URL ||
-    action.attrs?.['data-repository-action'] !== true ||
-    starCount === undefined
-  ) {
-    return action;
-  }
+export function formatRepositoryStarCountLabel(starCount: number | undefined): string | undefined {
+  if (!isRepositoryStarCount(starCount)) return undefined;
 
-  return Object.assign({}, action, { text: formatRepositoryActionText(starCount) });
+  const unit = starCount === 1 ? 'star' : 'stars';
+  return `${compactNumberFormatter.format(starCount)} ${unit}`;
 }
 
 export const getRepositoryStarCount = createRepositoryStarCountLoader();

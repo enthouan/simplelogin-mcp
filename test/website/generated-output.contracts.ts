@@ -6,14 +6,17 @@ import { CANONICAL_WEBSITE_URL } from '../../website/src/data/publication.js';
 import { REPOSITORY_URL } from '../../website/src/data/repository.js';
 import {
   apiKeyHtml,
+  fallbackInstallHtml,
   fallbackHomeHtml,
+  fallbackOutputRoot,
+  githubHeroActionFromHtml,
   homeHtml,
   installHtml,
   listFiles,
   outputRoot,
   readOutputFile,
   readRepoFile,
-  repositoryActionFromHtml,
+  repositoryNavigationLinksFromHtml,
 } from './support.js';
 
 const LEGACY_REDIRECTS = {
@@ -226,18 +229,42 @@ export function registerGeneratedOutputContracts(): void {
     expect(homeHtml).toContain('<meta property="og:image:width" content="1200"/>');
     expect(homeHtml).toContain('<meta property="og:image:height" content="630"/>');
     expect(homeHtml).toContain(`href="${REPOSITORY_URL}"`);
-    const githubHeroAction = repositoryActionFromHtml(homeHtml);
-    const fallbackGithubHeroAction = repositoryActionFromHtml(fallbackHomeHtml);
+    const githubHeroAction = githubHeroActionFromHtml(homeHtml);
+    const fallbackGithubHeroAction = githubHeroActionFromHtml(fallbackHomeHtml);
     expect(githubHeroAction).not.toBe('');
     expect(githubHeroAction).toContain('<svg');
     expect(githubHeroAction).toContain('rel="external"');
     expect(githubHeroAction).toContain('referrerpolicy="no-referrer"');
-    expect(githubHeroAction).toMatch(/View on GitHub · 1\.2K stars<\/a>$/);
+    expect(githubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(githubHeroAction).not.toMatch(/\bstars?\b/);
     expect(fallbackGithubHeroAction).not.toBe('');
     expect(fallbackGithubHeroAction).toContain('<svg');
     expect(fallbackGithubHeroAction).toContain('rel="external"');
     expect(fallbackGithubHeroAction).toContain('referrerpolicy="no-referrer"');
     expect(fallbackGithubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(fallbackGithubHeroAction).not.toMatch(/\bstars?\b/);
+    const populatedNavigationLinks = repositoryNavigationLinksFromHtml(installHtml);
+    const fallbackNavigationLinks = repositoryNavigationLinksFromHtml(fallbackInstallHtml);
+    expect(populatedNavigationLinks).toHaveLength(2);
+    expect(fallbackNavigationLinks).toHaveLength(2);
+    for (const navigationLink of populatedNavigationLinks) {
+      expect(navigationLink).toContain(`href="${REPOSITORY_URL}"`);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(2);
+      expect(navigationLink).toContain(
+        'aria-label="simplelogin-mcp source repository, 1.2K stars"',
+      );
+      expect(navigationLink).toMatch(/<span[^>]*>1\.2K<\/span>/);
+    }
+    for (const navigationLink of fallbackNavigationLinks) {
+      expect(navigationLink).toContain(`href="${REPOSITORY_URL}"`);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(1);
+      expect(navigationLink).toContain('aria-label="simplelogin-mcp source repository"');
+      expect(navigationLink).not.toMatch(/\bstars?\b/);
+    }
     expect(homeHtml).not.toContain('>Star on GitHub<');
     expect(homeHtml).not.toContain('>Node 24<');
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
@@ -261,15 +288,17 @@ export function registerGeneratedOutputContracts(): void {
   });
 
   it('keeps GitHub metadata requests and credentials out of generated visitor assets', async () => {
-    const textFiles = (await listFiles(outputRoot)).filter((path) =>
-      /\.(?:css|html|js|json|map|svg|txt|xml)$/.test(path),
-    );
-
-    for (const path of textFiles) {
-      const output = await readOutputFile(path);
-      expect(output, path).not.toMatch(
-        /api\.github\.com|stargazers_count|\/stargazers\b|shields\.io|github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+/i,
+    for (const root of [outputRoot, fallbackOutputRoot]) {
+      const textFiles = (await listFiles(root)).filter((path) =>
+        /\.(?:css|html|js|json|map|svg|txt|xml)$/.test(path),
       );
+
+      for (const path of textFiles) {
+        const output = await readOutputFile(path, root);
+        expect(output, `${root}:${path}`).not.toMatch(
+          /api\.github\.com|stargazers_count|\/stargazers\b|shields\.io|github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+/i,
+        );
+      }
     }
   });
 

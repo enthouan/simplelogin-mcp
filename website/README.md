@@ -91,10 +91,12 @@ header after the first preview deployment. No website publication or base-URL en
 is required.
 
 Repository links and GitHub actions are always rendered. Each build makes one memoized,
-best-effort, unauthenticated request for the public repository's current star count. The lookup has
-a two-second timeout and falls back to the count-free **View on GitHub** action after a network
-error, malformed response, non-success response, rate limit, or invalid count. Repository cards
-remain limited to static project facts such as the MIT license, supported Node version, and
+best-effort, unauthenticated request for the public repository's current star count. When the
+lookup succeeds, Starlight's GitHub navigation link displays the compact count in the desktop
+header and mobile documentation menu. The homepage **View on GitHub** action stays count-free. The
+lookup has a two-second timeout and falls back to the accessible icon-only navigation link after a
+network error, malformed response, non-success response, rate limit, or invalid count. Repository
+cards remain limited to static project facts such as the MIT license, supported Node version, and
 self-hosting model. The generated site contains no GitHub credential or API endpoint, and visitors'
 browsers make no GitHub metadata request.
 

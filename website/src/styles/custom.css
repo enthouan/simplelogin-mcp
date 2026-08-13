@@ -158,10 +158,6 @@ html[data-has-hero] .hero {
   background: #181717;
 }
 
-[data-repository-action] {
-  white-space: nowrap;
-}
-
 [data-github-action]:hover {
   border-color: #000000;
 }

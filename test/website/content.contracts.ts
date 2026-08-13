@@ -9,8 +9,8 @@ import {
   REPOSITORY_URL,
   createRepositoryStarCountLoader,
   fetchRepositoryStarCount,
-  formatRepositoryActionText,
-  populateRepositoryHeroAction,
+  formatRepositoryStarCount,
+  formatRepositoryStarCountLabel,
 } from '../../website/src/data/repository.js';
 import type { RepositoryFetch } from '../../website/src/data/repository.js';
 import {
@@ -22,6 +22,8 @@ import {
   contributingHtml,
   faqHtml,
   fallbackHomeHtml,
+  fallbackInstallHtml,
+  githubHeroActionFromHtml,
   homeHtml,
   howItWorksHtml,
   installHtml,
@@ -32,7 +34,7 @@ import {
   readRepoFile,
   referenceHtml,
   reportingIssuesHtml,
-  repositoryActionFromHtml,
+  repositoryNavigationLinksFromHtml,
   securityHtml,
   securityPolicyHtml,
   toolsHtml,
@@ -188,8 +190,9 @@ export function registerContentContracts(): void {
     expect(homeHtml).not.toContain('SimpleLogin × Model Context Protocol');
     expect(homeHtml).not.toMatch(/api\.github\.com|shields\.io|\/stargazers/);
     const headerHtml = homeHtml.slice(homeHtml.indexOf('<header'), homeHtml.indexOf('</header>'));
-    expect(headerHtml).toContain(`<a href="${REPOSITORY_URL}" rel="me"`);
-    expect(headerHtml).toContain('>simplelogin-mcp source repository</span>');
+    expect(headerHtml).toContain(`<a href="${REPOSITORY_URL}" rel="me external"`);
+    expect(headerHtml).toContain('aria-label="simplelogin-mcp source repository, 1.2K stars"');
+    expect(headerHtml).toMatch(/<span[^>]*>1\.2K<\/span>/);
 
     const customCss = await readRepoFile('website/src/styles/custom.css');
     expect(customCss).toMatch(/#ea319f|#ff93c9/);
@@ -274,9 +277,19 @@ export function registerContentContracts(): void {
   });
 
   it('renders static repository trust details alongside best-effort build metadata', async () => {
-    const [repositorySource, repositoryDataSource, websiteReadme] = await Promise.all([
+    const [
+      repositorySource,
+      repositoryDataSource,
+      repositorySocialLinkSource,
+      routeDataSource,
+      astroConfig,
+      websiteReadme,
+    ] = await Promise.all([
       readRepoFile('website/src/components/RepositoryLink.astro'),
       readRepoFile('website/src/data/repository.ts'),
+      readRepoFile('website/src/components/RepositorySocialLink.astro'),
+      readRepoFile('website/src/starlightRouteData.ts'),
+      readRepoFile('website/astro.config.mjs'),
       readRepoFile('website/README.md'),
     ]);
 
@@ -296,6 +309,11 @@ export function registerContentContracts(): void {
     expect(repositoryDataSource).not.toMatch(/Authorization|PUBLIC_|process\.env|console\./);
     expect(repositorySource).toContain('--sl-card-border: var(--sl-color-gray-5)');
     expect(repositorySource).toContain('--sl-card-bg: var(--sl-color-gray-6)');
+    expect(astroConfig).toContain("SocialIcons: './src/components/RepositorySocialLink.astro'");
+    expect(repositorySocialLinkSource).toContain('await getRepositoryStarCount()');
+    expect(repositorySocialLinkSource).toContain('data-repository-navigation');
+    expect(repositorySocialLinkSource).not.toMatch(/client:|<script|fetch\(/);
+    expect(routeDataSource).not.toMatch(/getRepositoryStarCount|populateRepositoryHeroAction/);
     expect(websiteReadme).toContain('Each build makes one memoized');
     expect(websiteReadme).toContain('two-second timeout');
     expect(websiteReadme).toMatch(/visitors'\s+browsers make no GitHub metadata request/);
@@ -327,16 +345,20 @@ export function registerContentContracts(): void {
     expect(requestHeaders).not.toHaveProperty('Authorization');
   });
 
-  it('accepts zero stars and formats compact populated and count-free fallback actions', async () => {
+  it('accepts zero stars and formats compact populated navigation counts', async () => {
     const zero = await fetchRepositoryStarCount(() =>
       Promise.resolve(repositoryResponse({ stargazers_count: 0 })),
     );
 
     expect(zero).toBe(0);
-    expect(formatRepositoryActionText(zero)).toBe('View on GitHub · 0 stars');
-    expect(formatRepositoryActionText(1)).toBe('View on GitHub · 1 star');
-    expect(formatRepositoryActionText(1_234)).toBe('View on GitHub · 1.2K stars');
-    expect(formatRepositoryActionText(undefined)).toBe('View on GitHub');
+    expect(formatRepositoryStarCount(zero)).toBe('0');
+    expect(formatRepositoryStarCount(1)).toBe('1');
+    expect(formatRepositoryStarCount(1_234)).toBe('1.2K');
+    expect(formatRepositoryStarCount(undefined)).toBeUndefined();
+    expect(formatRepositoryStarCountLabel(zero)).toBe('0 stars');
+    expect(formatRepositoryStarCountLabel(1)).toBe('1 star');
+    expect(formatRepositoryStarCountLabel(1_234)).toBe('1.2K stars');
+    expect(formatRepositoryStarCountLabel(undefined)).toBeUndefined();
   });
 
   it.each([
@@ -397,37 +419,6 @@ export function registerContentContracts(): void {
     await expect(loadStarCount()).resolves.toBeUndefined();
     await expect(loadStarCount()).resolves.toBeUndefined();
     expect(requestCount).toBe(1);
-  });
-
-  it('populates only the marked repository hero action and preserves its semantics', () => {
-    const action = {
-      text: 'View on GitHub',
-      link: REPOSITORY_URL,
-      icon: { type: 'icon' as const, name: 'github' as const },
-      variant: 'secondary' as const,
-      attrs: {
-        'data-github-action': true,
-        'data-repository-action': true,
-        iconPlacement: 'start',
-        rel: 'external',
-        referrerpolicy: 'no-referrer',
-      },
-    };
-
-    expect(populateRepositoryHeroAction(action, 1_234)).toEqual({
-      ...action,
-      text: 'View on GitHub · 1.2K stars',
-    });
-    expect(populateRepositoryHeroAction(action, undefined)).toBe(action);
-    expect(
-      populateRepositoryHeroAction(
-        { ...action, attrs: { ...action.attrs, 'data-repository-action': false } },
-        1_234,
-      ).text,
-    ).toBe('View on GitHub');
-    expect(
-      populateRepositoryHeroAction({ ...action, link: `${REPOSITORY_URL}/issues` }, 1_234).text,
-    ).toBe('View on GitHub');
   });
 
   it('renders every documented procedure as distinct Starlight steps', async () => {
@@ -609,21 +600,42 @@ export function registerContentContracts(): void {
       );
     }
 
-    const githubHeroAction = repositoryActionFromHtml(homeHtml);
-    const fallbackGithubHeroAction = repositoryActionFromHtml(fallbackHomeHtml);
+    const githubHeroAction = githubHeroActionFromHtml(homeHtml);
+    const fallbackGithubHeroAction = githubHeroActionFromHtml(fallbackHomeHtml);
     expect(githubHeroAction).not.toBe('');
     expect(githubHeroAction).toContain('<svg');
     expect(githubHeroAction.indexOf('<svg')).toBeLessThan(
       githubHeroAction.indexOf('View on GitHub'),
     );
-    expect(githubHeroAction).toMatch(/View on GitHub · 1\.2K stars<\/a>$/);
+    expect(githubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(githubHeroAction).not.toMatch(/\bstars?\b/);
     expect(githubHeroAction).toContain('rel="external"');
     expect(githubHeroAction).toContain('referrerpolicy="no-referrer"');
     expect(fallbackGithubHeroAction).not.toBe('');
     expect(fallbackGithubHeroAction).toContain('<svg');
     expect(fallbackGithubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(fallbackGithubHeroAction).not.toMatch(/\bstars?\b/);
     expect(fallbackGithubHeroAction).toContain('rel="external"');
     expect(fallbackGithubHeroAction).toContain('referrerpolicy="no-referrer"');
+    for (const navigationLink of repositoryNavigationLinksFromHtml(homeHtml)) {
+      expect(navigationLink).toContain(
+        'aria-label="simplelogin-mcp source repository, 1.2K stars"',
+      );
+      expect(navigationLink).toMatch(/<span[^>]*>1\.2K<\/span>/);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(2);
+    }
+    expect(repositoryNavigationLinksFromHtml(homeHtml)).toHaveLength(1);
+    expect(repositoryNavigationLinksFromHtml(installHtml)).toHaveLength(2);
+    for (const navigationLink of repositoryNavigationLinksFromHtml(fallbackInstallHtml)) {
+      expect(navigationLink).toContain('aria-label="simplelogin-mcp source repository"');
+      expect(navigationLink).not.toMatch(/\bstars?\b/);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(1);
+    }
+    expect(repositoryNavigationLinksFromHtml(fallbackInstallHtml)).toHaveLength(2);
     expect(homepageSource).toMatch(
       /- text: View on GitHub\s+link: https:\/\/github\.com\/enthouan\/simplelogin-mcp\s+icon: github/,
     );

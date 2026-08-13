@@ -29,6 +29,28 @@ test('key pages have no serious automated accessibility violations @mobile @them
 
     expect(violations, `${path} has serious accessibility violations`).toEqual([]);
   }
+
+  if (testInfo.project.name.startsWith('mobile')) {
+    const mobileMenu = page.locator('starlight-menu-button').first();
+    await mobileMenu.locator('button').click();
+    await expect(mobileMenu).toHaveAttribute('aria-expanded', 'true');
+    await expect(
+      page.locator('#starlight__sidebar [data-repository-navigation]:visible'),
+    ).toBeVisible();
+
+    const menuResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    const menuViolations = menuResults.violations
+      .filter(({ impact }) => impact === 'critical' || impact === 'serious')
+      .map(({ id, impact, nodes }) => ({
+        id,
+        impact,
+        targets: nodes.map(({ target }) => target.join(' ')),
+      }));
+
+    expect(menuViolations, 'The open mobile menu has serious accessibility violations').toEqual([]);
+  }
 });
 
 test('the skip link reaches the main content with a visible keyboard focus indicator', async ({

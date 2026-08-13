@@ -12,9 +12,11 @@ export interface PackageJson {
 }
 
 export let outputRoot = '';
+export let fallbackOutputRoot = '';
 export let homeHtml = '';
 export let fallbackHomeHtml = '';
 export let installHtml = '';
+export let fallbackInstallHtml = '';
 export let apiKeyHtml = '';
 export let howItWorksHtml = '';
 export let securityHtml = '';
@@ -100,7 +102,7 @@ export async function setupWebsiteFixture(): Promise<void> {
     temporaryOutputRoots.push(outputRoot);
     await buildWebsiteInFreshProcess(outputRoot, 'populated');
   }
-  const fallbackOutputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-fallback-'));
+  fallbackOutputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-fallback-'));
   temporaryOutputRoots.push(fallbackOutputRoot);
   await buildWebsiteInFreshProcess(fallbackOutputRoot, 'fallback');
 
@@ -108,6 +110,7 @@ export async function setupWebsiteFixture(): Promise<void> {
     homeHtml,
     fallbackHomeHtml,
     installHtml,
+    fallbackInstallHtml,
     apiKeyHtml,
     howItWorksHtml,
     securityHtml,
@@ -128,6 +131,7 @@ export async function setupWebsiteFixture(): Promise<void> {
     readOutputFile('index.html'),
     readOutputFile('index.html', fallbackOutputRoot),
     readOutputFile('getting-started/index.html'),
+    readOutputFile('getting-started/index.html', fallbackOutputRoot),
     readOutputFile('getting-started/simplelogin-api-key/index.html'),
     readOutputFile('guides/how-it-works/index.html'),
     readOutputFile('guides/security/index.html'),
@@ -151,14 +155,18 @@ export async function cleanupWebsiteFixture(): Promise<void> {
   await Promise.all(temporaryOutputRoots.map((root) => rm(root, { recursive: true, force: true })));
 }
 
-export function repositoryActionFromHtml(html: string): string {
-  return (
-    [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)]
-      .map((match) => match[0])
-      .find(
-        (action) =>
-          action.includes('data-repository-action') &&
-          action.includes('href="https://github.com/enthouan/simplelogin-mcp"'),
-      ) ?? ''
+function linksFromHtml(html: string): string[] {
+  return [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map((match) => match[0]);
+}
+
+export function githubHeroActionFromHtml(html: string): string {
+  return linksFromHtml(html).find((link) => link.includes('data-github-action')) ?? '';
+}
+
+export function repositoryNavigationLinksFromHtml(html: string): string[] {
+  return linksFromHtml(html).filter(
+    (link) =>
+      link.includes('data-repository-navigation') &&
+      link.includes('href="https://github.com/enthouan/simplelogin-mcp"'),
   );
 }

@@ -67,10 +67,10 @@ test('the generated 404 is useful and unknown routes return 404', async ({
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
 });
 
-test('native mobile menu is keyboard operable @mobile', async ({ page }, testInfo) => {
+test('native mobile menu is keyboard operable @mobile @theme', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'This check requires mobile navigation.');
 
-  await openPage(page, '/getting-started/', 'light');
+  await openPage(page, '/getting-started/', expectedTheme(testInfo));
   const menu = page.locator('starlight-menu-button').first();
   const menuButton = menu.locator('button');
   await expect(menuButton).toBeVisible();

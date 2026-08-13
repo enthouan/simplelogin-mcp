@@ -83,6 +83,7 @@ export default defineConfig({
       routeMiddleware: './src/starlightRouteData.ts',
       components: {
         Footer: './src/components/Footer.astro',
+        SocialIcons: './src/components/RepositorySocialLink.astro',
       },
       social: [
         {
