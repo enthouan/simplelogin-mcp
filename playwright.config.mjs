@@ -24,8 +24,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command:
-      'cross-env ASTRO_PREVIEW_BACKGROUND=0 pnpm --dir website exec astro preview --host 127.0.0.1 --port 4174',
+    command: 'node website/scripts/preview-test-fixture.mjs --host 127.0.0.1 --port 4174',
     url: previewUrl,
     reuseExistingServer: false,
     timeout: 120_000,

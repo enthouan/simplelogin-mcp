@@ -5,7 +5,14 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'website/.astro/**', 'website/dist/**', 'node_modules/**'],
+    ignores: [
+      'dist/**',
+      'test-results/**',
+      'website/.astro/**',
+      'website/.test-dist/**',
+      'website/dist/**',
+      'node_modules/**',
+    ],
   },
   eslint.configs.recommended,
   {

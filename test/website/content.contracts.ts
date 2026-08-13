@@ -4,7 +4,15 @@ import { expect, it } from 'vitest';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
 import { CLIENT_SETUPS, VERIFY_PROMPT } from '../../website/src/data/clients.js';
 import { CANONICAL_WEBSITE_URL } from '../../website/src/data/publication.js';
-import { REPOSITORY_URL } from '../../website/src/data/repository.js';
+import {
+  REPOSITORY_API_URL,
+  REPOSITORY_URL,
+  createRepositoryStarCountLoader,
+  fetchRepositoryStarCount,
+  formatRepositoryStarCount,
+  formatRepositoryStarCountLabel,
+} from '../../website/src/data/repository.js';
+import type { RepositoryFetch } from '../../website/src/data/repository.js';
 import {
   apiCoverageHtml,
   apiKeyHtml,
@@ -13,6 +21,9 @@ import {
   configurationHtml,
   contributingHtml,
   faqHtml,
+  fallbackHomeHtml,
+  fallbackInstallHtml,
+  githubHeroActionFromHtml,
   homeHtml,
   howItWorksHtml,
   installHtml,
@@ -23,6 +34,7 @@ import {
   readRepoFile,
   referenceHtml,
   reportingIssuesHtml,
+  repositoryNavigationLinksFromHtml,
   securityHtml,
   securityPolicyHtml,
   toolsHtml,
@@ -35,6 +47,14 @@ function stepItemCounts(html: string): number[] {
   return [...html.matchAll(/<ol role="list" class="sl-steps">([\s\S]*?)<\/ol>/g)].map(
     (match) => [...match[1]!.matchAll(/<li>/g)].length,
   );
+}
+
+function repositoryResponse(payload: unknown, ok = true, status = ok ? 200 : 500) {
+  return {
+    ok,
+    status,
+    json: () => Promise.resolve(payload),
+  };
 }
 
 export function registerContentContracts(): void {
@@ -169,10 +189,10 @@ export function registerContentContracts(): void {
     expect(homeHtml).toContain('rel="external" referrerpolicy="no-referrer"');
     expect(homeHtml).not.toContain('SimpleLogin × Model Context Protocol');
     expect(homeHtml).not.toMatch(/api\.github\.com|shields\.io|\/stargazers/);
-    expect(homeHtml).not.toMatch(/\b\d[\d,.]*\s+(?:GitHub\s+)?stars?\b/i);
     const headerHtml = homeHtml.slice(homeHtml.indexOf('<header'), homeHtml.indexOf('</header>'));
-    expect(headerHtml).toContain(`<a href="${REPOSITORY_URL}" rel="me"`);
-    expect(headerHtml).toContain('>simplelogin-mcp source repository</span>');
+    expect(headerHtml).toContain(`<a href="${REPOSITORY_URL}" rel="me external"`);
+    expect(headerHtml).toContain('aria-label="simplelogin-mcp source repository, 1.2K stars"');
+    expect(headerHtml).toMatch(/<span[^>]*>1\.2K<\/span>/);
 
     const customCss = await readRepoFile('website/src/styles/custom.css');
     expect(customCss).toMatch(/#ea319f|#ff93c9/);
@@ -256,10 +276,20 @@ export function registerContentContracts(): void {
     }
   });
 
-  it('renders static repository trust details without build-time GitHub requests', async () => {
-    const [repositorySource, repositoryDataSource, websiteReadme] = await Promise.all([
+  it('renders static repository trust details alongside best-effort build metadata', async () => {
+    const [
+      repositorySource,
+      repositoryDataSource,
+      repositorySocialLinkSource,
+      routeDataSource,
+      astroConfig,
+      websiteReadme,
+    ] = await Promise.all([
       readRepoFile('website/src/components/RepositoryLink.astro'),
       readRepoFile('website/src/data/repository.ts'),
+      readRepoFile('website/src/components/RepositorySocialLink.astro'),
+      readRepoFile('website/src/starlightRouteData.ts'),
+      readRepoFile('website/astro.config.mjs'),
       readRepoFile('website/README.md'),
     ]);
 
@@ -272,11 +302,123 @@ export function registerContentContracts(): void {
     }
     expect(reportingIssuesHtml).toContain('>Open an issue<');
     expect(repositorySource).not.toMatch(/fetch|GitHub stars|latestRelease|node:process/);
-    expect(repositoryDataSource.trim()).toBe(`export const REPOSITORY_URL = '${REPOSITORY_URL}';`);
+    expect(repositoryDataSource).toContain(`export const REPOSITORY_URL = '${REPOSITORY_URL}';`);
+    expect(repositoryDataSource).toContain(
+      `export const REPOSITORY_API_URL = '${REPOSITORY_API_URL}';`,
+    );
+    expect(repositoryDataSource).not.toMatch(/Authorization|PUBLIC_|process\.env|console\./);
     expect(repositorySource).toContain('--sl-card-border: var(--sl-color-gray-5)');
     expect(repositorySource).toContain('--sl-card-bg: var(--sl-color-gray-6)');
-    expect(websiteReadme).toContain('Builds do not call the GitHub API');
-    expect(websiteReadme).not.toContain('WEBSITE_DISABLE_REPOSITORY_METADATA');
+    expect(astroConfig).toContain("SocialIcons: './src/components/RepositorySocialLink.astro'");
+    expect(repositorySocialLinkSource).toContain('await getRepositoryStarCount()');
+    expect(repositorySocialLinkSource).toContain('data-repository-navigation');
+    expect(repositorySocialLinkSource).not.toMatch(/client:|<script|fetch\(/);
+    expect(routeDataSource).not.toMatch(/getRepositoryStarCount|populateRepositoryHeroAction/);
+    expect(websiteReadme).toContain('Each build makes one memoized');
+    expect(websiteReadme).toContain('two-second timeout');
+    expect(websiteReadme).toMatch(/visitors'\s+browsers make no GitHub metadata request/);
+  });
+
+  it('loads and memoizes a valid repository star count with public-only headers', async () => {
+    let requestCount = 0;
+    let requestInput = '';
+    let requestHeaders: Record<string, string> | undefined;
+    const fetchImpl: RepositoryFetch = (input, init) => {
+      requestCount += 1;
+      requestInput = input;
+      requestHeaders = init.headers;
+      return Promise.resolve(repositoryResponse({ stargazers_count: 1_234 }));
+    };
+    const loadStarCount = createRepositoryStarCountLoader(fetchImpl);
+
+    const [first, second] = await Promise.all([loadStarCount(), loadStarCount()]);
+    const third = await loadStarCount();
+
+    expect([first, second, third]).toEqual([1_234, 1_234, 1_234]);
+    expect(requestCount).toBe(1);
+    expect(requestInput).toBe(REPOSITORY_API_URL);
+    expect(requestHeaders).toEqual({
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'simplelogin-mcp-website-build',
+      'X-GitHub-Api-Version': '2026-03-10',
+    });
+    expect(requestHeaders).not.toHaveProperty('Authorization');
+  });
+
+  it('accepts zero stars and formats compact populated navigation counts', async () => {
+    const zero = await fetchRepositoryStarCount(() =>
+      Promise.resolve(repositoryResponse({ stargazers_count: 0 })),
+    );
+
+    expect(zero).toBe(0);
+    expect(formatRepositoryStarCount(zero)).toBe('0');
+    expect(formatRepositoryStarCount(1)).toBe('1');
+    expect(formatRepositoryStarCount(1_234)).toBe('1.2K');
+    expect(formatRepositoryStarCount(undefined)).toBeUndefined();
+    expect(formatRepositoryStarCountLabel(zero)).toBe('0 stars');
+    expect(formatRepositoryStarCountLabel(1)).toBe('1 star');
+    expect(formatRepositoryStarCountLabel(1_234)).toBe('1.2K stars');
+    expect(formatRepositoryStarCountLabel(undefined)).toBeUndefined();
+  });
+
+  it.each([
+    ['null payload', null],
+    ['array payload', []],
+    ['missing count', {}],
+    ['string count', { stargazers_count: '12' }],
+    ['negative zero', { stargazers_count: -0 }],
+    ['negative count', { stargazers_count: -1 }],
+    ['fractional count', { stargazers_count: 1.5 }],
+    ['nonfinite count', { stargazers_count: Number.POSITIVE_INFINITY }],
+    ['unsafe count', { stargazers_count: Number.MAX_SAFE_INTEGER + 1 }],
+  ])('falls back for an invalid repository %s', async (_label, payload) => {
+    await expect(
+      fetchRepositoryStarCount(() => Promise.resolve(repositoryResponse(payload))),
+    ).resolves.toBeUndefined();
+  });
+
+  it('falls back for malformed JSON and network rejection', async () => {
+    await expect(
+      fetchRepositoryStarCount(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.reject(new SyntaxError('malformed JSON')),
+        }),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      fetchRepositoryStarCount(() => Promise.reject(new TypeError('network unavailable'))),
+    ).resolves.toBeUndefined();
+  });
+
+  it('aborts a slow repository request at the bounded timeout', async () => {
+    let observedAbort = false;
+    const fetchImpl: RepositoryFetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener(
+          'abort',
+          () => {
+            observedAbort = true;
+            reject(new DOMException('Aborted', 'AbortError'));
+          },
+          { once: true },
+        );
+      });
+
+    await expect(fetchRepositoryStarCount(fetchImpl, 5)).resolves.toBeUndefined();
+    expect(observedAbort).toBe(true);
+  });
+
+  it.each([403, 429, 500])('caches fallback after an HTTP %i response', async (status) => {
+    let requestCount = 0;
+    const loadStarCount = createRepositoryStarCountLoader(() => {
+      requestCount += 1;
+      return Promise.resolve(repositoryResponse({ stargazers_count: 99 }, false, status));
+    });
+
+    await expect(loadStarCount()).resolves.toBeUndefined();
+    await expect(loadStarCount()).resolves.toBeUndefined();
+    expect(requestCount).toBe(1);
   });
 
   it('renders every documented procedure as distinct Starlight steps', async () => {
@@ -458,17 +600,42 @@ export function registerContentContracts(): void {
       );
     }
 
-    const githubHeroAction =
-      /<a class="sl-link-button[^"]*secondary[^"]*"[^>]*href="https:\/\/github\.com\/enthouan\/simplelogin-mcp"[^>]*>[\s\S]*?View on GitHub<\/a>/.exec(
-        homeHtml,
-      )?.[0] ?? '';
+    const githubHeroAction = githubHeroActionFromHtml(homeHtml);
+    const fallbackGithubHeroAction = githubHeroActionFromHtml(fallbackHomeHtml);
     expect(githubHeroAction).not.toBe('');
     expect(githubHeroAction).toContain('<svg');
     expect(githubHeroAction.indexOf('<svg')).toBeLessThan(
       githubHeroAction.indexOf('View on GitHub'),
     );
+    expect(githubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(githubHeroAction).not.toMatch(/\bstars?\b/);
     expect(githubHeroAction).toContain('rel="external"');
     expect(githubHeroAction).toContain('referrerpolicy="no-referrer"');
+    expect(fallbackGithubHeroAction).not.toBe('');
+    expect(fallbackGithubHeroAction).toContain('<svg');
+    expect(fallbackGithubHeroAction).toMatch(/View on GitHub<\/a>$/);
+    expect(fallbackGithubHeroAction).not.toMatch(/\bstars?\b/);
+    expect(fallbackGithubHeroAction).toContain('rel="external"');
+    expect(fallbackGithubHeroAction).toContain('referrerpolicy="no-referrer"');
+    for (const navigationLink of repositoryNavigationLinksFromHtml(homeHtml)) {
+      expect(navigationLink).toContain(
+        'aria-label="simplelogin-mcp source repository, 1.2K stars"',
+      );
+      expect(navigationLink).toMatch(/<span[^>]*>1\.2K<\/span>/);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(2);
+    }
+    expect(repositoryNavigationLinksFromHtml(homeHtml)).toHaveLength(1);
+    expect(repositoryNavigationLinksFromHtml(installHtml)).toHaveLength(2);
+    for (const navigationLink of repositoryNavigationLinksFromHtml(fallbackInstallHtml)) {
+      expect(navigationLink).toContain('aria-label="simplelogin-mcp source repository"');
+      expect(navigationLink).not.toMatch(/\bstars?\b/);
+      expect(navigationLink).toContain('rel="me external"');
+      expect(navigationLink).toContain('referrerpolicy="no-referrer"');
+      expect(navigationLink.match(/<svg/g)).toHaveLength(1);
+    }
+    expect(repositoryNavigationLinksFromHtml(fallbackInstallHtml)).toHaveLength(2);
     expect(homepageSource).toMatch(
       /- text: View on GitHub\s+link: https:\/\/github\.com\/enthouan\/simplelogin-mcp\s+icon: github/,
     );

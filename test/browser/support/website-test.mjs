@@ -43,7 +43,7 @@ export async function openPage(page, path, theme) {
 }
 
 export async function focusWithKeyboard(page, target) {
-  for (let index = 0; index < 24; index += 1) {
+  for (let index = 0; index < 64; index += 1) {
     if (await target.evaluate((element) => globalThis.document.activeElement === element)) return;
     await page.keyboard.press('Tab');
   }
