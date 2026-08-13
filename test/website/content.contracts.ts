@@ -133,9 +133,8 @@ export function registerContentContracts(): void {
 
     for (const page of [homeHtml, installHtml]) {
       const normalizedPage = page.replace(/\s+/g, ' ');
-      const normalizedText = normalizedPage.replace(/<[^>]+>/g, '');
 
-      expect(normalizedText.split(disclaimer)).toHaveLength(2);
+      expect(normalizedPage.split(disclaimer)).toHaveLength(2);
       expect(normalizedPage).toContain(
         'aria-label="Independent integration for SimpleLogin" class="starlight-aside starlight-aside--note"',
       );

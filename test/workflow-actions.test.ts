@@ -14,7 +14,7 @@ import {
 } from 'yaml';
 
 const workflowsDirectory = new URL('../.github/workflows/', import.meta.url);
-const externalReferencePattern = /^([^/@\s]+)\/([^/@\s]+)(?:\/[^@\s]+)*@([^@\s]+)$/;
+const externalReferencePattern = /^([^/@\s]+)\/([^/@\s]+)(?:\/[^/@\s]+)*@([^@\s]+)$/;
 const immutableCommitPattern = /^[0-9a-f]{40}$/;
 const exactVersionPattern =
   /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -275,6 +275,31 @@ describe('GitHub workflow action pinning', () => {
     ).toBe('uses has a non-string reference');
   });
 
+  it.each([
+    'owner/repository//action@0123456789abcdef0123456789abcdef01234567',
+    'owner/repository/action/@0123456789abcdef0123456789abcdef01234567',
+  ])('rejects an external reference with an empty path segment: %s', (reference) => {
+    expect(
+      scanWorkflow(`jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${reference} # v1.2.3`)[0]?.violation,
+    ).toContain('unsupported external reference');
+  });
+
+  it('rejects slash-heavy malformed input without ambiguous segment matching', () => {
+    const reference = `!/${'!/'.repeat(1_000)}`;
+
+    expect(
+      scanWorkflow(`jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${JSON.stringify(reference)}`)[0]?.violation,
+    ).toContain('unsupported external reference');
+  });
+
   it('finds semantic uses keys across valid YAML styles and aliases', () => {
     expect(
       scanWorkflow(`env:
@@ -348,6 +373,36 @@ jobs:
           version: 'v1.2.3',
         },
         line: 3,
+      },
+    ]);
+  });
+
+  it('accepts pinned root and nested external actions', () => {
+    expect(
+      scanWorkflow(`jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # v1.2.3
+      - uses: owner/repository/path/to/action@abcdef0123456789abcdef0123456789abcdef01 # v4.5.6`),
+    ).toEqual([
+      {
+        external: {
+          action: 'actions/checkout',
+          commit: '0123456789abcdef0123456789abcdef01234567',
+          repository: 'actions/checkout',
+          version: 'v1.2.3',
+        },
+        line: 5,
+      },
+      {
+        external: {
+          action: 'owner/repository/path/to/action',
+          commit: 'abcdef0123456789abcdef0123456789abcdef01',
+          repository: 'owner/repository',
+          version: 'v4.5.6',
+        },
+        line: 6,
       },
     ]);
   });
