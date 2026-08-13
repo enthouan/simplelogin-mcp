@@ -5,6 +5,7 @@ node_modules/
 dist/
 website/dist/
 website/.astro/
+website/.test-dist/
 playwright-report/
 test-results/
 

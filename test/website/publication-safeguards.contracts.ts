@@ -129,16 +129,21 @@ export function registerPublicationSafeguardsContracts(): void {
     const websitePackageJson = JSON.parse(websitePackage) as PackageJson;
 
     expect(rootPackageJson.scripts['website:build']).toBe('pnpm --dir website build');
+    expect(rootPackageJson.scripts['website:build:test']).toBe(
+      'node website/scripts/build-test-fixture.mjs',
+    );
     expect(rootPackageJson.scripts['website:dev']).toBe('pnpm --dir website dev');
     expect(rootPackageJson.scripts['website:og']).toBe('tsx website/scripts/render-og-image.ts');
     expect(rootPackageJson.scripts['website:og:check']).toBe(
       'tsx website/scripts/render-og-image.ts --check',
     );
     expect(rootPackageJson.scripts['website:test:built']).toBe(
-      'cross-env WEBSITE_TEST_USE_DIST=1 vitest run test/website.test.ts',
+      'cross-env WEBSITE_TEST_OUTPUT_ROOT=website/.test-dist vitest run test/website.test.ts',
     );
     expect(rootPackageJson.devDependencies['cross-env']).toBe('10.1.0');
     expect(rootPackageJson.scripts['website:check']).toContain('pnpm website:og:check');
+    expect(rootPackageJson.scripts['website:check']).toContain('pnpm website:build:test');
+    expect(rootPackageJson.scripts['website:check']).toMatch(/pnpm website:build$/);
     expect(rootPackageJson.scripts).not.toHaveProperty(`website:build${':production'}`);
     expect(websitePackageJson.scripts['build']).toBe('astro build');
     expect(websitePackageJson.scripts['dev']).toBe('astro dev --host 127.0.0.1 --port 4173');
@@ -146,7 +151,7 @@ export function registerPublicationSafeguardsContracts(): void {
       'astro preview --host 127.0.0.1 --port 4173',
     );
     expect(playwrightConfig).toContain(
-      'cross-env ASTRO_PREVIEW_BACKGROUND=0 pnpm --dir website exec astro preview --host 127.0.0.1 --port 4174',
+      'node website/scripts/preview-test-fixture.mjs --host 127.0.0.1 --port 4174',
     );
     for (const command of Object.values(websitePackageJson.scripts)) {
       expect(command).not.toMatch(/^[A-Z][A-Z0-9_]*=/);

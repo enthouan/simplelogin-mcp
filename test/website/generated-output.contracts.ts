@@ -6,12 +6,14 @@ import { CANONICAL_WEBSITE_URL } from '../../website/src/data/publication.js';
 import { REPOSITORY_URL } from '../../website/src/data/repository.js';
 import {
   apiKeyHtml,
+  fallbackHomeHtml,
   homeHtml,
   installHtml,
   listFiles,
   outputRoot,
   readOutputFile,
   readRepoFile,
+  repositoryActionFromHtml,
 } from './support.js';
 
 const LEGACY_REDIRECTS = {
@@ -224,10 +226,20 @@ export function registerGeneratedOutputContracts(): void {
     expect(homeHtml).toContain('<meta property="og:image:width" content="1200"/>');
     expect(homeHtml).toContain('<meta property="og:image:height" content="630"/>');
     expect(homeHtml).toContain(`href="${REPOSITORY_URL}"`);
-    expect(homeHtml).toContain('View on GitHub</a>');
+    const githubHeroAction = repositoryActionFromHtml(homeHtml);
+    const fallbackGithubHeroAction = repositoryActionFromHtml(fallbackHomeHtml);
+    expect(githubHeroAction).not.toBe('');
+    expect(githubHeroAction).toContain('<svg');
+    expect(githubHeroAction).toContain('rel="external"');
+    expect(githubHeroAction).toContain('referrerpolicy="no-referrer"');
+    expect(githubHeroAction).toMatch(/View on GitHub · 1\.2K stars<\/a>$/);
+    expect(fallbackGithubHeroAction).not.toBe('');
+    expect(fallbackGithubHeroAction).toContain('<svg');
+    expect(fallbackGithubHeroAction).toContain('rel="external"');
+    expect(fallbackGithubHeroAction).toContain('referrerpolicy="no-referrer"');
+    expect(fallbackGithubHeroAction).toMatch(/View on GitHub<\/a>$/);
     expect(homeHtml).not.toContain('>Star on GitHub<');
     expect(homeHtml).not.toContain('>Node 24<');
-    expect(homeHtml).not.toMatch(/\b\d[\d,.]* GitHub stars\b/);
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
     expect(notFoundHtml).not.toContain('<meta name="robots" content="index, follow"/>');
     expect(notFoundHtml).not.toContain('rel="canonical"');
@@ -246,6 +258,19 @@ export function registerGeneratedOutputContracts(): void {
     expect(websiteReadme).toContain('origin root, so its generated `/robots.txt`');
     expect(websiteReadme).toContain('No website publication or base-URL environment variable');
     expect(socialCard).toContain(`${TOOL_CATALOG.length} tools`);
+  });
+
+  it('keeps GitHub metadata requests and credentials out of generated visitor assets', async () => {
+    const textFiles = (await listFiles(outputRoot)).filter((path) =>
+      /\.(?:css|html|js|json|map|svg|txt|xml)$/.test(path),
+    );
+
+    for (const path of textFiles) {
+      const output = await readOutputFile(path);
+      expect(output, path).not.toMatch(
+        /api\.github\.com|stargazers_count|\/stargazers\b|shields\.io|github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+/i,
+      );
+    }
   });
 
   it('publishes machine-readable documentation discovery at the canonical origin', async () => {

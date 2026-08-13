@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 export interface PackageJson {
@@ -13,6 +13,7 @@ export interface PackageJson {
 
 export let outputRoot = '';
 export let homeHtml = '';
+export let fallbackHomeHtml = '';
 export let installHtml = '';
 export let apiKeyHtml = '';
 export let howItWorksHtml = '';
@@ -31,9 +32,9 @@ export let contributingHtml = '';
 export let reportingIssuesHtml = '';
 export let securityPolicyHtml = '';
 
-let removeOutputRootAfterTests = false;
+const temporaryOutputRoots: string[] = [];
 const execFileAsync = promisify(execFile);
-const useBuiltWebsite = process.env['WEBSITE_TEST_USE_DIST'] === '1';
+const builtWebsiteOutput = process.env['WEBSITE_TEST_OUTPUT_ROOT'];
 
 export async function readRepoFile(path: string): Promise<string> {
   return readFile(join(process.cwd(), path), 'utf8');
@@ -55,7 +56,10 @@ export async function listFiles(root: string, directory = root): Promise<string[
   return files.flat().sort();
 }
 
-async function buildWebsiteInFreshProcess(outputDir: string): Promise<void> {
+async function buildWebsiteInFreshProcess(
+  outputDir: string,
+  fixture: 'fallback' | 'populated',
+): Promise<void> {
   const websiteRoot = join(process.cwd(), 'website');
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -69,11 +73,11 @@ async function buildWebsiteInFreshProcess(outputDir: string): Promise<void> {
   await execFileAsync(
     process.execPath,
     [
-      join(websiteRoot, 'node_modules/astro/bin/astro.mjs'),
-      'build',
-      '--outDir',
+      join(websiteRoot, 'scripts/build-test-fixture.mjs'),
+      '--out-dir',
       outputDir,
-      '--force',
+      '--fixture',
+      fixture,
     ],
     {
       cwd: websiteRoot,
@@ -84,20 +88,25 @@ async function buildWebsiteInFreshProcess(outputDir: string): Promise<void> {
 }
 
 export async function setupWebsiteFixture(): Promise<void> {
-  if (useBuiltWebsite) {
-    outputRoot = join(process.cwd(), 'website', 'dist');
+  if (builtWebsiteOutput) {
+    outputRoot = resolve(process.cwd(), builtWebsiteOutput);
     await stat(join(outputRoot, 'index.html')).catch(() => {
       throw new Error(
-        'WEBSITE_TEST_USE_DIST=1 requires a completed `pnpm website:build` in website/dist.',
+        'WEBSITE_TEST_OUTPUT_ROOT requires a completed `pnpm website:build:test` artifact.',
       );
     });
   } else {
     outputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-'));
-    removeOutputRootAfterTests = true;
-    await buildWebsiteInFreshProcess(outputRoot);
+    temporaryOutputRoots.push(outputRoot);
+    await buildWebsiteInFreshProcess(outputRoot, 'populated');
   }
+  const fallbackOutputRoot = await mkdtemp(join(tmpdir(), 'simplelogin-mcp-starlight-fallback-'));
+  temporaryOutputRoots.push(fallbackOutputRoot);
+  await buildWebsiteInFreshProcess(fallbackOutputRoot, 'fallback');
+
   [
     homeHtml,
+    fallbackHomeHtml,
     installHtml,
     apiKeyHtml,
     howItWorksHtml,
@@ -117,6 +126,7 @@ export async function setupWebsiteFixture(): Promise<void> {
     securityPolicyHtml,
   ] = await Promise.all([
     readOutputFile('index.html'),
+    readOutputFile('index.html', fallbackOutputRoot),
     readOutputFile('getting-started/index.html'),
     readOutputFile('getting-started/simplelogin-api-key/index.html'),
     readOutputFile('guides/how-it-works/index.html'),
@@ -138,7 +148,17 @@ export async function setupWebsiteFixture(): Promise<void> {
 }
 
 export async function cleanupWebsiteFixture(): Promise<void> {
-  if (removeOutputRootAfterTests && outputRoot) {
-    await rm(outputRoot, { recursive: true, force: true });
-  }
+  await Promise.all(temporaryOutputRoots.map((root) => rm(root, { recursive: true, force: true })));
+}
+
+export function repositoryActionFromHtml(html: string): string {
+  return (
+    [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)]
+      .map((match) => match[0])
+      .find(
+        (action) =>
+          action.includes('data-repository-action') &&
+          action.includes('href="https://github.com/enthouan/simplelogin-mcp"'),
+      ) ?? ''
+  );
 }

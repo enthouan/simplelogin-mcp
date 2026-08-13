@@ -26,8 +26,11 @@ pnpm website:build
 pnpm website:check
 ```
 
-`website:check` runs Astro diagnostics, creates one production artifact, and then runs the static
-output contracts and focused browser checks against that same `website/dist/`. Chromium covers the
+`website:check` runs Astro diagnostics, creates an isolated production-mode test artifact with a
+deterministic repository-metadata fixture, and then runs the static output contracts and focused
+browser checks against it. The static contracts also create a temporary rate-limit fixture to prove
+the rendered fallback without contacting GitHub. The gate finishes with the real production build,
+so `website/dist/` always contains deployable output rather than fixture data. Chromium covers the
 desktop, mobile, theme, search, accessibility, and responsive checks; one WebKit desktop smoke check
 catches basic engine-specific regressions without multiplying the full matrix. Install the pinned
 browsers once after installing dependencies:
@@ -37,8 +40,9 @@ pnpm exec playwright install chromium webkit
 ```
 
 For a standalone static-contract or browser run, use `pnpm website:test` or
-`pnpm website:test:browser`. Each convenience command creates a fresh production build first;
-`pnpm website:check` is the preferred full gate because it builds only once.
+`pnpm website:test:browser`. Each convenience command creates a fresh deterministic fixture build
+outside `website/dist/` first; `pnpm website:check` is the preferred full gate because it also
+restores and validates the real best-effort production build.
 
 ## Social image
 
@@ -86,9 +90,16 @@ can use the same production artifact without creating duplicate search results. 
 header after the first preview deployment. No website publication or base-URL environment variable
 is required.
 
-Repository links and GitHub actions are always rendered. Builds do not call the GitHub API; the
-repository cards contain only static project facts such as the MIT license, supported Node version,
-and self-hosting model.
+Repository links and GitHub actions are always rendered. Each build makes one memoized,
+best-effort, unauthenticated request for the public repository's current star count. The lookup has
+a two-second timeout and falls back to the count-free **View on GitHub** action after a network
+error, malformed response, non-success response, rate limit, or invalid count. Repository cards
+remain limited to static project facts such as the MIT license, supported Node version, and
+self-hosting model. The generated site contains no GitHub credential or API endpoint, and visitors'
+browsers make no GitHub metadata request.
+
+Automated website tests intercept that one build-time request with local populated and rate-limit
+fixtures, so they exercise both rendered states deterministically and never depend on GitHub.
 
 The canonical site is hosted at the origin root, so its generated `/robots.txt` is authoritative.
 

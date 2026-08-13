@@ -4,6 +4,7 @@ import { getHeadings as getSecurityPolicyHeadings } from '../../SECURITY.md';
 import { getHeadings as getSupportHeadings } from '../../SUPPORT.md';
 import { getHeadings as getApiCoverageHeadings } from '../../docs/api-coverage.md';
 import { CATEGORY_ENTRIES } from './data/catalog.js';
+import { getRepositoryStarCount, populateRepositoryHeroAction } from './data/repository.js';
 
 const WEBSITE_NAME = 'simplelogin-mcp';
 const canonicalHeadings = new Map([
@@ -58,6 +59,13 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
   }
 
   if (route.entry.id !== '') return;
+
+  if (route.entry.data.hero) {
+    const starCount = await getRepositoryStarCount();
+    route.entry.data.hero.actions = route.entry.data.hero.actions.map((action) =>
+      populateRepositoryHeroAction(action, starCount),
+    );
+  }
 
   const canonicalHref = route.head.find(
     (entry) => entry.tag === 'link' && entry.attrs?.rel === 'canonical',
