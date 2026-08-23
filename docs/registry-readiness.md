@@ -139,14 +139,20 @@ requires both platform provenance records and confirms that neither platform exp
 
 ```bash
 verify_historical_image_trust() (
-  set -e
+  set -euo pipefail
   historical_image=ghcr.io/enthouan/simplelogin-mcp:1.0.0
-  historical_manifest="$(docker buildx imagetools inspect "$historical_image" \
-    --format '{{json .Manifest}}')"
+  manifest_output="$(mktemp -d)"
+  trap 'rm -rf "$manifest_output"' EXIT
+  manifest_file="$manifest_output/index.json"
 
-  printf '%s\n' "$historical_manifest" | jq -e '
-    .digest == "sha256:847243e08876caab367a0bb98bc4d80dd04bacc92c0224a11172507498d34704"
-    and any(.manifests[];
+  docker buildx imagetools inspect "$historical_image" --raw > "$manifest_file"
+  historical_digest="sha256:$(openssl dgst -sha256 -r "$manifest_file" | awk '{print $1}')"
+  pinned_image="${historical_image%@*}@$historical_digest"
+
+  test "$historical_digest" \
+    = "sha256:847243e08876caab367a0bb98bc4d80dd04bacc92c0224a11172507498d34704"
+  jq -e '
+    any(.manifests[];
       .platform.os == "linux"
       and .platform.architecture == "amd64"
       and .digest == "sha256:099be601161d5b1f15a58f876f26711e4f0abc4ec6e57f593def7d3f338021d6")
@@ -154,13 +160,13 @@ verify_historical_image_trust() (
       .platform.os == "linux"
       and .platform.architecture == "arm64"
       and .digest == "sha256:48480f24d09b5400cef9508da255c510dc0394e498ef0284c9d1c38b5738572c")
-  '
+  ' "$manifest_file"
 
   for platform in linux/amd64 linux/arm64; do
-    docker buildx imagetools inspect "$historical_image" \
+    docker buildx imagetools inspect "$pinned_image" \
       --format "{{json (index .Provenance \"$platform\").SLSA}}" \
       | jq -e 'type == "object" and length > 0'
-    docker buildx imagetools inspect "$historical_image" \
+    docker buildx imagetools inspect "$pinned_image" \
       --format "{{json (index .SBOM \"$platform\").SPDX}}" \
       | jq -e '. == null'
   done

@@ -186,32 +186,37 @@ either platform lacks provenance or an SPDX SBOM:
 
 ```bash
 verify_image_trust() (
-  set -e
+  set -euo pipefail
   image_ref="$1"
+  manifest_output="$(mktemp -d)"
+  trap 'rm -rf "$manifest_output"' EXIT
+  manifest_file="$manifest_output/index.json"
 
-  manifest_json="$(docker buildx imagetools inspect "$image_ref" \
-    --format '{{json .Manifest}}')"
-  printf '%s\n' "$manifest_json" | jq -er '.digest'
-  printf '%s\n' "$manifest_json" | jq -e '
+  docker buildx imagetools inspect "$image_ref" --raw > "$manifest_file"
+  index_digest="sha256:$(openssl dgst -sha256 -r "$manifest_file" | awk '{print $1}')"
+  pinned_image="${image_ref%@*}@$index_digest"
+  printf '%s\n' "$index_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+  printf '%s\n' "$index_digest"
+  jq -e '
     .annotations["io.modelcontextprotocol.server.name"]
       == "io.github.enthouan/simplelogin-mcp"
-  '
-  printf '%s\n' "$manifest_json" | jq -e '
+  ' "$manifest_file"
+  jq -e '
     [.manifests[]
       | select(.platform.os == "linux")
       | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")]
     | length == 2
-  '
-  printf '%s\n' "$manifest_json" | jq -r '
+  ' "$manifest_file"
+  jq -r '
     .manifests[]
     | select(.platform.os == "linux")
     | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")
     | [.platform.os + "/" + .platform.architecture, .digest]
     | @tsv
-  '
+  ' "$manifest_file"
 
   for platform in linux/amd64 linux/arm64; do
-    docker buildx imagetools inspect "$image_ref" \
+    docker buildx imagetools inspect "$pinned_image" \
       --format "{{json (index .Provenance \"$platform\").SLSA}}" \
       | jq -e '
         type == "object" and length > 0
@@ -221,7 +226,7 @@ verify_image_trust() (
           or (.buildConfig | type == "object" and length > 0)
         )
       '
-    docker buildx imagetools inspect "$image_ref" \
+    docker buildx imagetools inspect "$pinned_image" \
       --format "{{json (index .SBOM \"$platform\").SPDX}}" \
       | jq -e '
         .SPDXID == "SPDXRef-DOCUMENT"
