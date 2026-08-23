@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- Publish future GHCR images with explicit max-mode BuildKit SLSA provenance and native SPDX SBOM
+  attestations, while deferring separate image signing.
+
 ## v1.0.0
 
 ### Added

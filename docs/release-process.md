@@ -3,6 +3,12 @@
 This is the public maintainer checklist for publishing `simplelogin-mcp`. The repository uses a
 protected `main` branch, pull-request validation, semver tags, GitHub Releases, and GHCR images.
 
+The durable [image trust policy](registry-readiness.md#supply-chain-and-image-trust) requires every
+future image published from `main` or a semver tag to carry explicit max-mode BuildKit SLSA
+provenance and a native BuildKit SPDX SBOM. It does not generate a separate GitHub artifact
+attestation or Cosign signature. Historical `v1.0.0` remains provenance-only and must not be
+republished to backfill an SBOM.
+
 ## Release Inputs
 
 Before preparing a release:
@@ -63,6 +69,51 @@ actionlint .github/workflows/*.yml
 git diff --check
 ```
 
+Confirm that the publishing build in `.github/workflows/release.yml` still explicitly sets
+`provenance: mode=max` and `sbom: true`. The workflow tests enforce that policy, but the workflow
+must also be reviewed semantically for secrets passed as public build arguments. Max provenance
+can disclose build-argument values; use BuildKit secret mounts for secrets.
+
+Where Docker is available, validate attestation generation without publishing. Use the local
+exporter because the pull-request workflow's `cacheonly` exporter creates no build output and
+cannot prove that attestations were generated or persisted:
+
+```bash
+verify_local_image_trust() (
+  set -e
+  trust_output="$(mktemp -d)"
+  trap 'rm -rf "$trust_output"' EXIT
+
+  docker buildx build \
+    --platform linux/amd64 \
+    --provenance=mode=max \
+    --sbom=true \
+    --output "type=local,dest=$trust_output" \
+    .
+
+  test -s "$trust_output/provenance.json"
+  test -s "$trust_output/sbom.spdx.json"
+  jq -e '
+    (.predicateType | startswith("https://slsa.dev/provenance/"))
+    and (
+      (.predicate.buildDefinition.internalParameters.buildConfig
+        | type == "object" and length > 0)
+      or (.predicate.buildConfig | type == "object" and length > 0)
+    )
+  ' \
+    "$trust_output/provenance.json"
+  jq -e '(.SPDXID // .predicate.SPDXID) == "SPDXRef-DOCUMENT"' \
+    "$trust_output/sbom.spdx.json"
+)
+
+verify_local_image_trust
+```
+
+Review `provenance.json` for the expected BuildKit builder, source, and build parameters and confirm
+that it contains no credential or sensitive build-argument value. The local exporter validates
+the attestation content without pushing, but only post-publish registry inspection can prove that
+the attestations are attached to the released multi-platform index.
+
 Before a release candidate is approved, run a redacted full-history secret scan across every fetched
 branch and tag with an approved Gitleaks binary. Do not silently substitute a current-tree scan:
 
@@ -112,6 +163,10 @@ Do not move or replace a published tag without an explicit corrective-release de
 [.github/workflows/release.yml](../.github/workflows/release.yml) builds and publishes the Docker
 image to GHCR on pushes to `main` and on semver tags matching `v*.*.*`.
 
+Every image index produced by either trigger must have per-platform max-mode BuildKit SLSA
+provenance and a native SPDX SBOM. These are native BuildKit attestation manifests, not a separate
+GitHub artifact attestation or Cosign signature. Do not describe the images as separately signed.
+
 Expected image tags:
 
 - default-branch pushes: `latest` and `sha-<full-main-sha>`;
@@ -125,15 +180,74 @@ gh run list --repo enthouan/simplelogin-mcp --limit 10 \
 gh run watch <run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
 
-Verify the published images before announcing the release:
+Verify the published images before announcing the release. The helper prints the immutable index
+digest and both platform-manifest digests, checks the MCP ownership annotation, and fails when
+either platform lacks provenance or an SPDX SBOM:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z \
-  | grep 'io.modelcontextprotocol.server.name'
+verify_image_trust() (
+  set -e
+  image_ref="$1"
+
+  manifest_json="$(docker buildx imagetools inspect "$image_ref" \
+    --format '{{json .Manifest}}')"
+  printf '%s\n' "$manifest_json" | jq -er '.digest'
+  printf '%s\n' "$manifest_json" | jq -e '
+    .annotations["io.modelcontextprotocol.server.name"]
+      == "io.github.enthouan/simplelogin-mcp"
+  '
+  printf '%s\n' "$manifest_json" | jq -e '
+    [.manifests[]
+      | select(.platform.os == "linux")
+      | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")]
+    | length == 2
+  '
+  printf '%s\n' "$manifest_json" | jq -r '
+    .manifests[]
+    | select(.platform.os == "linux")
+    | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")
+    | [.platform.os + "/" + .platform.architecture, .digest]
+    | @tsv
+  '
+
+  for platform in linux/amd64 linux/arm64; do
+    docker buildx imagetools inspect "$image_ref" \
+      --format "{{json (index .Provenance \"$platform\").SLSA}}" \
+      | jq -e '
+        type == "object" and length > 0
+        and (
+          (.buildDefinition.internalParameters.buildConfig
+            | type == "object" and length > 0)
+          or (.buildConfig | type == "object" and length > 0)
+        )
+      '
+    docker buildx imagetools inspect "$image_ref" \
+      --format "{{json (index .SBOM \"$platform\").SPDX}}" \
+      | jq -e '
+        .SPDXID == "SPDXRef-DOCUMENT"
+        and (.spdxVersion | startswith("SPDX-"))
+      '
+  done
+)
+
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:latest
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
 ```
+
+Run the check only after both the `main` and semver-tag workflows have completed successfully. The
+`latest` check covers the default-branch publication; `X.Y.Z` and `X.Y` cover the tag publication;
+the immutable `sha-<full-main-sha>` tag ties the evidence back to the source commit. Record the
+resolved index digest and the two platform digests in the release evidence.
+
+BuildKit scans the final image stage for the native SBOM by default. Packages used only in earlier
+builder stages are not included unless those stages explicitly opt in with
+`BUILDKIT_SBOM_SCAN_STAGE`; do not treat the SBOM as a complete build-time dependency inventory.
+Provenance and an SBOM provide evidence, not proof that an image is secure. A missing separate
+GitHub/Cosign signature is not a release failure under the selected policy. Revisit keyless signing
+only for the concrete triggers documented in the image trust policy, and obtain approval before
+adding OIDC or attestation permissions.
 
 ## GitHub Release
 
