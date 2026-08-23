@@ -22,7 +22,6 @@ interface RegistryEnvironmentVariable {
 interface RegistryPackage {
   registryType: string;
   identifier: string;
-  version?: string;
   transport: {
     type: string;
   };
@@ -58,7 +57,7 @@ function expectSpecificVersion(version: string): void {
 }
 
 describe('MCP registry metadata', () => {
-  it('uses the GitHub namespace, current package version, and pinned GHCR OCI image', () => {
+  it('uses the GitHub namespace, current server version, and pinned GHCR OCI image', () => {
     const packageJson = readJson<PackageJson>('package.json');
     const metadata = readJson<RegistryMetadata>(SERVER_JSON_PATH);
     const [ociPackage] = metadata.packages ?? [];
@@ -75,12 +74,11 @@ describe('MCP registry metadata', () => {
     expect(ociPackage).toMatchObject({
       registryType: 'oci',
       identifier: `${GHCR_IMAGE}:${packageJson.version}`,
-      version: packageJson.version,
       transport: { type: 'stdio' },
     });
+    expect(ociPackage).not.toHaveProperty('version');
 
     expectSpecificVersion(metadata.version);
-    expectSpecificVersion(ociPackage?.version ?? '');
     expectSpecificVersion(ociPackage?.identifier.split(':').at(-1) ?? '');
   });
 
