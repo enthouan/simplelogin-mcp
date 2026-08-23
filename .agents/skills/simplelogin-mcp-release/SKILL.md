@@ -211,15 +211,72 @@ gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
 
-Verify image tags before creating the GitHub Release:
+Verify image tags before creating the GitHub Release. Capture each raw index once, derive its
+immutable digest from those exact bytes, and pin every attestation lookup to that digest. The helper
+prints the index and platform-manifest digests and fails unless both supported platforms have
+max-mode provenance and an SPDX SBOM:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
-docker buildx imagetools inspect ghcr.io/enthouan/simplelogin-mcp:X.Y.Z \
-  | grep 'io.modelcontextprotocol.server.name'
+verify_image_trust() (
+  set -euo pipefail
+  image_ref="$1"
+  manifest_output="$(mktemp -d)"
+  trap 'rm -rf "$manifest_output"' EXIT
+  manifest_file="$manifest_output/index.json"
+
+  docker buildx imagetools inspect "$image_ref" --raw > "$manifest_file"
+  index_digest="sha256:$(openssl dgst -sha256 -r "$manifest_file" | awk '{print $1}')"
+  pinned_image="${image_ref%@*}@$index_digest"
+  printf '%s\n' "$index_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+  printf '%s\n' "$index_digest"
+  jq -e '
+    .annotations["io.modelcontextprotocol.server.name"]
+      == "io.github.enthouan/simplelogin-mcp"
+  ' "$manifest_file"
+  jq -e '
+    [.manifests[]
+      | select(.platform.os == "linux")
+      | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")]
+    | length == 2
+  ' "$manifest_file"
+  jq -r '
+    .manifests[]
+    | select(.platform.os == "linux")
+    | select(.platform.architecture == "amd64" or .platform.architecture == "arm64")
+    | [.platform.os + "/" + .platform.architecture, .digest]
+    | @tsv
+  ' "$manifest_file"
+
+  for platform in linux/amd64 linux/arm64; do
+    docker buildx imagetools inspect "$pinned_image" \
+      --format "{{json (index .Provenance \"$platform\").SLSA}}" \
+      | jq -e '
+        type == "object" and length > 0
+        and (
+          (.buildDefinition.internalParameters.buildConfig
+            | type == "object" and length > 0)
+          or (.buildConfig | type == "object" and length > 0)
+        )
+      '
+    docker buildx imagetools inspect "$pinned_image" \
+      --format "{{json (index .SBOM \"$platform\").SPDX}}" \
+      | jq -e '
+        .SPDXID == "SPDXRef-DOCUMENT"
+        and (.spdxVersion | startswith("SPDX-"))
+      '
+  done
+)
+
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:latest
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y.Z
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y
+verify_image_trust ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
 ```
+
+Run all four checks only after both workflows succeed. `latest` verifies the main publication;
+`X.Y.Z` and `X.Y` verify the tag publication; and the immutable `sha-<full-main-sha>` tag ties the
+evidence to the source commit. Record every resolved index and platform digest. Do not create the
+GitHub Release if any platform is missing max provenance or its native SPDX SBOM.
 
 Create the GitHub Release after the tag workflow and GHCR image checks pass.
 Use the title `vX.Y.Z` exactly, without `release` or any other suffix. Use the

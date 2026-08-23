@@ -7,7 +7,13 @@ import { renderDockerMcpToolsJson } from '../src/tools/catalog.js';
 const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
 const SERVER_JSON_PATH = 'server.json';
+const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
+const RELEASE_SKILL_PATH = '.agents/skills/simplelogin-mcp-release/SKILL.md';
 const BUILD_PUSH_ACTION_REFERENCE = /^docker\/build-push-action@[0-9a-f]{40}$/;
+const SEPARATE_TRUST_ACTION_REFERENCE =
+  /^(?:actions\/attest(?:-[^@/]+)?|sigstore\/cosign-installer|slsa-framework\/[^@]+)@/i;
+const SEPARATE_TRUST_COMMAND =
+  /(?:^|[;&|]\s*|\s)cosign\s+(?:sign|attest|attach\s+(?:attestation|sbom))(?:\s|$)/im;
 const SECRET_LIKE_INPUT =
   /(?:^|[^a-z0-9])(?:api[-_]?key|access[-_]?key(?:[-_]?id)?|auth(?:orization)?|bearer|credentials?|password|passwd|private[-_]?key|secrets?|session(?:[-_]?id)?|signing[-_]?key|ssh[-_]?key|pat|tokens?)(?:$|[^a-z0-9])/i;
 const SECRET_LIKE_SUFFIX =
@@ -101,18 +107,54 @@ function isSecretLikeInput(value: string): boolean {
   return SECRET_LIKE_INPUT.test(value) || SECRET_LIKE_SUFFIX.test(value.replace(/[^a-z0-9]/gi, ''));
 }
 
-function workflowSteps(path: string): YamlMapping[] {
+function workflowDocument(path: string): YamlMapping {
   const workflow = parse(readRepoFile(path)) as unknown;
   if (!isYamlMapping(workflow) || !isYamlMapping(workflow['jobs'])) {
     throw new Error(`${path} must define a jobs mapping`);
   }
+  return workflow;
+}
 
-  return Object.values(workflow['jobs']).flatMap((job) => {
+function workflowJobs(workflow: YamlMapping): YamlMapping[] {
+  if (!isYamlMapping(workflow['jobs'])) {
+    return [];
+  }
+  return Object.values(workflow['jobs']).filter(isYamlMapping);
+}
+
+function workflowSteps(path: string): YamlMapping[] {
+  return workflowJobs(workflowDocument(path)).flatMap((job) => {
     if (!isYamlMapping(job) || !Array.isArray(job['steps'])) {
       return [];
     }
     return job['steps'].filter(isYamlMapping);
   });
+}
+
+function scalarValuesForKey(value: unknown, key: string): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => scalarValuesForKey(entry, key));
+  }
+  if (!isYamlMapping(value)) {
+    return [];
+  }
+
+  return Object.entries(value).flatMap(([entryKey, entryValue]) => {
+    const nested = scalarValuesForKey(entryValue, key);
+    if (entryKey !== key) {
+      return nested;
+    }
+    const scalar = actionInputString(entryValue);
+    return scalar === undefined ? nested : [scalar, ...nested];
+  });
+}
+
+function usesSeparateTrustMechanism(workflow: YamlMapping): boolean {
+  return (
+    scalarValuesForKey(workflow, 'uses').some((value) =>
+      SEPARATE_TRUST_ACTION_REFERENCE.test(value),
+    ) || scalarValuesForKey(workflow, 'run').some((value) => SEPARATE_TRUST_COMMAND.test(value))
+  );
 }
 
 function outputMayPublish(output: string): boolean {
@@ -146,7 +188,7 @@ function stepMayPublish(step: YamlMapping): boolean {
 }
 
 function publishingBuildStep(): YamlMapping {
-  const candidates = workflowSteps('.github/workflows/release.yml').filter((step) => {
+  const candidates = workflowSteps(RELEASE_WORKFLOW_PATH).filter((step) => {
     if (!actionInputString(step['uses'])?.startsWith('docker/build-push-action@')) {
       return false;
     }
@@ -259,6 +301,19 @@ describe('Published image trust policy', () => {
     expect(hasSecretLikeBuildArg).toBe(false);
   });
 
+  it('keeps option A on the minimum release permissions without a separate trust mechanism', () => {
+    const workflow = workflowDocument(RELEASE_WORKFLOW_PATH);
+
+    expect(workflow['permissions']).toEqual({
+      contents: 'read',
+      packages: 'write',
+    });
+    for (const job of workflowJobs(workflow)) {
+      expect(job).not.toHaveProperty('permissions');
+    }
+    expect(usesSeparateTrustMechanism(workflow)).toBe(false);
+  });
+
   it('recognizes representative secret-like build argument names', () => {
     for (const name of [
       'AWS_ACCESS_KEY_ID',
@@ -284,6 +339,52 @@ describe('Published image trust policy', () => {
       expect(stepMayPublish({ with: inputs })).toBe(true);
     }
     expect(stepMayPublish({ with: { push: false, outputs: 'type=cacheonly' } })).toBe(false);
+  });
+
+  it('recognizes representative separate signing and attestation paths', () => {
+    for (const step of [
+      { uses: 'actions/attest-build-provenance@0123456789abcdef' },
+      { uses: 'actions/attest-sbom@0123456789abcdef' },
+      { uses: 'sigstore/cosign-installer@0123456789abcdef' },
+      {
+        uses: 'slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@main',
+      },
+      { run: 'cosign sign ghcr.io/example/image@sha256:abc' },
+      { run: 'cosign attest ghcr.io/example/image@sha256:abc' },
+      { run: 'cosign attach sbom --sbom image.spdx.json ghcr.io/example/image@sha256:abc' },
+    ]) {
+      expect(usesSeparateTrustMechanism({ jobs: { test: { steps: [step] } } })).toBe(true);
+    }
+    expect(
+      usesSeparateTrustMechanism({
+        jobs: { verify: { steps: [{ run: 'cosign verify ghcr.io/example/image@sha256:abc' }] } },
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps the operative release skill digest-pinned and platform-complete', () => {
+    const releaseSkill = readRepoFile(RELEASE_SKILL_PATH);
+    const verificationGate = releaseSkill.indexOf('verify_image_trust() (');
+    const releaseCreation = releaseSkill.indexOf('gh release create');
+
+    expect(verificationGate).toBeGreaterThan(-1);
+    expect(releaseCreation).toBeGreaterThan(verificationGate);
+    for (const requiredInstruction of [
+      'imagetools inspect "$image_ref" --raw > "$manifest_file"',
+      'pinned_image="${image_ref%@*}@$index_digest"',
+      'for platform in linux/amd64 linux/arm64',
+      '.Provenance',
+      '.buildDefinition.internalParameters.buildConfig',
+      '.SBOM',
+      '.SPDXID == "SPDXRef-DOCUMENT"',
+      '.spdxVersion | startswith("SPDX-")',
+      'verify_image_trust ghcr.io/enthouan/simplelogin-mcp:latest',
+      'verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y.Z',
+      'verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y',
+      'verify_image_trust ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>',
+    ]) {
+      expect(releaseSkill).toContain(requiredInstruction);
+    }
   });
 });
 
