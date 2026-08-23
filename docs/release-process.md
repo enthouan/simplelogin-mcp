@@ -38,9 +38,10 @@ Update release metadata:
 - [README.md](../README.md): update versioned examples such as `/health` output and pinned GHCR
   image tags when they should point at the new release.
 - `server.json`: create or update the official MCP Registry manifest for the target version only;
-  set the top-level version, OCI package version, and GHCR image tag to `X.Y.Z` so the manifest
-  points at the semver image produced by the release workflow. Do not carry a root manifest for an
-  older image that lacks the MCP ownership annotation.
+  set the top-level version and GHCR image tag to `X.Y.Z` so the manifest points at the semver image
+  produced by the release workflow. Omit the package-level `version` for OCI packages because the
+  official Registry requires the version in the image identifier. Do not carry a root manifest for
+  an older image that lacks the MCP ownership annotation.
 - [registry/docker-mcp/server.yaml](../registry/docker-mcp/server.yaml): update the staged Docker
   MCP Registry image tag and source commit if preparing a public registry submission.
 

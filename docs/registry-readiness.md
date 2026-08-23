@@ -32,6 +32,8 @@ Metadata invariants:
 - [x] Use package type `oci` with the GHCR distribution path.
 - [x] Pin the package identifier to the target semver image tag; do not use `latest` or a version
       range.
+- [x] Omit the package-level `version` for OCI packages; the official Registry requires the version
+      in the image identifier instead.
 - [x] Represent stdio execution with `transport.type=stdio` and `TRANSPORT=stdio`.
 - [x] Mark `SL_API_KEY` required and secret without a committed value.
 
@@ -50,8 +52,7 @@ Release PRs should create or update these fields together:
 
 - `package.json` version.
 - `server.json` top-level `version`.
-- `server.json` OCI package `version`.
-- `server.json` OCI package identifier tag.
+- `server.json` OCI package identifier tag, with no package-level `version` field.
 - `registry/docker-mcp/server.yaml` image tag; leave `source.commit` unset until a separately
   approved registry submission can use the exact release-image source commit.
 
