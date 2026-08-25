@@ -6,6 +6,10 @@ import { renderDockerMcpToolsJson } from '../src/tools/catalog.js';
 
 const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
+const DOCKER_MCP_RELEASE = {
+  version: '1.0.0',
+  sourceCommit: '3e9b94ae977df377ecf0cdd2e96ef4bcf2a10c68',
+} as const;
 const SERVER_JSON_PATH = 'server.json';
 const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
 const RELEASE_SKILL_PATH = '.agents/skills/simplelogin-mcp-release/SKILL.md';
@@ -55,6 +59,18 @@ interface RegistryMetadata {
     id?: string;
   };
   packages?: RegistryPackage[];
+}
+
+interface DockerMcpStagingMetadata {
+  image: string;
+  about: {
+    title: string;
+  };
+  source: {
+    project: string;
+    branch: string;
+    commit: string;
+  };
 }
 
 function readRepoFile(path: string): string {
@@ -389,17 +405,22 @@ describe('Published image trust policy', () => {
 });
 
 describe('Docker MCP Registry staging metadata', () => {
-  it('pins the staged Docker registry entry to the current GHCR release image', () => {
+  it('pins the staged Docker registry entry to the exact GHCR release source', () => {
     const packageJson = readJson<PackageJson>('package.json');
     const serverYaml = readRepoFile('registry/docker-mcp/server.yaml');
-    const imageTag = new RegExp(`image: ${GHCR_IMAGE}:(\\S+)`).exec(serverYaml)?.[1] ?? '';
+    const server = parse(serverYaml) as DockerMcpStagingMetadata;
+    const imageTag = server.image.split(':').at(-1) ?? '';
 
-    expect(serverYaml).toContain(`image: ${GHCR_IMAGE}:${packageJson.version}`);
+    expect(packageJson.version).toBe(DOCKER_MCP_RELEASE.version);
+    expect(server.image).toBe(`${GHCR_IMAGE}:${DOCKER_MCP_RELEASE.version}`);
     expectSpecificVersion(imageTag);
-    expect(serverYaml).toContain(
-      'Set commit during the separately approved registry submission so it matches the image source.',
-    );
-    expect(serverYaml).not.toMatch(/^ {2}commit: [0-9a-f]{40}$/m);
+    expect(server.about.title).toBe('SimpleLogin');
+    expect(server.source).toEqual({
+      project: 'https://github.com/enthouan/simplelogin-mcp',
+      branch: 'main',
+      commit: DOCKER_MCP_RELEASE.sourceCommit,
+    });
+    expect(server.source.commit).toMatch(/^[0-9a-f]{40}$/);
     expect(serverYaml).toContain('env: SL_API_KEY');
     expect(serverYaml).toContain('name: TRANSPORT\n      value: stdio');
     expect(serverYaml).toContain('project: https://github.com/enthouan/simplelogin-mcp');

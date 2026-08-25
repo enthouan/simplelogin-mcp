@@ -10,14 +10,13 @@ meta:
     - simplelogin
     - mcp
 about:
-  title: simplelogin-mcp
+  title: SimpleLogin
   description: Independent MCP server for SimpleLogin alias and account workflows.
   icon: https://simplelogin-mcp.com/favicon.svg
 source:
   project: https://github.com/enthouan/simplelogin-mcp
   branch: main
-  # Set commit during the separately approved registry submission so it matches the image source.
-  # commit: <merged-main-sha>
+  commit: 3e9b94ae977df377ecf0cdd2e96ef4bcf2a10c68
 config:
   description: Configure SimpleLogin API access for simplelogin-mcp.
   secrets:
@@ -29,10 +28,10 @@ config:
       value: stdio
     - name: SL_API_URL
       example: https://app.simplelogin.io
-      value: '{{simplelogin-mcp.sl_api_url}}'
+      value: "{{simplelogin-mcp.sl_api_url}}"
     - name: SL_REQUEST_TIMEOUT_MS
-      example: '15000'
-      value: '{{simplelogin-mcp.sl_request_timeout_ms}}'
+      example: "15000"
+      value: "{{simplelogin-mcp.sl_request_timeout_ms}}"
   parameters:
     type: object
     properties:
@@ -41,4 +40,4 @@ config:
         default: https://app.simplelogin.io
       sl_request_timeout_ms:
         type: string
-        default: '15000'
+        default: "15000"
