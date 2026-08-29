@@ -7,6 +7,12 @@
   "plugins": ["prettier-plugin-astro"],
   "overrides": [
     {
+      "files": "registry/docker-mcp/*.yaml",
+      "options": {
+        "singleQuote": false
+      }
+    },
+    {
       "files": "*.astro",
       "options": {
         "parser": "astro"
