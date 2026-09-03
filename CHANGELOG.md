@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- Update the transitive `fast-uri` and `qs` runtime dependencies to versions that address
+  published host-confusion, SSRF, and denial-of-service advisories.
 - Correct the official MCP Registry OCI package metadata so the version is carried only by the
   immutable image identifier accepted by the Registry publisher.
 - Finalize the staged Docker MCP Registry metadata with its validated catalog title, formatting,
