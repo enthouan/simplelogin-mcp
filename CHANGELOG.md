@@ -2,10 +2,20 @@
 
 ## Unreleased
 
+## v1.0.1
+
 ### Changed
 
 - Publish future GHCR images with explicit max-mode BuildKit SLSA provenance and native SPDX SBOM
   attestations, while deferring separate image signing.
+- Refresh production, development, website, and pinned GitHub Actions dependencies.
+
+### Fixed
+
+- Correct the official MCP Registry OCI package metadata so the version is carried only by the
+  immutable image identifier accepted by the Registry publisher.
+- Finalize the staged Docker MCP Registry metadata with its validated catalog title, formatting,
+  and exact v1.0.0 source pin.
 
 ## v1.0.0
 

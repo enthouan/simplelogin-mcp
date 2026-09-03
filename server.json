@@ -3,7 +3,7 @@
   "name": "io.github.enthouan/simplelogin-mcp",
   "title": "simplelogin-mcp",
   "description": "Independent MCP server for SimpleLogin alias, mailbox, domain, settings, and account workflows.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "repository": {
     "url": "https://github.com/enthouan/simplelogin-mcp",
     "source": "github",
@@ -13,7 +13,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/enthouan/simplelogin-mcp:1.0.0",
+      "identifier": "ghcr.io/enthouan/simplelogin-mcp:1.0.1",
       "transport": {
         "type": "stdio"
       },

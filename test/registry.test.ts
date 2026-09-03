@@ -406,12 +406,10 @@ describe('Published image trust policy', () => {
 
 describe('Docker MCP Registry staging metadata', () => {
   it('pins the staged Docker registry entry to the exact GHCR release source', () => {
-    const packageJson = readJson<PackageJson>('package.json');
     const serverYaml = readRepoFile('registry/docker-mcp/server.yaml');
     const server = parse(serverYaml) as DockerMcpStagingMetadata;
     const imageTag = server.image.split(':').at(-1) ?? '';
 
-    expect(packageJson.version).toBe(DOCKER_MCP_RELEASE.version);
     expect(server.image).toBe(`${GHCR_IMAGE}:${DOCKER_MCP_RELEASE.version}`);
     expectSpecificVersion(imageTag);
     expect(server.about.title).toBe('SimpleLogin');
