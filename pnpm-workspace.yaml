@@ -2,6 +2,11 @@
 packages:
   - website
 
+# Satteri's native loader is bundled into Starlight's prerendered chunks, where
+# platform bindings must resolve from the workspace root.
+publicHoistPattern:
+  - '@bruits/satteri-*'
+
 # Allow esbuild — a transitive dependency of tsx (used by `pnpm dev`) — to run its
 # install script, which links the prebuilt platform binary.
 allowBuilds:

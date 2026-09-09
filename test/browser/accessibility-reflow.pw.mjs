@@ -31,9 +31,9 @@ test('key pages have no serious automated accessibility violations @mobile @them
   }
 
   if (testInfo.project.name.startsWith('mobile')) {
-    const mobileMenu = page.locator('starlight-menu-button').first();
-    await mobileMenu.locator('button').click();
-    await expect(mobileMenu).toHaveAttribute('aria-expanded', 'true');
+    const mobileMenuButton = page.locator('.sl-menu-button').first();
+    await mobileMenuButton.click();
+    await expect(page.locator('#starlight__sidebar:popover-open')).toBeVisible();
     await expect(
       page.locator('#starlight__sidebar [data-repository-navigation]:visible'),
     ).toBeVisible();
