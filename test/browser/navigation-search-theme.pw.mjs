@@ -71,12 +71,11 @@ test('native mobile menu is keyboard operable @mobile @theme', async ({ page }, 
   test.skip(!testInfo.project.name.startsWith('mobile'), 'This check requires mobile navigation.');
 
   await openPage(page, '/getting-started/', expectedTheme(testInfo));
-  const menu = page.locator('starlight-menu-button').first();
-  const menuButton = menu.locator('button');
+  const menuButton = page.locator('.sl-menu-button').first();
   await expect(menuButton).toBeVisible();
   await menuButton.focus();
   await page.keyboard.press('Enter');
-  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#starlight__sidebar:popover-open')).toBeVisible();
 
   const toolCatalogLink = page
     .locator('#starlight__sidebar a[href="/reference/tools/"]:visible')

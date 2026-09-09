@@ -87,9 +87,9 @@ test('repository links retain responsive, theme, hover, and keyboard behavior @m
   } else {
     await expect(page.locator('header [data-repository-navigation]')).toBeHidden();
     await openPage(page, '/getting-started/', theme);
-    const mobileMenu = page.locator('starlight-menu-button').first();
-    await mobileMenu.locator('button').click();
-    await expect(mobileMenu).toHaveAttribute('aria-expanded', 'true');
+    const mobileMenuButton = page.locator('.sl-menu-button').first();
+    await mobileMenuButton.click();
+    await expect(page.locator('#starlight__sidebar:popover-open')).toBeVisible();
     repositoryNavigation = page
       .locator('#starlight__sidebar [data-repository-navigation]:visible')
       .first();
