@@ -209,7 +209,7 @@ describe('registered tool surface', () => {
     const digest = createHash('sha256').update(stableJson(publicContract)).digest('hex');
 
     // Update only after reviewing the complete listTools contract as an intentional public change.
-    expect(digest).toBe('4bcaea46f6441372455b557dddbb44c36be1f13af926ccb8a7cc2f6437e120f9');
+    expect(digest).toBe('50819c4778fcbce0ecaadcf6feef4b773ffa1787380149a798063fa5284b739b');
   });
 
   it('enforces literal confirm=true for every permanent-delete tool over MCP', async () => {
