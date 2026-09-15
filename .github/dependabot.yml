@@ -4,9 +4,8 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'saturday'
-      time: '08:30'
+      interval: 'cron'
+      cronjob: '30 8 1,15 * *'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 4
     cooldown:
@@ -35,9 +34,8 @@ updates:
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'saturday'
-      time: '09:00'
+      interval: 'cron'
+      cronjob: '0 9 1,15 * *'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 1
     cooldown:
@@ -56,9 +54,8 @@ updates:
   - package-ecosystem: 'docker'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'saturday'
-      time: '09:30'
+      interval: 'cron'
+      cronjob: '30 9 1,15 * *'
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 1
     cooldown:

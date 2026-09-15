@@ -67,9 +67,10 @@ verification, and follow [docs/live-smoke-test.md](docs/live-smoke-test.md).
 
 ## Dependency Maintenance
 
-Dependabot checks npm/pnpm dependencies, GitHub Actions, and Docker image references weekly. CI
-remains the gate for every generated dependency pull request, including a non-publishing
-Docker/release dry run for PRs.
+Dependabot checks npm/pnpm dependencies, GitHub Actions, and Docker image references twice monthly,
+on the 1st and 15th at 08:30, 09:00, and 09:30 respectively, in the America/Los_Angeles timezone.
+Security updates run independently of this version-update schedule. CI remains the gate for every
+generated dependency pull request, including a non-publishing Docker/release dry run for PRs.
 
 Repository auto-merge must be enabled for low-risk Dependabot updates, but only the
 `Dependabot Auto-Merge` workflow can opt a pull request into it. The workflow is limited to
