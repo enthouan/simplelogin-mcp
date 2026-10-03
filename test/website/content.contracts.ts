@@ -182,7 +182,7 @@ export function registerContentContracts(): void {
     expect(homeHtml).not.toContain('affiliation-notice');
     expect(homeHtml).not.toContain('Not affiliated with or endorsed by SimpleLogin or Proton AG.');
     expect(homeHtml).not.toContain('Open source and independently maintained');
-    expect(homeHtml).not.toContain('>Star on GitHub<');
+    expect(homeHtml).not.toMatch(/>\s*Star on GitHub\s*</);
     expect(homeHtml).not.toContain('>MIT licensed<');
     expect(homeHtml).not.toContain('>Self-hostable<');
     expect(homeHtml).not.toContain('>Node 24<');
@@ -294,13 +294,13 @@ export function registerContentContracts(): void {
     ]);
 
     for (const page of [referenceHtml, contributingHtml, reportingIssuesHtml]) {
-      expect(page).toContain('>Star on GitHub<');
+      expect(page).toMatch(/>\s*Star on GitHub\s*</);
       expect(page).toContain('>MIT licensed<');
       expect(page).toContain('>Self-hostable<');
       expect(page).toContain('>Node 24<');
       expect(page).not.toMatch(/api\.github\.com|GitHub stars|Latest v/);
     }
-    expect(reportingIssuesHtml).toContain('>Open an issue<');
+    expect(reportingIssuesHtml).toMatch(/>\s*Open an issue\s*</);
     expect(repositorySource).not.toMatch(/fetch|GitHub stars|latestRelease|node:process/);
     expect(repositoryDataSource).toContain(`export const REPOSITORY_URL = '${REPOSITORY_URL}';`);
     expect(repositoryDataSource).toContain(

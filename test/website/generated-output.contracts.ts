@@ -265,7 +265,7 @@ export function registerGeneratedOutputContracts(): void {
       expect(navigationLink).toContain('aria-label="simplelogin-mcp source repository"');
       expect(navigationLink).not.toMatch(/\bstars?\b/);
     }
-    expect(homeHtml).not.toContain('>Star on GitHub<');
+    expect(homeHtml).not.toMatch(/>\s*Star on GitHub\s*</);
     expect(homeHtml).not.toContain('>Node 24<');
     expect(notFoundHtml).toContain('<meta name="robots" content="noindex, nofollow"/>');
     expect(notFoundHtml).not.toContain('<meta name="robots" content="index, follow"/>');
