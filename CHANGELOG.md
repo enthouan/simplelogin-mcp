@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v1.0.2
+
+### Changed
+
+- Refresh production dependencies, including the MCP SDK, Hono, its Node.js server adapter, and Zod.
+- Refresh development, website, and pinned GitHub Actions dependencies.
+- Clarify README workflows and setup instructions, and schedule grouped Dependabot updates twice
+  monthly.
+
 ## v1.0.1
 
 ### Changed
