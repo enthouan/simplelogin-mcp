@@ -140,7 +140,7 @@ docker compose ps
 curl http://localhost:3000/health
 ```
 
-The v1.0.1 response is `{"status":"ok","version":"1.0.1"}`.
+The v1.0.2 response is `{"status":"ok","version":"1.0.2"}`.
 
 The default file pulls the [published GHCR image](https://github.com/enthouan/simplelogin-mcp/pkgs/container/simplelogin-mcp),
 publishes the host port only on `127.0.0.1`, and requires `MCP_AUTH_TOKEN` because the application
