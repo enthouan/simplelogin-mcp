@@ -53,6 +53,9 @@ successful tagged Docker publication, only in `enthouan/simplelogin-mcp` and onl
 `vX.Y.Z` tags. It does not run on `main`, pull requests, forks, prereleases, or a manual trigger.
 The tag, `package.json`, `server.json`, and semver OCI identifier must agree before publication.
 Do not rewrite manifest versions at runtime to conceal release-metadata drift.
+Before either publishing job starts, a read-only `release-policy` job fetches `main` and requires
+every release-tag commit to be reachable from it. Older merged commits are valid; off-main commits
+fail before the Docker or OIDC-enabled Registry jobs can run.
 
 The job uses a pinned, SHA-256-verified official publisher, runs its validation command, and
 anonymously verifies the image digest and MCP ownership metadata against the completed Docker
@@ -69,7 +72,8 @@ publication; it does not add image signing.
 Before authentication, the job checks the exact version in the live Registry:
 
 - An active entry whose `server` payload equals committed `server.json` is already complete:
-  skip login and publication.
+  still verify the public image against the Docker job digest and trust policy, then skip login
+  and publication. An identical manifest cannot excuse image drift or missing attestations.
 - A conflicting payload, inactive entry, or failed/ambiguous read fails closed.
 - An absent exact version permits one publication attempt, followed by exact-version read-back
   verification of active status and identical metadata. Retry reads when necessary, never the
@@ -92,6 +96,13 @@ Exceptional manual publication requires owner approval for the exact version and
 same validation, anonymous image verification, one-attempt publication, read-back, and credential
 cleanup controls. Do not republish or alter the existing `1.0.2` image, tag, release, or Registry
 entry to enable automation; use a future approved release tag containing the workflow.
+
+Repository administrators should additionally restrict release-tag creation, updates and deletion
+to trusted release actors using a GitHub tag ruleset. That setting is separate from this workflow
+and must be verified before enabling the release path. The in-workflow ancestry gate prevents
+accidental off-main releases, not malicious changes to the workflow itself. Registry GitHub OIDC
+trusts the repository owner's namespace rather than enforcing this workflow's ref or environment;
+repository write access must remain limited to trusted maintainers.
 
 Release PRs should create or update these fields together:
 

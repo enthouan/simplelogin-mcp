@@ -15,6 +15,9 @@ republished to backfill an SBOM.
 
 Before preparing a release:
 
+- Confirm that stable release tags are restricted to trusted release actors in GitHub repository
+  rulesets. Repository settings are not installed by the workflow; configure them only with owner
+  approval. The workflow separately checks main ancestry before provisioning publishing jobs.
 - Confirm the target milestone has no remaining required issues.
 - Confirm the intended version number, for example `vX.Y.Z`.
 - Review [CHANGELOG.md](../CHANGELOG.md) and make sure `## Unreleased` describes the changes that
@@ -274,7 +277,8 @@ Before publication, the job:
 
 1. Installs a pinned, SHA-256-verified official `mcp-publisher` release.
 2. Reads the exact Registry version. An existing active entry with identical `server.json`
-   metadata is a successful no-op: authentication and publication are skipped. Conflicting
+   metadata still requires the image digest and trust checks before authentication and publication
+   can be skipped. Conflicting
    metadata, an inactive entry, or an unsuccessful/ambiguous Registry read stops the job.
 3. For an absent version, checks the semver image anonymously, ties its digest to the successful
    Docker job's output, verifies ownership, both platforms, max provenance and SPDX SBOMs, and

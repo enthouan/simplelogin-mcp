@@ -395,10 +395,19 @@ describe('Single-write Registry publication', () => {
     deps.lookup.mockResolvedValue(entry(manifest(), 'active', false));
     await expect(publishRegistry(manifest(), deps)).resolves.toBe('existing');
     expect(deps.lookup).toHaveBeenCalledTimes(1);
-    expect(deps.verifyImage).not.toHaveBeenCalled();
+    expect(deps.verifyImage).toHaveBeenCalledTimes(1);
     expect(deps.publisher).not.toHaveBeenCalled();
     expect(deps.cleanup).not.toHaveBeenCalled();
     expect(deps.wait).not.toHaveBeenCalled();
+  });
+
+  it('does not accept an identical entry when its public image verification fails', async () => {
+    const deps = dependencies();
+    deps.verifyImage.mockImplementation(() => {
+      throw new Error('image digest changed');
+    });
+    await expect(publishRegistry(manifest(), deps)).rejects.toThrow('image digest changed');
+    expect(deps.publisher).not.toHaveBeenCalled();
   });
 
   it.each(['conflict', 'deleted'])('never publishes over an existing %s', async (scenario) => {
@@ -554,7 +563,7 @@ interface WorkflowJob {
 interface ReleaseWorkflow {
   on: Record<string, unknown>;
   permissions: Record<string, string>;
-  jobs: { docker: WorkflowJob; registry: WorkflowJob };
+  jobs: { docker: WorkflowJob; registry: WorkflowJob; 'release-policy': WorkflowJob };
 }
 
 function releaseWorkflow(): ReleaseWorkflow {
@@ -564,6 +573,23 @@ function releaseWorkflow(): ReleaseWorkflow {
 }
 
 describe('Registry workflow wiring', () => {
+  it('checks protected-main ancestry in a read-only job before either publishing job starts', () => {
+    const workflow = releaseWorkflow();
+    const policy = workflow.jobs['release-policy'];
+    expect(policy.permissions).toEqual({ contents: 'read' });
+    const checkout = policy.steps.find((step) => step.uses?.startsWith('actions/checkout@'));
+    expect(checkout?.with).toEqual({ 'fetch-depth': 0, 'persist-credentials': false });
+    const guard = policy.steps.find((step) => step.run?.includes('merge-base'));
+    expect(guard?.if).toBe("startsWith(github.ref, 'refs/tags/')");
+    expect(guard?.run).toContain(
+      'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main',
+    );
+    expect(guard?.run).toContain(
+      'git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main',
+    );
+    expect(workflow.jobs.docker.needs).toBe('release-policy');
+    expect(workflow.jobs.registry.needs).toBe('docker');
+  });
   it('runs only after Docker success for upstream stable release pushes', () => {
     const workflow = releaseWorkflow();
     const registry = workflow.jobs.registry;

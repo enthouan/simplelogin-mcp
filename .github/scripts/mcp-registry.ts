@@ -192,6 +192,7 @@ export async function publishRegistry(
   const existing = await dependencies.lookup();
   if (existing !== null) {
     verifyEntry(manifest, existing);
+    dependencies.verifyImage();
     return 'existing';
   }
   dependencies.verifyImage();
