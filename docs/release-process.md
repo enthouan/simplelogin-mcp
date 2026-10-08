@@ -2,6 +2,8 @@
 
 This is the public maintainer checklist for publishing `simplelogin-mcp`. The repository uses a
 protected `main` branch, pull-request validation, semver tags, GitHub Releases, and GHCR images.
+Stable release tags also publish the matching `server.json` to the official MCP Registry after the
+tagged Docker image is published and verified.
 
 The durable [image trust policy](registry-readiness.md#supply-chain-and-image-trust) requires every
 future image published from `main` or a semver tag to carry explicit max-mode BuildKit SLSA
@@ -125,14 +127,15 @@ gitleaks git --redact --log-opts="--all --full-history" .
 Stop on a credible finding and report it privately without reproducing the secret value.
 
 When official MCP Registry metadata changes, also validate `server.json` against the current MCP
-Registry schema and confirm the official registry still has no stale entry for this server before
-publication:
+Registry schema and inspect the live Registry. Earlier published versions are expected; the exact
+target version must be absent or already active with identical metadata:
 
 ```bash
 curl -fsSL https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json \
   -o /tmp/mcp-server.schema.json
 pnpm dlx ajv-cli validate --strict=false -s /tmp/mcp-server.schema.json -d server.json
 curl -fsSL 'https://registry.modelcontextprotocol.io/v0.1/servers?search=simplelogin'
+curl -sS -i 'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.enthouan%2Fsimplelogin-mcp/versions/X.Y.Z'
 ```
 
 Open a pull request titled exactly `vX.Y.Z`. Include the validation commands and results in the PR
@@ -158,6 +161,9 @@ git push origin vX.Y.Z
 ```
 
 Do not move or replace a published tag without an explicit corrective-release decision.
+The approved release/tag flow includes automatic official MCP Registry publication for that exact
+version. It does not authorize changing an existing Registry entry, republishing a historical
+image, or adding another registry or signing mechanism.
 
 ## GitHub Actions And GHCR
 
@@ -253,12 +259,62 @@ builder stages are not included unless those stages explicitly opt in with
 Provenance and an SBOM provide evidence, not proof that an image is secure. A missing separate
 GitHub/Cosign signature is not a release failure under the selected policy. Revisit keyless signing
 only for the concrete triggers documented in the image trust policy, and obtain approval before
-adding OIDC or attestation permissions.
+adding signing-related OIDC or attestation permissions. The separate Registry job's OIDC permission
+authenticates metadata publication only; it does not sign images.
+
+## Official MCP Registry Publication
+
+The Registry job in [.github/workflows/release.yml](../.github/workflows/release.yml) depends on a
+successful Docker job and runs only for stable `vX.Y.Z` tag pushes in
+`enthouan/simplelogin-mcp`. It does not publish on `main`, pull requests, forks, prerelease tags, or
+a manual dispatch. The tag, `package.json` version, `server.json` version, and OCI image identifier
+must agree exactly; the workflow validates committed metadata instead of rewriting it at runtime.
+
+Before publication, the job:
+
+1. Installs a pinned, SHA-256-verified official `mcp-publisher` release.
+2. Reads the exact Registry version. An existing active entry with identical `server.json`
+   metadata is a successful no-op: authentication and publication are skipped. Conflicting
+   metadata, an inactive entry, or an unsuccessful/ambiguous Registry read stops the job.
+3. For an absent version, checks the semver image anonymously, ties its digest to the successful
+   Docker job's output, verifies ownership, both platforms, max provenance and SPDX SBOMs, and
+   runs the official publisher's manifest validation before authenticating to the Registry.
+4. If that exact version is absent, authenticates with `mcp-publisher login github-oidc` and makes
+   one publication attempt, then reads the exact version back and verifies active status and
+   identical metadata. Read-back checks may retry; publication must never retry blindly.
+5. Removes temporary publisher credentials even when a step fails.
+
+Only this job receives `contents: read` and `id-token: write`; it has no package-write or
+attestation-write permission. GitHub's short-lived OIDC identity replaces a stored Registry secret,
+PAT, or interactive device login, following the
+[official GitHub Actions publishing guidance](https://modelcontextprotocol.io/registry/github-actions).
+
+Record the exact-version Registry URL and immutable image digest with the release evidence. Check
+the exact published version, not only `/versions/latest`: a delayed older release can be valid
+without `isLatest: true`, because the Registry orders semantic versions. Registry metadata is
+[immutable once published](https://modelcontextprotocol.io/registry/versioning), so a correction
+requires a new approved version; do not try to overwrite an entry. Publication keeps the catalog
+current but does not upgrade users' installed servers.
+
+### Recovering A Failed Registry Job
+
+If the Docker job succeeded but Registry publication failed, inspect the exact-version API entry
+and the failed job's logs before retrying. A lost publisher response can still mean publication
+succeeded. Re-run **only the failed Registry job** after a transient failure; its preflight treats
+an already active, identical entry as success without publishing again. Do not re-run the successful
+Docker job or the entire workflow to repair Registry publication: rebuilding could move the
+released image tag to a different digest.
+
+Stop on metadata conflicts, inactive entries, changed image digests, or unresolved authentication
+errors. Workflow or metadata corrections require the normal PR/release path; do not move the old
+tag to pick up a fix. Any exceptional manual publication needs separate owner approval for its
+exact payload and version. Leave the existing `1.0.2` image, tag, release, and Registry entry
+unchanged; automation begins with a future approved release tag containing this workflow.
 
 ## GitHub Release
 
-Create the GitHub Release after the tag workflow and GHCR image checks pass. Use title `vX.Y.Z`
-and release notes from that version's changelog section:
+Create the GitHub Release after the tag workflow, GHCR image checks, and exact-version Registry
+verification pass. Use title `vX.Y.Z` and release notes from that version's changelog section:
 
 ```bash
 version=X.Y.Z
@@ -275,7 +331,8 @@ gh release view vX.Y.Z --repo enthouan/simplelogin-mcp \
 
 ## Milestone Closure
 
-Close the milestone only after the release, tag workflow, and GHCR images are verified:
+Close the milestone only after the release, tag workflow, GHCR images, and exact-version official
+MCP Registry entry are verified:
 
 ```bash
 gh api repos/enthouan/simplelogin-mcp/milestones --paginate \

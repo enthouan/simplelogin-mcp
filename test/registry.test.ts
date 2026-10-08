@@ -322,11 +322,17 @@ describe('Published image trust policy', () => {
 
     expect(workflow['permissions']).toEqual({
       contents: 'read',
+    });
+    const jobs = workflow['jobs'] as YamlMapping;
+    expect(Object.keys(jobs).sort()).toEqual(['docker', 'registry']);
+    expect((jobs['docker'] as YamlMapping)['permissions']).toEqual({
+      contents: 'read',
       packages: 'write',
     });
-    for (const job of workflowJobs(workflow)) {
-      expect(job).not.toHaveProperty('permissions');
-    }
+    expect((jobs['registry'] as YamlMapping)['permissions']).toEqual({
+      contents: 'read',
+      'id-token': 'write',
+    });
     expect(usesSeparateTrustMechanism(workflow)).toBe(false);
   });
 

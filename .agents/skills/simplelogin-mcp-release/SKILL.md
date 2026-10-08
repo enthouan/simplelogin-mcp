@@ -17,6 +17,9 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
 - The release PR merge approval is the only normal approval boundary. After the approved release PR
   is merged, continue through tag push, workflow/GHCR verification, GitHub Release creation, and
   milestone closure for that exact version without asking for a second publish approval.
+- Stable release tags also publish the committed `server.json` to the official MCP Registry after
+  Docker succeeds. This normal automated publication is covered by the same release approval.
+  The Registry job uses GitHub Actions OIDC; do not start a device login or add a publishing secret.
 - Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
   the tag and PR title.
 - Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
@@ -210,6 +213,15 @@ gh run list --repo enthouan/simplelogin-mcp --limit 10 \
 gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
+
+The tag workflow must include a successful `registry` job for the exact release. It validates
+version alignment, anonymously checks the Docker job digest and image trust metadata, publishes
+once, and verifies the exact active Registry payload. An identical already-published version is
+skipped safely; older releases need not be marked latest. Inspect the version URL in the job summary.
+If only Registry publication failed, inspect the exact entry and re-run only that failed job as
+described in `docs/release-process.md`. Never re-run a successful Docker job or the whole workflow
+to repair Registry publication, because that can replace an existing image tag. Stop on immutable
+metadata conflicts or inactive entries; do not overwrite, change status, or blindly retry.
 
 Verify image tags before creating the GitHub Release. Capture each raw index once, derive its
 immutable digest from those exact bytes, and pin every attestation lookup to that digest. The helper

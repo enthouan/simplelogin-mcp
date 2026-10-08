@@ -1,6 +1,6 @@
 name: release
 
-# Build and publish a multi-arch image to GHCR on pushes to main and semver tags.
+# Publish GHCR images on main/tags, then Registry metadata on stable release tags.
 on:
   push:
     branches: [main]
@@ -8,12 +8,16 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,6 +64,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -72,3 +77,62 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  registry:
+    needs: docker
+    if: >-
+      github.repository == 'enthouan/simplelogin-mcp' &&
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
+      !contains(github.ref_name, '-') && !contains(github.ref_name, '+')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: mcp-registry-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Check release metadata
+        run: node .github/scripts/mcp-registry.ts check
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Install verified MCP publisher
+        env:
+          # Update the version and official Linux amd64 archive checksum together.
+          MCP_PUBLISHER_VERSION: '1.8.1'
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          publisher_dir="$(mktemp -d "$RUNNER_TEMP/mcp-publisher.XXXXXX")"
+          archive="$publisher_dir/mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 15 --max-time 120 \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$MCP_PUBLISHER_SHA256" "$archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$publisher_dir" mcp-publisher
+          "$publisher_dir/mcp-publisher" --version
+          printf '%s\n' "$publisher_dir" >> "$GITHUB_PATH"
+
+      - name: Publish and verify Registry entry
+        env:
+          RELEASE_IMAGE_DIGEST: ${{ needs.docker.outputs.digest }}
+        run: node .github/scripts/mcp-registry.ts publish
+
+      - name: Remove temporary Registry credentials
+        if: always()
+        run: node .github/scripts/mcp-registry.ts logout
