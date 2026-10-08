@@ -214,14 +214,30 @@ gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
 
-The tag workflow must include a successful `registry` job for the exact release. It validates
-version alignment, anonymously checks the Docker job digest and image trust metadata, publishes
-once, and verifies the exact active Registry payload. An identical already-published version is
-skipped safely; older releases need not be marked latest. Inspect the version URL in the job summary.
+The tag workflow must include a successful `registry` job for the exact release. Before any image
+push, the read-only policy job validates version alignment, annotated tag identity, checkout/event
+commit agreement, and protected-main ancestry. The Docker job reuses an existing exact image only
+after anonymous source/version, runtime configuration and per-platform trust verification. New
+builds push only the exact version first. Both new and reused images must pass an offline,
+digest-pinned MCP initialization, version, full tool-catalog and stdio health-check smoke on the
+runner's native platform before aliases or Registry metadata are published. This does not replace
+the per-platform provenance/SBOM checks or claim runtime testing of both architectures.
+
+Image writers are serialized with queued pending runs. Convenience aliases are copied from the
+verified index without rebuilding. Immediately before alias writes, fresh remote annotated tags
+must still contain the current tag at the verified commit. An older retry preserves a newer minor
+alias and never repairs a missing or stale minor alias owned by a newer release tag; retry the
+newer release to repair that alias. The Registry job
+anonymously rechecks the Docker job digest and image trust metadata, publishes once, and verifies
+the exact active Registry payload. An identical already-published version is skipped safely;
+older releases need not be marked latest. Inspect the version URL, source commit and image digest
+in the job summary.
 If only Registry publication failed, inspect the exact entry and re-run only that failed job as
-described in `docs/release-process.md`. Never re-run a successful Docker job or the whole workflow
-to repair Registry publication, because that can replace an existing image tag. Stop on immutable
-metadata conflicts or inactive entries; do not overwrite, change status, or blindly retry.
+described in `docs/release-process.md`. Future tags containing the image-reuse guard can safely
+recover full workflow reruns, including incomplete aliases, but historical workflows without this
+guard must not be rerun because they can replace existing images. Stop on immutable metadata or
+image conflicts, inactive entries, or missing trust evidence; do not overwrite, change status, or
+blindly retry.
 
 Verify image tags before creating the GitHub Release. Capture each raw index once, derive its
 immutable digest from those exact bytes, and pin every attestation lookup to that digest. The helper

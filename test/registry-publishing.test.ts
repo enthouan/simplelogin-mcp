@@ -5,6 +5,7 @@ import { parse } from 'yaml';
 import {
   type Manifest,
   type PublicationDependencies,
+  TransientRegistryError,
   lookupVersion,
   publishRegistry,
   registryUrl,
@@ -17,6 +18,7 @@ const serverName = 'io.github.enthouan/simplelogin-mcp';
 const imageName = 'ghcr.io/enthouan/simplelogin-mcp';
 const officialKey = 'io.modelcontextprotocol.registry/official';
 const version = '1.2.3';
+const revision = 'c'.repeat(40);
 const platformDigest = `sha256:${'a'.repeat(64)}`;
 
 function manifest(): Manifest {
@@ -235,7 +237,7 @@ describe('Registry read-only version checks', () => {
 
   it('does not reinterpret a network failure as absence', async () => {
     const request = vi.fn<typeof fetch>().mockRejectedValue(new Error('network unavailable'));
-    await expect(lookupVersion(manifest(), request)).rejects.toThrow('network unavailable');
+    await expect(lookupVersion(manifest(), request)).rejects.toBeInstanceOf(TransientRegistryError);
   });
 
   it('accepts identical active metadata, including an older version and reordered properties', () => {
@@ -273,20 +275,37 @@ function imageFixture() {
   };
   const provenance: Record<string, unknown> = { buildConfig: { steps: ['build'] } };
   const sbom: Record<string, unknown> = { SPDXID: 'SPDXRef-DOCUMENT', spdxVersion: 'SPDX-2.3' };
+  const config = {
+    User: 'node',
+    Cmd: ['node', 'dist/index.js'],
+    Labels: {
+      'org.opencontainers.image.source': 'https://github.com/enthouan/simplelogin-mcp',
+      'org.opencontainers.image.revision': revision,
+      'org.opencontainers.image.version': version,
+      'io.modelcontextprotocol.server.name': serverName,
+    },
+  };
   const raw = () => JSON.stringify(index);
   const digest = () => `sha256:${createHash('sha256').update(raw()).digest('hex')}`;
   const command = vi.fn((program: string, args: string[]): string => {
     expect(program).toBe('docker');
     if (args.at(-1) === '--raw') return raw();
+    if (args.at(-1)?.includes('.Image')) {
+      return JSON.stringify({
+        os: 'linux',
+        architecture: args.at(-1)?.includes('arm64') ? 'arm64' : 'amd64',
+        config,
+      });
+    }
     return JSON.stringify(args.at(-1)?.includes('.Provenance') ? provenance : sbom);
   });
-  return { index, provenance, sbom, raw, digest, command };
+  return { index, provenance, sbom, config, raw, digest, command };
 }
 
 describe('Public release image verification', () => {
   it('binds the public tag to the Docker digest and pins both platforms trust lookups', () => {
     const fixture = imageFixture();
-    verifyImage(manifest(), fixture.digest(), fixture.command);
+    verifyImage(manifest(), fixture.digest(), fixture.command, revision);
     expect(fixture.command).toHaveBeenNthCalledWith(1, 'docker', [
       'buildx',
       'imagetools',
@@ -298,6 +317,11 @@ describe('Public release image verification', () => {
       `{{json (index .Provenance "linux/${architecture}").SLSA}}`,
       `{{json (index .SBOM "linux/${architecture}").SPDX}}`,
     ]);
+    expectedFormats.push(
+      ...['amd64', 'arm64'].map(
+        (architecture) => `{{json (index .Image "linux/${architecture}")}}`,
+      ),
+    );
     expect(fixture.command.mock.calls.slice(1)).toEqual(
       expectedFormats.map((format) => [
         'docker',
@@ -312,14 +336,16 @@ describe('Public release image verification', () => {
     fixture.provenance['buildDefinition'] = {
       internalParameters: { buildConfig: { steps: ['build'] } },
     };
-    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).not.toThrow();
+    expect(() =>
+      verifyImage(manifest(), fixture.digest(), fixture.command, revision),
+    ).not.toThrow();
   });
 
   it.each(['', 'sha256:abc', `sha256:${'A'.repeat(64)}`, 'latest'])(
     'rejects invalid Docker digest %s',
     (digest) => {
       const fixture = imageFixture();
-      expect(() => verifyImage(manifest(), digest, fixture.command)).toThrow(
+      expect(() => verifyImage(manifest(), digest, fixture.command, revision)).toThrow(
         'Docker job image digest',
       );
       expect(fixture.command).not.toHaveBeenCalled();
@@ -328,7 +354,7 @@ describe('Public release image verification', () => {
 
   it('rejects a public tag that resolves to a different image', () => {
     const fixture = imageFixture();
-    expect(() => verifyImage(manifest(), platformDigest, fixture.command)).toThrow(
+    expect(() => verifyImage(manifest(), platformDigest, fixture.command, revision)).toThrow(
       'does not match the Docker job digest',
     );
     expect(fixture.command).toHaveBeenCalledTimes(1);
@@ -337,7 +363,7 @@ describe('Public release image verification', () => {
   it('rejects a mismatching image ownership annotation', () => {
     const fixture = imageFixture();
     fixture.index.annotations['io.modelcontextprotocol.server.name'] = 'io.github.someone/other';
-    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).toThrow(
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
       'ownership annotation mismatch',
     );
   });
@@ -355,7 +381,7 @@ describe('Public release image verification', () => {
       } else {
         target.digest = 'sha256:invalid';
       }
-      expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).toThrow(
+      expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
         `Missing or duplicate linux/${architecture} manifest`,
       );
     }
@@ -364,7 +390,7 @@ describe('Public release image verification', () => {
   it.each([undefined, {}, null, []])('rejects absent or empty max-mode configuration', (config) => {
     const fixture = imageFixture();
     fixture.provenance['buildConfig'] = config;
-    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).toThrow();
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow();
   });
 
   it.each([
@@ -375,7 +401,9 @@ describe('Public release image verification', () => {
   ])('rejects invalid SPDX field %s', (key, value) => {
     const fixture = imageFixture();
     fixture.sbom[key] = value;
-    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).toThrow('SPDX SBOM');
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
+      'SPDX SBOM',
+    );
   });
 
   it('fails if an anonymous image or trust lookup is unavailable', () => {
@@ -383,8 +411,34 @@ describe('Public release image verification', () => {
     fixture.command.mockImplementation(() => {
       throw new Error('anonymous image unavailable');
     });
-    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command)).toThrow(
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
       'anonymous image unavailable',
+    );
+  });
+
+  it.each([
+    ['org.opencontainers.image.source', 'https://github.com/other/repo', 'source mismatch'],
+    ['org.opencontainers.image.revision', 'd'.repeat(40), 'revision differs'],
+    ['org.opencontainers.image.version', '1.2.4', 'version differs'],
+    ['io.modelcontextprotocol.server.name', 'io.github.other/server', 'ownership label mismatch'],
+  ])('checks the runtime label %s against the release', (label, value, message) => {
+    const fixture = imageFixture();
+    (fixture.config.Labels as Record<string, string>)[label] = value!;
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
+      message,
+    );
+  });
+
+  it('requires the intended non-root user and runtime command', () => {
+    const fixture = imageFixture();
+    fixture.config.User = 'root';
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
+      'run as node',
+    );
+    fixture.config.User = 'node';
+    fixture.config.Cmd = ['sh'];
+    expect(() => verifyImage(manifest(), fixture.digest(), fixture.command, revision)).toThrow(
+      'image command',
     );
   });
 });
@@ -497,7 +551,7 @@ describe('Single-write Registry publication', () => {
     const deps = dependencies();
     deps.lookup
       .mockResolvedValueOnce(null)
-      .mockRejectedValueOnce(new Error('temporary network failure'))
+      .mockRejectedValueOnce(new TransientRegistryError('temporary network failure'))
       .mockResolvedValueOnce(null);
     await expect(publishRegistry(manifest(), deps)).resolves.toBe('published');
     expect(deps.lookup).toHaveBeenCalledTimes(4);
@@ -505,6 +559,18 @@ describe('Single-write Registry publication', () => {
     expect(deps.publisher.mock.calls.filter(([args]) => args[0] === 'publish')).toHaveLength(1);
     expect(deps.cleanup).toHaveBeenCalledTimes(1);
   });
+
+  it.each([new Error('HTTP 401'), new SyntaxError('malformed response')])(
+    'does not retry a permanent readback error: %s',
+    async (error) => {
+      const deps = dependencies();
+      deps.lookup.mockResolvedValueOnce(null).mockRejectedValueOnce(error);
+      await expect(publishRegistry(manifest(), deps)).rejects.toThrow(error);
+      expect(deps.lookup).toHaveBeenCalledTimes(2);
+      expect(deps.wait).not.toHaveBeenCalled();
+      expect(deps.cleanup).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('fails with explicit recovery instructions when the single write remains unconfirmed', async () => {
     const deps = dependencies();
@@ -562,6 +628,7 @@ interface WorkflowJob {
 
 interface ReleaseWorkflow {
   on: Record<string, unknown>;
+  concurrency: { group: string; 'cancel-in-progress': boolean; queue: string };
   permissions: Record<string, string>;
   jobs: { docker: WorkflowJob; registry: WorkflowJob; 'release-policy': WorkflowJob };
 }
@@ -579,14 +646,13 @@ describe('Registry workflow wiring', () => {
     expect(policy.permissions).toEqual({ contents: 'read' });
     const checkout = policy.steps.find((step) => step.uses?.startsWith('actions/checkout@'));
     expect(checkout?.with).toEqual({ 'fetch-depth': 0, 'persist-credentials': false });
-    const guard = policy.steps.find((step) => step.run?.includes('merge-base'));
+    const guard = policy.steps.find((step) => step.id === 'policy');
     expect(guard?.if).toBe("startsWith(github.ref, 'refs/tags/')");
     expect(guard?.run).toContain(
       'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main',
     );
-    expect(guard?.run).toContain(
-      'git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main',
-    );
+    expect(guard?.run).toContain('node .github/scripts/mcp-registry.ts policy');
+    expect(policy.outputs?.['revision']).toBe('${{ steps.policy.outputs.revision }}');
     expect(workflow.jobs.docker.needs).toBe('release-policy');
     expect(workflow.jobs.registry.needs).toBe('docker');
   });
@@ -625,11 +691,43 @@ describe('Registry workflow wiring', () => {
     const workflow = releaseWorkflow();
     const build = workflow.jobs.docker.steps.find((step) => step.id === 'build');
     expect(build?.uses).toMatch(/^docker\/build-push-action@[a-f0-9]{40}$/);
-    expect(workflow.jobs.docker.outputs?.['digest']).toBe('${{ steps.build.outputs.digest }}');
+    expect(workflow.jobs.docker.outputs?.['digest']).toBe(
+      '${{ steps.existing.outputs.digest || steps.build.outputs.digest }}',
+    );
     const publish = workflow.jobs.registry.steps.find((step) =>
       step.run?.endsWith('mcp-registry.ts publish'),
     );
     expect(publish?.env?.['RELEASE_IMAGE_DIGEST']).toBe('${{ needs.docker.outputs.digest }}');
+    expect(publish?.env?.['RELEASE_COMMIT']).toBe('${{ needs.docker.outputs.revision }}');
+  });
+
+  it('queues image writers and gates aliases and Registry on verified offline image startup', () => {
+    const workflow = releaseWorkflow();
+    expect(workflow.concurrency).toEqual({
+      group: 'release-publishing-${{ github.repository }}',
+      'cancel-in-progress': false,
+      queue: 'max',
+    });
+    const steps = workflow.jobs.docker.steps;
+    const existing = steps.findIndex((step) => step.id === 'existing');
+    const login = steps.findIndex((step) => step.uses?.startsWith('docker/login-action@'));
+    const build = steps.findIndex((step) => step.id === 'build');
+    const verify = steps.findIndex((step) => step.run?.endsWith('mcp-registry.ts verify-image'));
+    const smoke = steps.findIndex((step) => step.run?.includes('smoke-release-image.ts'));
+    const aliases = steps.findIndex((step) => step.run?.endsWith('mcp-registry.ts repair-aliases'));
+    expect(existing).toBeGreaterThan(-1);
+    expect(login).toBeGreaterThan(existing);
+    expect(build).toBeGreaterThan(login);
+    expect(verify).toBeGreaterThan(build);
+    expect(smoke).toBeGreaterThan(verify);
+    expect(aliases).toBeGreaterThan(smoke);
+    expect(steps[build]?.if).toBe("steps.existing.outputs.exists != 'true'");
+    const metadata = steps.find((step) => step.id === 'meta')?.with;
+    expect(metadata?.['tags']).toContain('type=sha,format=long,enable={{is_default_branch}}');
+    expect(metadata?.['tags']).not.toContain('pattern={{major}}.{{minor}}');
+    for (const index of [existing, verify, smoke, aliases]) {
+      expect(steps[index]?.if).toBe("startsWith(github.ref, 'refs/tags/')");
+    }
   });
 
   it('installs a version-and-checksum-pinned publisher before publishing, and always logs out', () => {

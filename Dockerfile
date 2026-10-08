@@ -35,9 +35,8 @@ USER node
 
 EXPOSE 3000
 
-# Liveness via the HTTP health endpoint (the default http transport; for one-shot
-# stdio containers the status is simply ignored).
+# Probe the configured HTTP bind/port; stdio has no HTTP listener to probe.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+  CMD ["node", "dist/healthcheck.js"]
 
 CMD ["node", "dist/index.js"]

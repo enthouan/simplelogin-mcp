@@ -17,7 +17,8 @@ Before preparing a release:
 
 - Confirm that stable release tags are restricted to trusted release actors in GitHub repository
   rulesets. Repository settings are not installed by the workflow; configure them only with owner
-  approval. The workflow separately checks main ancestry before provisioning publishing jobs.
+  approval. Before provisioning publishing jobs, the workflow checks version alignment, annotated
+  tag identity, the exact checked-out/event commit, and protected-main ancestry.
 - Confirm the target milestone has no remaining required issues.
 - Confirm the intended version number, for example `vX.Y.Z`.
 - Review [CHANGELOG.md](../CHANGELOG.md) and make sure `## Unreleased` describes the changes that
@@ -182,6 +183,38 @@ Expected image tags:
 - default-branch pushes: `latest` and `sha-<full-main-sha>`;
 - semver tag pushes: `X.Y.Z`, `X.Y`, and `sha-<full-main-sha>`.
 
+Image writers are serialized across main and release tags, with pending runs queued rather than
+replacing each other using GitHub's documented
+[`queue: max` concurrency setting](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+The current actionlint v1.7.12 schema does not yet recognize `queue`; when using that version,
+lint this workflow with `actionlint -ignore '^unexpected key "queue" for "concurrency" section' .github/workflows/release.yml`
+and lint the other workflows normally. The workflow contract tests separately require the exact
+queue configuration. Remove this narrow compatibility exception when actionlint supports it.
+
+A stable release first anonymously checks the exact version and Registry
+entry. An existing image must match the release version, source commit, ownership and runtime
+configuration on both platforms, and pass the provenance/SBOM gate; it is reused, never rebuilt.
+An existing Registry entry without its image is a hard failure, not permission to rebuild.
+
+New release builds initially push only `X.Y.Z`. Before updating convenience aliases or publishing
+Registry metadata, the workflow starts that digest-pinned image on the runner's native platform
+with `--network=none` and a synthetic API key. It checks MCP initialization, the runtime version,
+the complete tool catalog, and the actual stdio health-check command without calling API tools.
+Both architectures still receive metadata and attestation verification; this runtime smoke test
+does not claim to execute both architectures. Pull-request CI runs the same smoke test on a local
+image without publishing it.
+
+The workflow then copies the verified index, including attestations, to missing or older aliases
+and reads them back. Immediately before planning writes, it reads remote annotated stable tags
+and requires the current tag to still point to the verified release commit. If a newer release in
+the same minor line exists, an older retry leaves `X.Y` alone even when that alias is missing or
+stale; rerun the newer release to repair it. A newer `X.Y` image also stays untouched if its Git
+tag is no longer visible. A SHA alias
+from the same commit's main build can be promoted to the release digest; an unrelated or conflicting
+release image stops recovery. Alias writes never rewrite the exact `X.Y.Z` image. The container
+health check probes the configured HTTP host/port in HTTP mode; in stdio mode there is no HTTP
+listener, and Docker tracks process liveness.
+
 Watch the release workflow runs:
 
 ```bash
@@ -272,6 +305,7 @@ successful Docker job and runs only for stable `vX.Y.Z` tag pushes in
 `enthouan/simplelogin-mcp`. It does not publish on `main`, pull requests, forks, prerelease tags, or
 a manual dispatch. The tag, `package.json` version, `server.json` version, and OCI image identifier
 must agree exactly; the workflow validates committed metadata instead of rewriting it at runtime.
+The read-only release-policy job performs those checks before the Docker job can push an image.
 
 Before publication, the job:
 
@@ -281,11 +315,14 @@ Before publication, the job:
    can be skipped. Conflicting
    metadata, an inactive entry, or an unsuccessful/ambiguous Registry read stops the job.
 3. For an absent version, checks the semver image anonymously, ties its digest to the successful
-   Docker job's output, verifies ownership, both platforms, max provenance and SPDX SBOMs, and
+   Docker job's built-or-reused output, verifies ownership, both platforms, source revision,
+   runtime configuration, max provenance and SPDX SBOMs, and
    runs the official publisher's manifest validation before authenticating to the Registry.
 4. If that exact version is absent, authenticates with `mcp-publisher login github-oidc` and makes
    one publication attempt, then reads the exact version back and verifies active status and
-   identical metadata. Read-back checks may retry; publication must never retry blindly.
+   identical metadata. Read-back checks retry only absence, network failures, HTTP 408/429 and
+   server errors; authentication and malformed-response failures stop immediately. Publication
+   must never retry blindly.
 5. Removes temporary publisher credentials even when a step fails.
 
 Only this job receives `contents: read` and `id-token: write`; it has no package-write or
@@ -304,16 +341,24 @@ current but does not upgrade users' installed servers.
 
 If the Docker job succeeded but Registry publication failed, inspect the exact-version API entry
 and the failed job's logs before retrying. A lost publisher response can still mean publication
-succeeded. Re-run **only the failed Registry job** after a transient failure; its preflight treats
-an already active, identical entry as success without publishing again. Do not re-run the successful
-Docker job or the entire workflow to repair Registry publication: rebuilding could move the
-released image tag to a different digest.
+succeeded. Prefer re-running **only the failed Registry job** after a transient failure; its
+preflight treats an already active, identical entry as success without publishing again. For
+future tags containing the image-reuse guard, re-running the Docker job or the whole workflow
+verifies and reuses the exact image instead of rebuilding it, repeats the offline smoke test, and
+repairs incomplete aliases without rolling a newer minor version backward. A failed image/trust
+check stops recovery; it never authorizes replacement. Historical workflows without this guard
+must not be re-run to repair Registry publication because they can overwrite released images.
 
 Stop on metadata conflicts, inactive entries, changed image digests, or unresolved authentication
 errors. Workflow or metadata corrections require the normal PR/release path; do not move the old
 tag to pick up a fix. Any exceptional manual publication needs separate owner approval for its
 exact payload and version. Leave the existing `1.0.2` image, tag, release, and Registry entry
 unchanged; automation begins with a future approved release tag containing this workflow.
+
+Keep the automation verification tracked in issue #102 until a genuine approved stable release
+has successfully authenticated with GitHub OIDC, published its new Registry version and passed
+the exact-version read-back. Local validation, green PR checks and an existing-entry no-op do not
+prove that production write path. Record the tag run, version URL and image digest as evidence.
 
 ## GitHub Release
 

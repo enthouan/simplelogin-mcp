@@ -87,10 +87,15 @@ need periodic republication, and updating the catalog does not upgrade users' in
 
 If only Registry publication fails, inspect its logs and exact-version endpoint, then re-run only
 the failed Registry job. Its preflight safely recognizes an identical successful publication even
-if the original publisher response was lost. Never re-run a successful Docker job or the entire
-workflow to repair a Registry failure: doing so can change the image behind a released tag. Stop
-and investigate conflicts, inactive entries, image-digest drift, or unresolved authentication
-errors. See [the recovery checklist](release-process.md#recovering-a-failed-registry-job).
+if the original publisher response was lost. Future release workflows with the image-reuse guard
+can also recover a full rerun without rebuilding an existing exact image: source/version, image
+trust and offline MCP startup are checked again, and missing aliases are repaired without moving a
+newer minor alias backward. Fresh remote annotated tags reserve the minor alias for the newest
+release in that line, even when the alias is missing or stale; retry that newer release to repair
+it. A missing or moved current tag stops alias recovery. Do not rerun historical workflows lacking
+that guard. Stop and
+investigate conflicts, inactive entries, image-digest drift, or unresolved authentication errors.
+See [the recovery checklist](release-process.md#recovering-a-failed-registry-job).
 
 Exceptional manual publication requires owner approval for the exact version and payload and the
 same validation, anonymous image verification, one-attempt publication, read-back, and credential
