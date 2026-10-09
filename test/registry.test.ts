@@ -6,9 +6,10 @@ import { renderDockerMcpToolsJson } from '../src/tools/catalog.js';
 
 const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
+// Docker submission releases are selected explicitly, independently of package.json.version.
 const DOCKER_MCP_RELEASE = {
-  version: '1.0.0',
-  sourceCommit: '3e9b94ae977df377ecf0cdd2e96ef4bcf2a10c68',
+  version: '1.0.2',
+  sourceCommit: 'c6e702b72a12c1612f67d9347b313e4d588865a2',
 } as const;
 const SERVER_JSON_PATH = 'server.json';
 const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
