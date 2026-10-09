@@ -17,6 +17,9 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
 - The release PR merge approval is the only normal approval boundary. After the approved release PR
   is merged, continue through tag push, workflow/GHCR verification, GitHub Release creation, and
   milestone closure for that exact version without asking for a second publish approval.
+- Stable release tags also publish the committed `server.json` to the official MCP Registry after
+  Docker succeeds. This normal automated publication is covered by the same release approval.
+  The Registry job uses GitHub Actions OIDC; do not start a device login or add a publishing secret.
 - Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
   the tag and PR title.
 - Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
@@ -210,6 +213,31 @@ gh run list --repo enthouan/simplelogin-mcp --limit 10 \
 gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
 ```
+
+The tag workflow must include a successful `registry` job for the exact release. Before any image
+push, the read-only policy job validates version alignment, annotated tag identity, checkout/event
+commit agreement, and protected-main ancestry. The Docker job reuses an existing exact image only
+after anonymous source/version, runtime configuration and per-platform trust verification. New
+builds push only the exact version first. Both new and reused images must pass an offline,
+digest-pinned MCP initialization, version, full tool-catalog and stdio health-check smoke on the
+runner's native platform before aliases or Registry metadata are published. This does not replace
+the per-platform provenance/SBOM checks or claim runtime testing of both architectures.
+
+Image writers are serialized with queued pending runs. Convenience aliases are copied from the
+verified index without rebuilding. Immediately before alias writes, fresh remote annotated tags
+must still contain the current tag at the verified commit. An older retry preserves a newer minor
+alias and never repairs a missing or stale minor alias owned by a newer release tag; retry the
+newer release to repair that alias. The Registry job
+anonymously rechecks the Docker job digest and image trust metadata, publishes once, and verifies
+the exact active Registry payload. An identical already-published version is skipped safely;
+older releases need not be marked latest. Inspect the version URL, source commit and image digest
+in the job summary.
+If only Registry publication failed, inspect the exact entry and re-run only that failed job as
+described in `docs/release-process.md`. Future tags containing the image-reuse guard can safely
+recover full workflow reruns, including incomplete aliases, but historical workflows without this
+guard must not be rerun because they can replace existing images. Stop on immutable metadata or
+image conflicts, inactive entries, or missing trust evidence; do not overwrite, change status, or
+blindly retry.
 
 Verify image tags before creating the GitHub Release. Capture each raw index once, derive its
 immutable digest from those exact bytes, and pin every attestation lookup to that digest. The helper

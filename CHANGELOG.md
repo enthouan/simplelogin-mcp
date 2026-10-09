@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- Validate stable release metadata and annotated main-branch tags before publishing images, reuse
+  verified exact images on retries, and reserve minor aliases for newer remote release tags even
+  when those aliases are missing or stale.
+- Gate official MCP Registry publishing on offline image startup, complete tool discovery, source
+  identity, and the existing per-platform provenance and SBOM checks.
+
+### Fixed
+
+- Make container health checks transport-aware and respect configured HTTP bind addresses and ports.
+- Stop Registry read-back retries on permanent authentication or malformed-response failures.
+
 ## v1.0.2
 
 ### Changed

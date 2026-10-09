@@ -1,9 +1,10 @@
 # Registry Readiness
 
 This document records the durable controls for publishing `simplelogin-mcp` to public MCP
-registries. It does not authorize publication: do not publish to the official MCP Registry, open a
-Docker MCP Registry pull request, claim Glama ownership, or create registry secrets unless that
-specific external action is explicitly approved.
+registries. The approved stable release/tag flow includes automatic official MCP Registry
+publication for that exact version. Exceptional manual publication, a Docker MCP Registry pull
+request, Glama ownership, or new registry credentials still requires explicit owner approval for
+that specific external action.
 
 ## Public Baseline
 
@@ -45,17 +46,68 @@ on 2026-08-23, the official registry requires the OCI package metadata and match
 annotation above. It does not require provenance, an SBOM, or a separate image signature. These
 trust artifacts are project policy, not a registry listing prerequisite.
 
-For each publication:
+### Automated Stable Releases
 
-1. Validate `server.json` against the current official schema and check the live registry for both
-   name collisions and earlier versions of this server.
-2. Verify the exact semver GHCR image anonymously, including its digest, `linux/amd64` and
-   `linux/arm64` manifests, MCP server-name annotation, max-mode provenance, and SPDX SBOM
-   attestations.
-3. Reverify the public repository, website, favicon, and signed-out GHCR package page.
-4. Authenticate with `mcp-publisher` using a supported GitHub flow.
-5. Obtain explicit approval for official MCP Registry publication, run `mcp-publisher publish`,
-   verify the resulting entry, and record its URL on the release-control issue.
+The Registry job in [.github/workflows/release.yml](../.github/workflows/release.yml) runs after
+successful tagged Docker publication, only in `enthouan/simplelogin-mcp` and only for strict stable
+`vX.Y.Z` tags. It does not run on `main`, pull requests, forks, prereleases, or a manual trigger.
+The tag, `package.json`, `server.json`, and semver OCI identifier must agree before publication.
+Do not rewrite manifest versions at runtime to conceal release-metadata drift.
+Before either publishing job starts, a read-only `release-policy` job fetches `main` and requires
+every release-tag commit to be reachable from it. Older merged commits are valid; off-main commits
+fail before the Docker or OIDC-enabled Registry jobs can run.
+
+The job uses a pinned, SHA-256-verified official publisher, runs its validation command, and
+anonymously verifies the image digest and MCP ownership metadata against the completed Docker
+job. Release verification also checks `linux/amd64` and `linux/arm64` manifests, max-mode provenance,
+SPDX SBOMs, and the public repository, website, favicon, and signed-out GHCR package page.
+
+Authentication uses GitHub Actions OIDC with `mcp-publisher login github-oidc`, as recommended by
+the [official automation guide](https://modelcontextprotocol.io/registry/github-actions). Only the
+Registry job receives `contents: read` and `id-token: write`; it has no package-write or
+attestation-write permission and requires no Registry secret, PAT, or device login. Temporary
+publisher credentials are removed on success or failure. This OIDC use authenticates Registry
+publication; it does not add image signing.
+
+Before authentication, the job checks the exact version in the live Registry:
+
+- An active entry whose `server` payload equals committed `server.json` is already complete:
+  still verify the public image against the Docker job digest and trust policy, then skip login
+  and publication. An identical manifest cannot excuse image drift or missing attestations.
+- A conflicting payload, inactive entry, or failed/ambiguous read fails closed.
+- An absent exact version permits one publication attempt, followed by exact-version read-back
+  verification of active status and identical metadata. Retry reads when necessary, never the
+  publication blindly.
+
+Record the verified exact-version URL and immutable image digest on the release-control issue.
+Do not require `isLatest: true` for a delayed older release: semantic versions determine latest.
+The Registry's [versioning rules](https://modelcontextprotocol.io/registry/versioning) make
+published metadata immutable, so corrections need a new approved version. Existing entries do not
+need periodic republication, and updating the catalog does not upgrade users' installations.
+
+If only Registry publication fails, inspect its logs and exact-version endpoint, then re-run only
+the failed Registry job. Its preflight safely recognizes an identical successful publication even
+if the original publisher response was lost. Future release workflows with the image-reuse guard
+can also recover a full rerun without rebuilding an existing exact image: source/version, image
+trust and offline MCP startup are checked again, and missing aliases are repaired without moving a
+newer minor alias backward. Fresh remote annotated tags reserve the minor alias for the newest
+release in that line, even when the alias is missing or stale; retry that newer release to repair
+it. A missing or moved current tag stops alias recovery. Do not rerun historical workflows lacking
+that guard. Stop and
+investigate conflicts, inactive entries, image-digest drift, or unresolved authentication errors.
+See [the recovery checklist](release-process.md#recovering-a-failed-registry-job).
+
+Exceptional manual publication requires owner approval for the exact version and payload and the
+same validation, anonymous image verification, one-attempt publication, read-back, and credential
+cleanup controls. Do not republish or alter the existing `1.0.2` image, tag, release, or Registry
+entry to enable automation; use a future approved release tag containing the workflow.
+
+Repository administrators should additionally restrict release-tag creation, updates and deletion
+to trusted release actors using a GitHub tag ruleset. That setting is separate from this workflow
+and must be verified before enabling the release path. The in-workflow ancestry gate prevents
+accidental off-main releases, not malicious changes to the workflow itself. Registry GitHub OIDC
+trusts the repository owner's namespace rather than enforcing this workflow's ref or environment;
+repository write access must remain limited to trusted maintainers.
 
 Release PRs should create or update these fields together:
 
@@ -120,10 +172,11 @@ Every future multi-platform image published by
 The project does not add a separate GitHub artifact attestation or Sigstore Cosign signature under
 this policy. Max provenance was already Docker's effective default for this public repository, but
 making it explicit prevents repository visibility or action defaults from silently weakening the
-policy. The SBOM adds a useful component inventory with no long-lived signing key, OIDC trust
-relationship, new signing action, or broader workflow permissions. No reviewed registry currently
-requires separate signing, and no identified consumer currently enforces a signer-identity policy,
-so that extra complexity is deferred until it has a concrete verifier.
+policy. The SBOM adds a useful component inventory with no long-lived signing key, signing-related
+OIDC trust relationship, new signing action, or broader image-build permissions. The separately
+scoped Registry publishing OIDC permission is not an image-signing mechanism. No reviewed registry
+currently requires separate signing, and no identified consumer currently enforces a signer-identity
+policy, so that extra complexity is deferred until it has a concrete verifier.
 
 `v1.0.0` is historical and remains unchanged: its two platform images have BuildKit SLSA
 provenance, but no native SBOM was found. It is therefore documented as provenance-only. Do not
@@ -220,8 +273,8 @@ Reconsider separate keyless signing if an MCP registry, deployment admission pol
 consumer requires signer identity; a regulatory or contractual control requires it; the threat
 model expands to registry or mutable-tag compromise; or the project can document an actual
 verification policy and audience. Choose exactly one mechanism first, sign immutable digests, and
-define its release scope before granting OIDC or attestation permissions. Do not add both GitHub
-artifact attestations and Cosign by default.
+define its release scope before granting signing-related OIDC or attestation permissions. Do not add
+both GitHub artifact attestations and Cosign by default.
 
 Release and publication gates:
 
@@ -229,5 +282,7 @@ Release and publication gates:
   annotation, max-provenance configuration, and per-platform provenance and SBOM attestations;
 - keep public registry metadata on semver tags, not `latest`;
 - describe future images as provenance-and-SBOM images, not as separately signed images;
-- require explicit approval before adding registry credentials, OIDC/attestation permissions, a
-  signing mechanism, or performing an external publication.
+- treat exact-version automatic official MCP Registry publication as part of the approved stable
+  release/tag flow;
+- require explicit approval before an exceptional manual publication, another registry submission,
+  new registry credentials, broader OIDC/attestation permissions, or a signing mechanism.
