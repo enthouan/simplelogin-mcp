@@ -114,35 +114,49 @@ Release PRs should create or update these fields together:
 - `package.json` version.
 - `server.json` top-level `version`.
 - `server.json` OCI package identifier tag, with no package-level `version` field.
-- `registry/docker-mcp/server.yaml` image tag; leave `source.commit` unset until a separately
-  approved registry submission can use the exact release-image source commit.
+
+The staged Docker MCP Registry release is selected separately from official Registry releases.
+Keep `registry/docker-mcp/server.yaml` on an explicit image tag and matching full `source.commit`;
+update that pair only when preparing a separately approved Docker submission. Do not clear the
+source pin or advance the Docker entry automatically with `package.json.version`.
 
 ## Docker MCP Registry
 
-Submission-ready staging files live under [registry/docker-mcp](../registry/docker-mcp):
+Submission candidate files live under [registry/docker-mcp](../registry/docker-mcp):
 
 - `server.yaml`: Docker MCP Registry server configuration for the target versioned GHCR image.
 - `tools.json`: static tool list derived from `src/tools/catalog.ts`; this avoids a Docker registry
   build-time tool-listing failure when `SL_API_KEY` is not configured.
 - `readme.md`: short submission README that points users to the project documentation.
 
-External submission steps, when approved:
+The selected candidate is the self-provided `ghcr.io/enthouan/simplelogin-mcp:1.0.2` image and
+released source commit `c6e702b72a12c1612f67d9347b313e4d588865a2`. The Docker expectations in
+`test/registry.test.ts` deliberately do not follow `package.json.version` automatically.
+See [the validation record](docker-mcp-validation.md) for the immutable digest, current Toolkit
+workflow, and the released image's stdio health-check limitation that requires an owner decision
+before submission.
 
-1. Fork `docker/mcp-registry`.
-2. Copy the staged files to `servers/simplelogin-mcp/` in that fork.
-3. Re-check Docker's current contribution guide before opening the PR.
-4. Run the Docker registry task flow from that repo, including catalog generation/import and local
-   Docker Desktop MCP Toolkit verification where available.
-5. Decide whether to keep using the existing GHCR image or let Docker build and host an `mcp/...`
-   image. Docker's
+Submission workflow:
+
+1. Refresh Docker's contribution guide and check for an existing fork or submission.
+2. Copy the three staged files to `servers/simplelogin-mcp/` in a separate upstream checkout.
+3. Run upstream validation, community-image pull/tool processing, catalog generation, and unit
+   tests. Because `tools.json` bypasses runtime discovery, also initialize the exact image and
+   list its tools over MCP without calling the SimpleLogin API.
+4. Test the generated catalog with a uniquely named local Toolkit catalog/profile. Follow the
+   installed CLI's help; v0.44.1 uses `catalog create` and `profile create`, not the contribution
+   guide's legacy `catalog import`/`reset` commands. Never reset global catalogs or replace the
+   default profile for this test.
+5. Keep the self-provided GHCR path. Docker's
    [contribution guide](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md), checked
-   on 2026-08-23, explicitly accepts an organization-provided image through `--image`. That
+   on 2026-10-08, explicitly accepts an organization-provided image through `--image`. That
    self-provided path uses the image directly and does not inherit Docker's enhanced build
-   guarantees. If Docker builds the `mcp/...` image, Docker says it supplies cryptographic
-   signatures, provenance, SBOMs, and automatic security updates. Publisher-generated provenance
-   and SBOMs on the GHCR image improve its transparency but do not make it Docker-built or
-   Docker-maintained.
-6. Open the Docker MCP Registry pull request only after approval.
+   guarantees. Publisher-generated provenance and SBOMs do not make it Docker-built, signed by
+   Docker, or Docker-maintained. Changing image ownership requires a separate owner decision.
+6. Present the exact upstream files, PR body, validation results, and credential status for
+   approval before creating the fork branch or upstream PR. Live account testing and sharing a
+   disposable review credential require separate explicit authorization. Keep the template's
+   credential-sharing checkbox unchecked until sharing actually occurs.
 
 ## Glama
 
