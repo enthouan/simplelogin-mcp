@@ -133,8 +133,9 @@ The selected candidate is the self-provided `ghcr.io/enthouan/simplelogin-mcp:1.
 released source commit `c6e702b72a12c1612f67d9347b313e4d588865a2`. The Docker expectations in
 `test/registry.test.ts` deliberately do not follow `package.json.version` automatically.
 See [the validation record](docker-mcp-validation.md) for the immutable digest, current Toolkit
-workflow, and the released image's stdio health-check limitation that requires an owner decision
-before submission.
+workflow, and the released image's stdio health-check limitation. The owner approved submission
+with that limitation disclosed; [Docker PR #5609](https://github.com/docker/mcp-registry/pull/5609)
+tracks upstream checks and review.
 
 Submission workflow:
 

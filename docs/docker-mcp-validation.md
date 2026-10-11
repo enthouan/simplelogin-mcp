@@ -1,9 +1,11 @@
 # Docker MCP submission validation
 
 Evidence for [issue #103](https://github.com/enthouan/simplelogin-mcp/issues/103), checked on
-2026-10-08 (Pacific). This records a locally validated submission candidate, not Docker acceptance
-or availability in a published catalog. Upstream submission still needs owner approval, including
-the image-health limitation below. The independent SimpleLogin/Proton disclaimer is preserved.
+2026-10-08 (Pacific). On 2026-10-10, the owner approved submitting v1.0.2 with the image-health
+limitation below disclosed. [Docker PR #5609](https://github.com/docker/mcp-registry/pull/5609)
+contains the three-file submission at `7fb4fbb8066e92e4642a540852bff98279fb7422`.
+This records validation and submission, not Docker acceptance or availability in a published
+catalog. The independent SimpleLogin/Proton disclaimer is preserved.
 
 ## Candidate and image evidence
 
@@ -61,9 +63,9 @@ The shared smoke expects `node dist/healthcheck.js`, introduced after v1.0.2 in
 [PR #136](https://github.com/enthouan/simplelogin-mcp/pull/136).
 
 No shared assertion, health check, published image, or tag was changed to hide this failure.
-The owner must choose whether to submit v1.0.2 with this limitation disclosed or wait for a
-separately approved release containing the existing fix. A new release is outside issue #103's
-current execution scope. Track that decision and any upstream objection on #103 and its PRs.
+The owner approved submission of v1.0.2 with this limitation disclosed on 2026-10-10. The upstream
+PR records the failure explicitly. A new release remains outside issue #103's current execution
+scope; any upstream requirement to change the release needs a separate owner decision.
 
 ## Toolkit v0.44.1 workflow
 
@@ -112,10 +114,18 @@ or global catalog was reset. Pulled public images remain in Docker's local cache
 
 ## Remaining external actions
 
-Prepare the exact upstream three-file diff and PR body, then obtain approval before creating a
-fork branch or PR. Preserve the self-provided GHCR path and disclose the failed health assertion.
-After submission, verify checks and track review feedback without claiming acceptance or catalog
-publication. Do not close #103 or change its project/milestone state automatically.
+The approved submission is open from `enthouan/mcp-registry:antoine/add-simplelogin-mcp-v1.0.2`
+to `docker/mcp-registry:main`. The self-provided GHCR image/source pair and three-file payload
+match the validated candidate.
+
+At submission on 2026-10-10, the upstream
+[CI run](https://github.com/docker/mcp-registry/actions/runs/38116449529) and
+[security-review trigger](https://github.com/docker/mcp-registry/actions/runs/38116449547) reported
+`action_required`, awaiting workflow approval by a Docker maintainer. Upstream checks have not
+passed. Follow up on [PR #5609](https://github.com/docker/mcp-registry/pull/5609): obtain maintainer
+workflow approval, verify the checks on the submitted head, and address review feedback. Do not
+claim acceptance or catalog publication, close #103, or change its project/milestone state
+automatically.
 
 Docker's contribution guide links a
 [Docker, Inc. Google Form](https://forms.gle/6Lw3nsvu2d6nFg8e6) requesting the upstream PR URL,
