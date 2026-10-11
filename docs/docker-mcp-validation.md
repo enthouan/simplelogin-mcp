@@ -3,7 +3,7 @@
 Evidence for [issue #103](https://github.com/enthouan/simplelogin-mcp/issues/103), checked on
 2026-10-08 (Pacific). On 2026-10-10, the owner approved submitting v1.0.2 with the image-health
 limitation below disclosed. [Docker PR #5609](https://github.com/docker/mcp-registry/pull/5609)
-contains the three-file submission at `7fb4fbb8066e92e4642a540852bff98279fb7422`.
+opened with the three-file submission at `7fb4fbb8066e92e4642a540852bff98279fb7422`.
 This records validation and submission, not Docker acceptance or availability in a published
 catalog. The independent SimpleLogin/Proton disclaimer is preserved.
 
@@ -21,14 +21,21 @@ index annotation. Each platform has maximum-mode SLSA provenance and an SPDX 2.3
 attestation subject matches that platform's manifest. These attestations are not evidence of a
 separate image signature.
 
-The source tool catalog is unchanged between v1.0.0 and v1.0.2. The staged `tools.json` still
-matches all 27 canonical summaries exactly; it was not regenerated.
+The source tool catalog is unchanged between v1.0.0 and v1.0.2. All 27 canonical names and
+summaries are preserved. Upstream Codex review identified missing secret requiredness and static
+argument metadata. The follow-up marks `SL_API_KEY` as required and regenerates `tools.json` with
+all 60 arguments from the registered input schemas: names, types, array item types, descriptions,
+and optional flags. The captured v1.0.2 image tool listing verifies the staged metadata; its
+SHA-256 is frozen with the selected release in the registry test, independently of the checkout.
+Separate protocol-level tests check the generator against current MCP schemas. Docker's argument format does not carry full JSON
+Schema constraints; the nullable domain display name is shown as a string with its null-clearing
+behavior retained in the description. No tool implementation or public MCP contract changes.
 
 ## Validation results
 
 | Layer                       | Result                                                                                                                                                                                                      |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repository                  | Frozen dependency install, 13 registry tests, lint, typecheck, build, all 424 tests, website checks, formatting, and whitespace checks pass.                                                                |
+| Repository                  | Frozen dependency install, 13 registry tests, lint, typecheck, build, all 425 tests, website checks, formatting, and whitespace checks pass.                                                                |
 | Docker Registry             | `task validate -- --name simplelogin-mcp`, `task build -- --tools --pull-community simplelogin-mcp`, `task catalog -- simplelogin-mcp`, and `task unittest` pass.                                           |
 | Direct image runtime        | Offline MCP initialization identifies `simplelogin-mcp` v1.0.2 and returns 27 tools with clean protocol stdout. The complete public tool contract matches the repository's frozen hash.                     |
 | Shared release-image smoke  | **Fails** its health-check assertion for the released v1.0.2 image; see below. This is not a sandbox failure.                                                                                               |
@@ -46,6 +53,11 @@ Direct runtime verification used the immutable index above on `linux/amd64`, `--
 annotations match the frozen public-contract SHA-256
 `af451ad318f5e7b0aadad1b25ae4af0fc56fcf050b046bca8d14c5dbf7a06eda`.
 The arm64 artifact was inspected, not runtime-tested.
+
+After the metadata review fixes, all four local Registry commands passed again. The generated
+catalog retains `required: true` on the API key, and the file-backed gateway again exposes all
+27 tools with matching schemas and original secret mapping, with both default and explicit
+optional configuration. The v1.0.2 image digest is unchanged.
 
 ## Released-image health limitation
 

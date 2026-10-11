@@ -1,8 +1,8 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { renderDockerMcpToolsJson } from '../src/tools/catalog.js';
 
 const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
@@ -10,6 +10,9 @@ const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
 const DOCKER_MCP_RELEASE = {
   version: '1.0.2',
   sourceCommit: 'c6e702b72a12c1612f67d9347b313e4d588865a2',
+  // Reviewed against the selected image's actual MCP listing, including all 60 arguments.
+  // Update only with an intentional Docker submission change, not a checkout/package bump.
+  toolsSha256: 'ae77321f2460b09281080bf80aa76b17a66edb217b4e4417e2d2c17fccdad487',
 } as const;
 const SERVER_JSON_PATH = 'server.json';
 const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
@@ -71,6 +74,9 @@ interface DockerMcpStagingMetadata {
     project: string;
     branch: string;
     commit: string;
+  };
+  config: {
+    secrets: { name: string; env: string; required?: boolean; example?: string }[];
   };
 }
 
@@ -427,7 +433,14 @@ describe('Docker MCP Registry staging metadata', () => {
       commit: DOCKER_MCP_RELEASE.sourceCommit,
     });
     expect(server.source.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(serverYaml).toContain('env: SL_API_KEY');
+    expect(server.config.secrets).toEqual([
+      {
+        name: 'simplelogin-mcp.sl_api_key',
+        env: 'SL_API_KEY',
+        required: true,
+        example: 'sl-your-key-here',
+      },
+    ]);
     expect(serverYaml).toContain('name: TRANSPORT\n      value: stdio');
     expect(serverYaml).toContain('project: https://github.com/enthouan/simplelogin-mcp');
     expect(serverYaml).toContain('icon: https://simplelogin-mcp.com/favicon.svg');
@@ -436,7 +449,10 @@ describe('Docker MCP Registry staging metadata', () => {
     );
   });
 
-  it('keeps staged Docker tools in sync with the source tool catalog summaries', () => {
-    expect(readRepoFile('registry/docker-mcp/tools.json')).toBe(renderDockerMcpToolsJson());
+  it('freezes staged Docker summaries and arguments to the explicitly selected release', () => {
+    const digest = createHash('sha256')
+      .update(readRepoFile('registry/docker-mcp/tools.json'))
+      .digest('hex');
+    expect(digest).toBe(DOCKER_MCP_RELEASE.toolsSha256);
   });
 });
