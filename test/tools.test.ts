@@ -20,6 +20,7 @@ import {
   TOOL_NAMES,
   loadToolInputArguments,
   loadRegisteredToolMetadata,
+  renderDockerMcpToolsJson,
   renderToolCatalogMarkdown,
   type ToolAnnotations,
   type ToolName,
@@ -210,6 +211,44 @@ describe('registered tool surface', () => {
 
     // Update only after reviewing the complete listTools contract as an intentional public change.
     expect(digest).toBe('af451ad318f5e7b0aadad1b25ae4af0fc56fcf050b046bca8d14c5dbf7a06eda');
+  });
+
+  it('renders Docker argument metadata matching the current MCP protocol schemas', async () => {
+    const tools = await withMcpClient({}, async (client) => (await client.listTools()).tools);
+    const generated = JSON.parse(await renderDockerMcpToolsJson()) as {
+      name: string;
+      arguments?: {
+        name: string;
+        type: string;
+        items?: { type: string };
+        desc: string;
+        optional?: boolean;
+      }[];
+    }[];
+
+    expect(generated.map((tool) => tool.name)).toEqual(tools.map((tool) => tool.name));
+    for (const tool of tools) {
+      const args = generated.find((entry) => entry.name === tool.name)?.arguments ?? [];
+      const properties = tool.inputSchema.properties ?? {};
+      expect(args.map((arg) => arg.name).sort(), tool.name).toEqual(Object.keys(properties).sort());
+      for (const arg of args) {
+        const property = properties[arg.name] as {
+          type: string | string[];
+          items?: { type: string };
+          description: string;
+        };
+        const types = Array.isArray(property.type) ? property.type : [property.type];
+        expect(
+          types.filter((type) => type !== 'null'),
+          `${tool.name}.${arg.name}`,
+        ).toEqual([arg.type]);
+        expect(arg.items).toEqual(
+          property.type === 'array' ? { type: property.items?.type } : undefined,
+        );
+        expect(arg.desc).toBe(property.description);
+        expect(Boolean(arg.optional)).toBe(!(tool.inputSchema.required ?? []).includes(arg.name));
+      }
+    }
   });
 
   it('enforces literal confirm=true for every permanent-delete tool over MCP', async () => {

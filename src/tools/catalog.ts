@@ -4,6 +4,7 @@
  * uses the annotation profiles from here, and tests use the same catalog to
  * catch drift between registered tools and public docs.
  */
+import type { ZodType } from 'zod';
 
 export const LIST_PAGE_SIZE = 20;
 export const CUSTOM_DOMAIN_TRASH_DEFAULT_LIMIT = 100;
@@ -423,11 +424,80 @@ function formatInputs(inputs: readonly ToolInputArgument[]): string {
     .join('; ');
 }
 
-export function renderDockerMcpToolsJson(): string {
-  const tools = TOOL_CATALOG.map((tool) => ({
-    name: tool.name,
-    description: tool.summary,
-  }));
+interface DockerMcpToolArgument {
+  name: string;
+  type: string;
+  items?: { type: string };
+  desc: string;
+  optional?: true;
+}
+
+export async function renderDockerMcpToolsJson(): Promise<string> {
+  const { registerAllTools } = await import('./index.js');
+  const { z } = await import('zod');
+  const argumentsByName = new Map<string, DockerMcpToolArgument[]>();
+  const server = {
+    registerTool(name: string, options: { inputSchema?: Record<string, ZodType> }): void {
+      const schema = z.toJSONSchema(z.object(options.inputSchema ?? {}), {
+        target: 'draft-7',
+        io: 'input',
+      });
+      const required = schema.required ?? [];
+      const args = Object.entries(schema.properties ?? {}).map(([inputName, property]) => {
+        if (typeof property !== 'object') {
+          throw new Error(`Unsupported Docker argument schema: ${name}.${inputName}`);
+        }
+        const types = Array.isArray(property.type)
+          ? property.type.filter((type) => type !== 'null')
+          : [property.type];
+        const type = types[0];
+        if (types.length !== 1 || !type || !property.description) {
+          throw new Error(`Unsupported Docker argument metadata: ${name}.${inputName}`);
+        }
+        let items: { type: string } | undefined;
+        if (type === 'array') {
+          const item = property.items;
+          if (typeof item !== 'object' || Array.isArray(item) || typeof item.type !== 'string') {
+            throw new Error(`Unsupported Docker array items: ${name}.${inputName}`);
+          }
+          items = { type: item.type };
+        }
+        // Docker's display metadata accepts one type, not the full JSON Schema.
+        // Nullable inputs retain their null-clearing semantics in the description.
+        return {
+          name: inputName,
+          type,
+          ...(items ? { items } : {}),
+          desc: property.description,
+          ...(!required.includes(inputName) ? { optional: true as const } : {}),
+        };
+      });
+      args.sort(
+        (left, right) =>
+          Number(Boolean(left.optional)) - Number(Boolean(right.optional)) ||
+          left.name.localeCompare(right.name),
+      );
+      if (argumentsByName.has(name)) throw new Error(`Duplicate registered tool: ${name}`);
+      argumentsByName.set(name, args);
+    },
+  };
+  registerAllTools(
+    server as unknown as Parameters<typeof registerAllTools>[0],
+    {} as Parameters<typeof registerAllTools>[1],
+  );
+
+  if (argumentsByName.size !== TOOL_CATALOG.length) {
+    throw new Error('Registered tools do not match the Docker tool catalog');
+  }
+  const tools = TOOL_CATALOG.map((tool) => {
+    const args = argumentsByName.get(tool.name);
+    if (!args) throw new Error(`Missing registered tool: ${tool.name}`);
+    return {
+      name: tool.name,
+      description: tool.summary,
+      ...(args.length > 0 ? { arguments: args } : {}),
+    };
+  });
 
   return `${JSON.stringify(tools, null, 2)}\n`;
 }
