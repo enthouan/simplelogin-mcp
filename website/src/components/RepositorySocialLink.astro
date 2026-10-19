@@ -14,32 +14,30 @@ const starCountText = formatRepositoryStarCount(starCount);
 const starCountLabel = formatRepositoryStarCountLabel(starCount);
 ---
 
-{
-  links.map(({ label, href, icon }) => {
-    const isRepository = href === REPOSITORY_URL;
-    const visibleStarCount = isRepository ? starCountText : undefined;
-    const accessibleLabel = isRepository && starCountLabel ? `${label}, ${starCountLabel}` : label;
+{links.map(({ label, href, icon }) => {
+  const isRepository = href === REPOSITORY_URL;
+  const visibleStarCount = isRepository ? starCountText : undefined;
+  const accessibleLabel = isRepository && starCountLabel ? `${label}, ${starCountLabel}` : label;
 
-    return (
-      <a
-        href={href}
-        rel={isRepository ? 'me external' : 'me'}
-        referrerpolicy={isRepository ? 'no-referrer' : undefined}
-        class="sl-flex"
-        aria-label={accessibleLabel}
-        data-repository-navigation={isRepository || undefined}
-      >
-        <Icon name={icon} />
-        {visibleStarCount && (
-          <span class="star-count" aria-hidden="true">
-            <Icon name="star" />
-            <span>{visibleStarCount}</span>
-          </span>
-        )}
-      </a>
-    );
-  })
-}
+  return (
+    <a
+      href={href}
+      rel={isRepository ? 'me external' : 'me'}
+      referrerpolicy={isRepository ? 'no-referrer' : undefined}
+      class="sl-flex"
+      aria-label={accessibleLabel}
+      data-repository-navigation={isRepository || undefined}
+    >
+      <Icon name={icon} />
+      {visibleStarCount && (
+        <span class="star-count" aria-hidden="true">
+          <Icon name="star" />
+          <span>{visibleStarCount}</span>
+        </span>
+      )}
+    </a>
+  );
+})}
 
 <style>
   @layer starlight.core {
