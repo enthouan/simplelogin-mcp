@@ -6,33 +6,35 @@ import { CATEGORY_ENTRIES } from '../data/catalog.js';
 
 <figure class="catalog-preview not-content" data-tool-count={TOOL_CATALOG.length}>
   <div class="catalog-preview__bar" aria-hidden="true">
-    <span></span><span></span><span></span>
+    <span></span>
+    <span></span>
+    <span></span>
     <strong>MCP request</strong>
   </div>
   <div class="catalog-preview__body">
-    <p>MCP method: <code>tools/list</code></p>
+    <p>
+      MCP method: <code>tools/list</code>
+    </p>
     <p class="catalog-preview__success">
       <Icon name="puzzle" size="1.1rem" />
       <span>{TOOL_CATALOG.length} tools loaded from the project catalog</span>
     </p>
     <dl>
-      {
-        CATEGORY_ENTRIES.map(({ category, label, tools }) => (
-          <div>
-            <dt>
-              <a href={`reference/tools/#tool-group-${category}`}>{label}</a>
-            </dt>
-            <dd>
-              <strong>{tools.length}</strong>{' '}
-              {tools
-                .slice(0, 4)
-                .map((tool) => tool.name)
-                .join(', ')}
-              {tools.length > 4 ? ', …' : ''}
-            </dd>
-          </div>
-        ))
-      }
+      {CATEGORY_ENTRIES.map(({ category, label, tools }) => (
+        <div>
+          <dt>
+            <a href={`reference/tools/#tool-group-${category}`}>{label}</a>
+          </dt>
+          <dd>
+            <strong>{tools.length}</strong>{' '}
+            {tools
+              .slice(0, 4)
+              .map((tool) => tool.name)
+              .join(', ')}
+            {tools.length > 4 ? ', …' : ''}
+          </dd>
+        </div>
+      ))}
     </dl>
   </div>
   <figcaption>

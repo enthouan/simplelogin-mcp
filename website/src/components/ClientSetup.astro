@@ -6,40 +6,36 @@ import VerifySetup from './VerifySetup.astro';
 
 <div data-client-setups>
   <div class="client-anchor-targets" aria-hidden="true">
-    {
-      CLIENT_SETUPS.map((client) => (
-        <span
-          id={client.key}
-          data-client-anchor
-          data-client-key={client.key}
-          data-client-icon={client.icon}
-        />
-      ))
-    }
+    {CLIENT_SETUPS.map((client) => (
+      <span
+        id={client.key}
+        data-client-anchor
+        data-client-key={client.key}
+        data-client-icon={client.icon}
+      />
+    ))}
   </div>
 
   <Tabs syncKey="mcp-client">
-    {
-      CLIENT_SETUPS.map((client) => (
-        <TabItem label={client.label}>
-          <p>{client.description}</p>
-          <p>
-            <strong>Where to configure it:</strong> {client.configLocation}
-          </p>
-          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
-          <Aside type="caution" title="Protect the SimpleLogin API key">
-            <p>{client.secretNote}</p>
-          </Aside>
-          <p>
-            <strong>Reload the client:</strong> {client.reload}
-          </p>
-          <p>
-            Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
-          </p>
-          <VerifySetup headingId={`verify-${client.key}`} />
-        </TabItem>
-      ))
-    }
+    {CLIENT_SETUPS.map((client) => (
+      <TabItem label={client.label}>
+        <p>{client.description}</p>
+        <p>
+          <strong>Where to configure it:</strong> {client.configLocation}
+        </p>
+        <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+        <Aside type="caution" title="Protect the SimpleLogin API key">
+          <p>{client.secretNote}</p>
+        </Aside>
+        <p>
+          <strong>Reload the client:</strong> {client.reload}
+        </p>
+        <p>
+          Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
+        </p>
+        <VerifySetup headingId={`verify-${client.key}`} />
+      </TabItem>
+    ))}
   </Tabs>
 
   <noscript>
@@ -52,27 +48,25 @@ import VerifySetup from './VerifySetup.astro';
       JavaScript is disabled. All client recipes are expanded below; copy configuration values
       manually.
     </p>
-    {
-      CLIENT_SETUPS.map((client) => (
-        <section aria-labelledby={`no-script-${client.key}`}>
-          <h3 id={`no-script-${client.key}`}>{client.label}</h3>
-          <p>{client.description}</p>
-          <p>
-            <strong>Where to configure it:</strong> {client.configLocation}
-          </p>
-          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
-          <p>
-            <strong>Protect the SimpleLogin API key:</strong> {client.secretNote}
-          </p>
-          <p>
-            <strong>Reload the client:</strong> {client.reload}
-          </p>
-          <p>
-            Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
-          </p>
-        </section>
-      ))
-    }
+    {CLIENT_SETUPS.map((client) => (
+      <section aria-labelledby={`no-script-${client.key}`}>
+        <h3 id={`no-script-${client.key}`}>{client.label}</h3>
+        <p>{client.description}</p>
+        <p>
+          <strong>Where to configure it:</strong> {client.configLocation}
+        </p>
+        <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+        <p>
+          <strong>Protect the SimpleLogin API key:</strong> {client.secretNote}
+        </p>
+        <p>
+          <strong>Reload the client:</strong> {client.reload}
+        </p>
+        <p>
+          Configuration syntax: <a href={client.docsUrl}>{client.docsLabel}</a>.
+        </p>
+      </section>
+    ))}
   </noscript>
 </div>
 

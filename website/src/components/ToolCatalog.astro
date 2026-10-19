@@ -20,7 +20,9 @@ import { CATEGORY_ENTRIES } from '../data/catalog.js';
       <span>Category</span>
       <select name="category" data-catalog-category>
         <option value="all">All categories</option>
-        {CATEGORY_ENTRIES.map(({ category, label }) => <option value={category}>{label}</option>)}
+        {CATEGORY_ENTRIES.map(({ category, label }) => (
+          <option value={category}>{label}</option>
+        ))}
       </select>
     </label>
     <label>
@@ -42,130 +44,124 @@ import { CATEGORY_ENTRIES } from '../data/catalog.js';
     No tools match those filters. Try a different search, category, or behavior.
   </p>
 
-  {
-    CATEGORY_ENTRIES.map(({ category, label, description, example, tools }) => (
-      <section class="tool-group" aria-labelledby={`tool-group-${category}`} data-tool-group>
-        <header>
-          <div>
-            <h2 id={`tool-group-${category}`}>{label}</h2>
-            <p>{description}</p>
-            <p class="category-example">
-              <strong>Example prompt:</strong> “{example}”
-            </p>
-          </div>
-          <div class="category-count">
-            <Badge
-              text={`${tools.length} tools`}
-              size="small"
-              aria-label={`${tools.length} tools`}
-            />
-          </div>
-        </header>
-        <ul>
-          {tools.map((tool) => {
-            const requiredCount = tool.inputs.filter((input) => input.required).length;
-            const optionalCount = tool.inputs.length - requiredCount;
-            const searchText = [
-              tool.name,
-              tool.summary,
-              tool.description,
-              tool.bounds,
-              tool.output,
-              ...tool.inputs.flatMap((input) => [input.name, input.description]),
-            ]
-              .join(' ')
-              .toLocaleLowerCase();
+  {CATEGORY_ENTRIES.map(({ category, label, description, example, tools }) => (
+    <section class="tool-group" aria-labelledby={`tool-group-${category}`} data-tool-group>
+      <header>
+        <div>
+          <h2 id={`tool-group-${category}`}>{label}</h2>
+          <p>{description}</p>
+          <p class="category-example">
+            <strong>Example prompt:</strong> “{example}”
+          </p>
+        </div>
+        <div class="category-count">
+          <Badge text={`${tools.length} tools`} size="small" aria-label={`${tools.length} tools`} />
+        </div>
+      </header>
+      <ul>
+        {tools.map((tool) => {
+          const requiredCount = tool.inputs.filter((input) => input.required).length;
+          const optionalCount = tool.inputs.length - requiredCount;
+          const searchText = [
+            tool.name,
+            tool.summary,
+            tool.description,
+            tool.bounds,
+            tool.output,
+            ...tool.inputs.flatMap((input) => [input.name, input.description]),
+          ]
+            .join(' ')
+            .toLocaleLowerCase();
 
-            return (
-              <li
-                id={tool.name}
-                data-tool-card
-                data-tool-name={tool.name}
-                data-category={tool.category}
-                data-read-only={String(tool.annotations.readOnlyHint)}
-                data-destructive={String(tool.annotations.destructiveHint)}
-                data-search={searchText}
-              >
-                <div class="tool-heading">
-                  <h3>
-                    <a href={`#${tool.name}`} aria-label={`Link to ${tool.name}`}>
-                      <code>{tool.name}</code>
-                      <span aria-hidden="true">#</span>
-                    </a>
-                  </h3>
-                  <div class="tool-behaviors" aria-label="Tool behavior">
-                    <Badge
-                      text={tool.annotations.readOnlyHint ? 'Read only' : 'Writes data'}
-                      variant={tool.annotations.readOnlyHint ? 'success' : 'caution'}
-                      size="small"
-                    />
-                    <Badge
-                      text={tool.annotations.idempotentHint ? 'Idempotent' : 'Not idempotent'}
-                      variant="note"
-                      size="small"
-                    />
-                    {tool.annotations.destructiveHint && (
-                      <Badge text="Destructive" variant="danger" size="small" />
-                    )}
-                  </div>
-                </div>
-                <p>{tool.summary}</p>
-                <p class="tool-usage">
-                  <strong>Usage and constraints:</strong> {tool.description}
-                </p>
-                <details class="tool-inputs">
-                  <summary>
-                    Inputs
-                    <span>
-                      {tool.inputs.length === 0
-                        ? 'none'
-                        : [
-                            requiredCount > 0 ? `${requiredCount} required` : undefined,
-                            optionalCount > 0 ? `${optionalCount} optional` : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(', ')}
-                    </span>
-                  </summary>
-                  {tool.inputs.length === 0 ? (
-                    <p>This tool takes no input arguments.</p>
-                  ) : (
-                    <dl>
-                      {tool.inputs.map((input) => (
-                        <div>
-                          <dt>
-                            <code>{input.name}</code>
-                            <Badge
-                              text={input.required ? 'Required field' : 'Optional field'}
-                              variant={input.required ? 'default' : 'note'}
-                              size="small"
-                            />
-                          </dt>
-                          <dd>{input.description}</dd>
-                        </div>
-                      ))}
-                    </dl>
+          return (
+            <li
+              id={tool.name}
+              data-tool-card
+              data-tool-name={tool.name}
+              data-category={tool.category}
+              data-read-only={String(tool.annotations.readOnlyHint)}
+              data-destructive={String(tool.annotations.destructiveHint)}
+              data-search={searchText}
+            >
+              <div class="tool-heading">
+                <h3>
+                  <a href={`#${tool.name}`} aria-label={`Link to ${tool.name}`}>
+                    <code>{tool.name}</code>
+                    <span aria-hidden="true">#</span>
+                  </a>
+                </h3>
+                <div class="tool-behaviors" aria-label="Tool behavior">
+                  <Badge
+                    text={tool.annotations.readOnlyHint ? 'Read only' : 'Writes data'}
+                    variant={tool.annotations.readOnlyHint ? 'success' : 'caution'}
+                    size="small"
+                  />
+                  <Badge
+                    text={tool.annotations.idempotentHint ? 'Idempotent' : 'Not idempotent'}
+                    variant="note"
+                    size="small"
+                  />
+                  {tool.annotations.destructiveHint && (
+                    <Badge text="Destructive" variant="danger" size="small" />
                   )}
-                </details>
-                <dl class="tool-meta">
-                  <div>
-                    <dt>Bounds</dt>
-                    <dd>{tool.bounds}</dd>
-                  </div>
-                  <div>
-                    <dt>Output</dt>
-                    <dd>
-                      <code>{tool.output}</code>
-                    </dd>
-                  </div>
-                </dl>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    ))
-  }
+                </div>
+              </div>
+              <p>{tool.summary}</p>
+              <p class="tool-usage">
+                <strong>Usage and constraints:</strong> {tool.description}
+              </p>
+              <details class="tool-inputs">
+                <summary>
+                  Inputs
+                  <span>
+                    {tool.inputs.length === 0
+                      ? 'none'
+                      : [
+                          requiredCount > 0 ? `${requiredCount} required` : undefined,
+                          optionalCount > 0 ? `${optionalCount} optional` : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                  </span>
+                </summary>
+                {tool.inputs.length === 0 ? (
+                  <p>This tool takes no input arguments.</p>
+                ) : (
+                  <dl>
+                    {tool.inputs.map((input) => (
+                      <div>
+                        <dt>
+                          <code>{input.name}</code>
+                          <Badge
+                            text={input.required ? 'Required field' : 'Optional field'}
+                            variant={input.required ? 'default' : 'note'}
+                            size="small"
+                          />
+                        </dt>
+                        <dd>{input.description}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </details>
+              <dl class="tool-meta">
+                <div>
+                  <dt>Bounds</dt>
+                  <dd>{tool.bounds}</dd>
+                </div>
+                <div>
+                  <dt>Output</dt>
+                  <dd>
+                    <code>{tool.output}</code>
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  ))}
 </div>
 
 <script>

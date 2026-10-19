@@ -28,84 +28,70 @@ if (!client) throw new Error(`Unknown MCP client recipe: ${clientKey}`);
   </noscript>
   <p>{client.description}</p>
   <p>
-    <strong>Where to configure it:</strong>
-    {' '}
-    {client.configLocation}
+    <strong>Where to configure it:</strong> {client.configLocation}
   </p>
 
-  {
-    client.http ? (
-      <>
-        <Tabs syncKey="client-transport">
-          <TabItem label="Local stdio">
-            <Code
-              code={client.code}
-              lang={client.language}
-              meta={`title="${client.configTitle}"`}
-            />
-            <Aside type="caution" title="Protect the SimpleLogin API key">
-              <p>{client.secretNote}</p>
-            </Aside>
-          </TabItem>
-          <TabItem label="Streamable HTTP">
-            <Code
-              code={client.http.code}
-              lang={client.http.language}
-              meta={`title="${client.http.configTitle}"`}
-            />
-            <p>{client.http.note}</p>
-            <Aside type="note" title="The SimpleLogin key stays on the server">
-              <p>
-                The HTTP client never receives <code>SL_API_KEY</code>. When the server uses{' '}
-                <code>MCP_AUTH_TOKEN</code>, the client sends a separate matching bearer value only
-                to <code>simplelogin-mcp</code>.
-              </p>
-            </Aside>
-          </TabItem>
-        </Tabs>
-        <noscript>
-          <section aria-label={`${client.label} local stdio configuration`}>
-            <h3>Local stdio</h3>
-            <Code
-              code={client.code}
-              lang={client.language}
-              meta={`title="${client.configTitle}"`}
-            />
-            <p>
-              <strong>Protect the SimpleLogin API key:</strong> {client.secretNote}
-            </p>
-          </section>
-          <section aria-label={`${client.label} Streamable HTTP configuration`}>
-            <h3>Streamable HTTP</h3>
-            <Code
-              code={client.http.code}
-              lang={client.http.language}
-              meta={`title="${client.http.configTitle}"`}
-            />
-            <p>{client.http.note}</p>
+  {client.http ? (
+    <>
+      <Tabs syncKey="client-transport">
+        <TabItem label="Local stdio">
+          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+          <Aside type="caution" title="Protect the SimpleLogin API key">
+            <p>{client.secretNote}</p>
+          </Aside>
+        </TabItem>
+        <TabItem label="Streamable HTTP">
+          <Code
+            code={client.http.code}
+            lang={client.http.language}
+            meta={`title="${client.http.configTitle}"`}
+          />
+          <p>{client.http.note}</p>
+          <Aside type="note" title="The SimpleLogin key stays on the server">
             <p>
               The HTTP client never receives <code>SL_API_KEY</code>. When the server uses{' '}
               <code>MCP_AUTH_TOKEN</code>, the client sends a separate matching bearer value only to{' '}
               <code>simplelogin-mcp</code>.
             </p>
-          </section>
-        </noscript>
-      </>
-    ) : (
-      <>
-        <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
-        <Aside type="caution" title="Protect the SimpleLogin API key">
-          <p>{client.secretNote}</p>
-        </Aside>
-      </>
-    )
-  }
+          </Aside>
+        </TabItem>
+      </Tabs>
+      <noscript>
+        <section aria-label={`${client.label} local stdio configuration`}>
+          <h3>Local stdio</h3>
+          <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+          <p>
+            <strong>Protect the SimpleLogin API key:</strong> {client.secretNote}
+          </p>
+        </section>
+        <section aria-label={`${client.label} Streamable HTTP configuration`}>
+          <h3>Streamable HTTP</h3>
+          <Code
+            code={client.http.code}
+            lang={client.http.language}
+            meta={`title="${client.http.configTitle}"`}
+          />
+          <p>{client.http.note}</p>
+          <p>
+            The HTTP client never receives <code>SL_API_KEY</code>. When the server uses{' '}
+            <code>MCP_AUTH_TOKEN</code>, the client sends a separate matching bearer value only to{' '}
+            <code>simplelogin-mcp</code>.
+          </p>
+        </section>
+      </noscript>
+    </>
+  ) : (
+    <>
+      <Code code={client.code} lang={client.language} meta={`title="${client.configTitle}"`} />
+      <Aside type="caution" title="Protect the SimpleLogin API key">
+        <p>{client.secretNote}</p>
+      </Aside>
+    </>
+  )}
 
   {client.httpUnavailableNote && <p>{client.httpUnavailableNote}</p>}
   <p>
-    <strong>Reload the client:</strong>
-    {' '}
-    {client.reload}
+    <strong>Reload the client:</strong> {client.reload}
   </p>
   <p>
     Reference: <a href={client.docsUrl}>{client.docsLabel}</a>.

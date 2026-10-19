@@ -19,9 +19,11 @@ const diagramUrl = `${import.meta.env.BASE_URL}request-flow.svg`;
     />
   </div>
   <p class="request-flow__note">
-    <strong>simplelogin-mcp never places <code>SL_API_KEY</code> in MCP requests or results.</strong
-    > Do not put the key in prompts. HTTP clients send the separate <code>MCP_AUTH_TOKEN</code> when configured
-    or required; stdio does not use it. Permanent deletion tools also require an explicit{' '}
+    <strong>
+      simplelogin-mcp never places <code>SL_API_KEY</code> in MCP requests or results.
+    </strong>{' '}
+    Do not put the key in prompts. HTTP clients send the separate <code>MCP_AUTH_TOKEN</code> when
+    configured or required; stdio does not use it. Permanent deletion tools also require an explicit{' '}
     <code>confirm=true</code> argument.
   </p>
 </figure>

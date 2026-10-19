@@ -26,20 +26,18 @@ const minimumNode = /^>=(\d+)/.exec(packageJson.engines.node)?.[1];
       >
         Star on GitHub
       </LinkButton>
-      {
-        showIssueLink && (
-          <LinkButton
-            href={`${REPOSITORY_URL}/issues/new/choose`}
-            icon="github"
-            iconPlacement="start"
-            variant="secondary"
-            rel="external"
-            referrerpolicy="no-referrer"
-          >
-            Open an issue
-          </LinkButton>
-        )
-      }
+      {showIssueLink && (
+        <LinkButton
+          href={`${REPOSITORY_URL}/issues/new/choose`}
+          icon="github"
+          iconPlacement="start"
+          variant="secondary"
+          rel="external"
+          referrerpolicy="no-referrer"
+        >
+          Open an issue
+        </LinkButton>
+      )}
       <Badge text="MIT licensed" variant="success" size="small" />
       <Badge text="Self-hostable" size="small" />
       {minimumNode && <Badge text={`Node ${minimumNode}`} size="small" />}
