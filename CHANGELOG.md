@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.4
+
+### Changed
+
+- Refresh production dependencies: MCP SDK 1.32.1, Hono 4.13.13, its Node.js server adapter
+  2.1.5, and Zod 4.6.7.
+- Refresh development and website dependencies, including Vitest 5.0.1 and
+  prettier-plugin-astro 1.0.1 with its updated Astro formatting.
+- Update the pinned setup-node and upload-artifact GitHub Actions.
+
 ## v1.0.3
 
 ### Changed
