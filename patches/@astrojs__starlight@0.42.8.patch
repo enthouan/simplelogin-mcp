@@ -1,0 +1,12 @@
+diff --git a/dist/components/Search.astro b/dist/components/Search.astro
+index d8c80d826995d6c8ce598aa618ddf7ea575ecadc..69b2f0032f993f58ecaab0567b598b50a4bce363 100644
+--- a/dist/components/Search.astro
++++ b/dist/components/Search.astro
+@@ -69,6 +69,7 @@ if (project.trailingSlash === 'never') dataAttributes['data-strip-trailing-slash
+ 			platformKey.textContent = '⌘';
+ 			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+ 		}
++		openBtn.setAttribute('aria-label', openBtn.textContent.trim());
+ 		shortcut.style.display = '';
+ 	})();
+ </script>

@@ -8,6 +8,7 @@ RUN corepack enable
 
 # Install dependencies first for better layer caching.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm install --filter simplelogin-mcp --frozen-lockfile
 
 # Compile.
@@ -25,6 +26,7 @@ RUN corepack enable
 
 # Production dependencies only (no TypeScript/tsx/eslint).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm install --filter simplelogin-mcp --prod --frozen-lockfile --ignore-scripts
 
 # Compiled JavaScript. package.json above is also used at runtime to read the version.
