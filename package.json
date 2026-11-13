@@ -53,7 +53,7 @@
   ],
   "packageManager": "pnpm@11.5.1",
   "dependencies": {
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.6",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "hono": "^4.13.14",
     "zod": "^4.6.7"
