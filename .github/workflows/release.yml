@@ -154,6 +154,46 @@ jobs:
           RELEASE_IMAGE_DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
         run: node .github/scripts/mcp-registry.ts repair-aliases
 
+  deploy:
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Notify deployment webhook after publishing main
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHmac } from 'node:crypto';
+          const { DEPLOY_WEBHOOK_URL: url, DEPLOY_WEBHOOK_SECRET: secret } = process.env;
+          if (!url && !secret) {
+            console.log('Deployment webhook not configured; skipping.');
+          } else {
+            try {
+              if (!url || !secret) throw new Error('Incomplete deployment configuration');
+              const endpoint = new URL(url);
+              if (endpoint.protocol !== 'https:') throw new Error('HTTPS required');
+              const body = JSON.stringify({ ref: process.env.GITHUB_REF, after: process.env.GITHUB_SHA });
+              const signature = createHmac('sha256', secret).update(body).digest('hex');
+              const response = await fetch(endpoint, {
+                method: 'POST', body, redirect: 'error', signal: AbortSignal.timeout(30_000),
+                headers: { 'Content-Type': 'application/json', 'X-GitHub-Event': 'push', 'X-Hub-Signature-256': `sha256=${signature}` },
+              });
+              if (!response.ok) throw new Error('Webhook rejected');
+              console.log('Deployment webhook accepted.');
+            } catch {
+              console.error('Deployment webhook delivery failed.');
+              process.exitCode = 1;
+            }
+          }
+          NODE
+
   registry:
     needs: docker
     if: >-
