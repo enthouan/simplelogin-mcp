@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.0.5
+
+### Changed
+
+- Refresh production dependencies: MCP SDK 1.32.2, Hono 4.13.18, and its Node.js server
+  adapter 2.1.8.
+- Refresh development and website dependencies, including Vitest 5.1.0, Astro 7.4.12,
+  and Prettier 3.10.1.
+- Update the pinned pnpm setup and Docker login GitHub Actions.
+
+### Fixed
+
+- Keep Astro website checking on a compatible stable WebAssembly runtime and preserve
+  the Starlight search button's accessible name.
+- Include workspace patches in Docker dependency-install stages so frozen installs work
+  with patched website dependencies.
+
 ## v1.0.4
 
 ### Changed
