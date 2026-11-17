@@ -77,12 +77,17 @@ pnpm website:preview
 
 Every build targets the canonical origin `https://simplelogin-mcp.com/`. Astro emits canonical and
 Open Graph URLs, `index, follow`, and the Starlight sitemap without a custom environment variable.
-Local development continues to use `pnpm website:dev`; production and Cloudflare preview deployments
-both use:
+Local development continues to use `pnpm website:dev`, and local production builds use
+`pnpm website:build`. Production and Cloudflare preview deployments both use this Cloudflare Pages
+build command:
 
 ```bash
-pnpm website:build
+(git fetch --unshallow || true) && pnpm website:build
 ```
+
+Cloudflare clones only the latest commit, so without the fetch Starlight's "Last updated" date would
+show the latest deploy date on every page. Fetching the full history restores per-page dates, and
+`|| true` keeps the build working if the fetch is ever refused.
 
 Cloudflare Pages [automatically sends `X-Robots-Tag: noindex` on preview
 deployments](https://developers.cloudflare.com/pages/configuration/preview-deployments/), so previews
