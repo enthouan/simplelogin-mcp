@@ -1,0 +1,147 @@
+name: Docker Hub stable mirror
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      revision:
+        type: string
+        required: true
+      digest:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Annotated stable release tag (vX.Y.Z)
+        type: string
+        required: true
+      revision:
+        description: Full release commit from the verified GHCR publication
+        type: string
+        required: true
+      digest:
+        description: Verified GHCR index digest (sha256:…)
+        type: string
+        required: true
+      publish:
+        description: Request the protected Docker Hub copy after preview
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
+  RELEASE_COMMIT: ${{ inputs.revision }}
+  RELEASE_IMAGE_DIGEST: ${{ inputs.digest }}
+
+jobs:
+  preview:
+    if: >-
+      github.repository == 'enthouan/simplelogin-mcp' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' && github.ref == format('refs/tags/{0}', inputs.tag) &&
+      startsWith(inputs.tag, 'v') && !contains(inputs.tag, '-') && !contains(inputs.tag, '+')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Verify selected source and preview exact and latest decisions
+        run: node .github/scripts/docker-hub-mirror.ts preview
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Install recovery smoke dependencies from main
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm install --frozen-lockfile
+
+      - name: Re-establish native offline GHCR discovery for recovery
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          pnpm exec tsx .github/scripts/smoke-release-image.ts "ghcr.io/enthouan/simplelogin-mcp@$RELEASE_IMAGE_DIGEST" "$RELEASE_COMMIT" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  mirror:
+    needs: preview
+    if: github.event_name == 'push' || inputs.publish
+    environment: docker-hub-mirror
+    concurrency:
+      group: docker-hub-stable-mirror-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Install frozen smoke dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install verified regctl
+        id: regctl
+        env:
+          REGCTL_VERSION: v0.11.7
+          REGCTL_SHA256: 3737fbbdd791e04e7a831640b681f3397a376498e80e2ad9b1b2d27296f239bc
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          bin="$(mktemp -d "$RUNNER_TEMP/mirror-tool.XXXXXX")"
+          echo "directory=$bin" >> "$GITHUB_OUTPUT"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 15 --max-time 120 \
+            "https://github.com/regclient/regclient/releases/download/$REGCTL_VERSION/regctl-linux-amd64" -o "$bin/regctl"
+          printf '%s  %s\n' "$REGCTL_SHA256" "$bin/regctl" | sha256sum --check --strict
+          chmod 700 "$bin/regctl"
+          echo "$bin" >> "$GITHUB_PATH"
+
+      - name: Copy or recover the exact tag and verify every destination descriptor
+        env: &publisher
+          MIRROR_TEMP: ${{ steps.regctl.outputs.directory }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_CONFIRMED_REPOSITORY: ${{ vars.DOCKERHUB_CONFIRMED_REPOSITORY }}
+        run: node .github/scripts/docker-hub-mirror.ts exact
+
+      - name: Anonymously pull the Docker Hub digest and exercise native offline MCP
+        run: |
+          set -euo pipefail
+          pnpm exec tsx .github/scripts/smoke-release-image.ts "docker.io/enthouan/simplelogin-mcp@$RELEASE_IMAGE_DIGEST" "$RELEASE_COMMIT" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Recheck release ownership and verify stable latest
+        env: *publisher
+        run: node .github/scripts/docker-hub-mirror.ts latest
+
+      - name: Remove the job's temporary publisher files on every outcome
+        if: always() && steps.regctl.outputs.directory != ''
+        env:
+          MIRROR_TEMP: ${{ steps.regctl.outputs.directory }}
+        run: rm -rf -- "$MIRROR_TEMP"
+
+      - name: Record independent secondary publication status
+        if: always()
+        env:
+          MIRROR_STATUS: ${{ job.status }}
+        run: |
+          echo "Docker Hub mirror: $MIRROR_STATUS. See the release run's docker and registry jobs for primary publication. Recover only this mirror using docs/docker-hub-mirror.md." >> "$GITHUB_STEP_SUMMARY"

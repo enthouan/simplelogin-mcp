@@ -18,20 +18,20 @@ import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
 export const registryUrl = 'https://registry.modelcontextprotocol.io';
-const repository = 'enthouan/simplelogin-mcp';
-const serverName = 'io.github.enthouan/simplelogin-mcp';
+export const repository = 'enthouan/simplelogin-mcp';
+export const serverName = 'io.github.enthouan/simplelogin-mcp';
 const imageName = `ghcr.io/${repository}`;
 const officialKey = 'io.modelcontextprotocol.registry/official';
-const digestPattern = /^sha256:[a-f0-9]{64}$/;
-const revisionPattern = /^[a-f0-9]{40}$/;
-const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+export const digestPattern = /^sha256:[a-f0-9]{64}$/;
+export const revisionPattern = /^[a-f0-9]{40}$/;
+export const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 export interface Manifest extends Record<string, unknown> {
   name: string;
   version: string;
 }
 
-function object(value: unknown): Record<string, unknown> {
+export function object(value: unknown): Record<string, unknown> {
   assert(typeof value === 'object' && value !== null && !Array.isArray(value), 'Expected object');
   return value as Record<string, unknown>;
 }
@@ -48,7 +48,15 @@ export function validateRelease(
     env['GITHUB_REF'] ?? '',
   );
   assert(match, 'Expected a stable vX.Y.Z release tag');
-  const version = match[1]!;
+  return validateReleaseMetadata(input, packageVersion, match[1]!);
+}
+
+export function validateReleaseMetadata(
+  input: unknown,
+  packageVersion: unknown,
+  version: string,
+): Manifest {
+  assert(versionPattern.test(version), 'Expected stable release version');
   const manifest = object(input);
   assert(manifest['name'] === serverName, 'Unexpected MCP server namespace');
   assert(

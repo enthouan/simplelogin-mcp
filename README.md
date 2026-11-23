@@ -148,6 +148,9 @@ binds `0.0.0.0` inside the container. Pin `SIMPLELOGIN_MCP_IMAGE_TAG` to a relea
 deployments. See the [Docker Compose guide](https://simplelogin-mcp.com/getting-started/docker/)
 before widening the host bind.
 
+Stable releases also support a Docker Hub mirror for `linux/amd64` and `linux/arm64`.
+See the [mirror's tag policy, availability checks and verification procedure](docs/docker-hub-mirror.md).
+
 ### Local Docker build
 
 For source changes, build the container from the checkout instead of pulling GHCR:

@@ -331,8 +331,9 @@ describe('Published image trust policy', () => {
       contents: 'read',
     });
     const jobs = workflow['jobs'] as YamlMapping;
-    expect(Object.keys(jobs).sort()).toEqual(['docker', 'registry', 'release-policy']);
+    expect(Object.keys(jobs).sort()).toEqual(['docker', 'mirror', 'registry', 'release-policy']);
     expect((jobs['release-policy'] as YamlMapping)['permissions']).toEqual({ contents: 'read' });
+    expect((jobs['mirror'] as YamlMapping)['permissions']).toEqual({ contents: 'read' });
     expect((jobs['docker'] as YamlMapping)['permissions']).toEqual({
       contents: 'read',
       packages: 'write',
