@@ -1,5 +1,7 @@
 # SimpleLogin MCP
 
+<img src="https://simplelogin-mcp.com/favicon.svg" alt="SimpleLogin MCP envelope logo" width="96" height="96">
+
 A self-hostable Model Context Protocol server for managing SimpleLogin aliases, contacts,
 mailboxes, custom domains and account settings. Connect an MCP client over stdio or Streamable HTTP.
 [Source repository](https://github.com/enthouan/simplelogin-mcp) · [Setup and client guides](https://simplelogin-mcp.com/getting-started/)
