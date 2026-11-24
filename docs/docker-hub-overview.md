@@ -1,6 +1,4 @@
-# SimpleLogin MCP
-
-<img src="https://simplelogin-mcp.com/favicon.svg" alt="SimpleLogin MCP envelope logo" width="96" height="96">
+# ![SimpleLogin MCP](https://simplelogin-mcp.com/simplelogin-mcp-wordmark.svg)
 
 A self-hostable Model Context Protocol server for managing SimpleLogin aliases, contacts,
 mailboxes, custom domains and account settings. Connect an MCP client over stdio or Streamable HTTP.
