@@ -18,6 +18,7 @@ const slsa = 'https://slsa.dev/provenance/v1';
 interface FixtureOptions {
   metadata?: Record<string, string>;
   runtime?: Record<string, string>;
+  health?: string[];
   subject?: string;
   ociSubject?: string;
   target?: string;
@@ -56,7 +57,7 @@ function graph(opts: FixtureOptions = {}) {
       config: {
         Cmd: ['node', 'dist/index.js'],
         User: 'node',
-        Healthcheck: { Test: ['CMD', 'node', 'dist/healthcheck.js'] },
+        Healthcheck: { Test: opts.health ?? ['CMD', 'node', 'dist/healthcheck.js'] },
         Labels: { ...labels, ...opts.runtime },
       },
     });
@@ -153,6 +154,58 @@ function graph(opts: FixtureOptions = {}) {
 }
 
 describe('anonymous OCI mirror verification', () => {
+  const original: FixtureOptions = {
+    runtime: { 'org.opencontainers.image.version': 'v' + version },
+    health: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1'],
+    omit: spdx,
+  };
+
+  it('verifies original bytes, per-platform identity and provenance for pinned pre-SBOM images', async () => {
+    const { registry, selected, resources, platforms } = graph(original);
+    resources.set('manifests/v' + version, resources.get('manifests/' + selected.digest)!);
+    expect(await registry.historicalTagDigest('v' + version)).toBe(selected.digest);
+    await expect(registry.historicalTagDigest('latest')).rejects.toThrow();
+    expect(await registry.verifyHistorical(selected, 'v' + version, false)).toEqual(platforms);
+    await expect(registry.verify(selected)).rejects.toThrow();
+    await expect(registry.verifyHistorical(selected, 'v' + version, true)).rejects.toThrow();
+    resources.delete('manifests/' + platforms['arm64']);
+    await expect(registry.verifyHistorical(selected, 'v' + version, false)).rejects.toBeInstanceOf(
+      MissingContent,
+    );
+  });
+
+  it.each<[string, FixtureOptions]>([
+    ['wrong provenance subject', { subject: 'd'.repeat(64) }],
+    ['missing provenance', { omit: slsa }],
+    ['different layer size', { badSize: true }],
+    ['unrecognized health command', { health: ['CMD-SHELL', 'true'] }],
+    [
+      'wrong source',
+      { runtime: { ...original.runtime, 'org.opencontainers.image.source': 'elsewhere' } },
+    ],
+    [
+      'wrong commit',
+      { runtime: { ...original.runtime, 'org.opencontainers.image.revision': 'b'.repeat(40) } },
+    ],
+    ['wrong original version', { runtime: { 'org.opencontainers.image.version': 'v1.0.6' } }],
+  ])('rejects a historical graph with %s', async (_, options) => {
+    const { registry, selected } = graph({ ...original, ...options });
+    await expect(registry.verifyHistorical(selected, 'v' + version, false)).rejects.toThrow();
+  });
+
+  it('requires max provenance and both original SBOMs when the historical release shipped them', async () => {
+    const later = { ...original, omit: undefined };
+    const { registry, selected, platforms } = graph(later);
+    expect(await registry.verifyHistorical(selected, 'v' + version, true)).toEqual(platforms);
+    for (const options of [
+      { omit: spdx, omitOn: 'arm64' },
+      { provenance: { buildDefinition: { internalParameters: { buildConfig: {} } } } },
+    ]) {
+      const { registry, selected } = graph({ ...later, ...options });
+      await expect(registry.verifyHistorical(selected, 'v' + version, true)).rejects.toThrow();
+    }
+  });
+
   it('checks exact index bytes, every platform, config, layer, attestation manifest and subject', async () => {
     const { registry, selected, platforms, request, resources } = graph();
     expect(await registry.tag(version)).toEqual(selected);

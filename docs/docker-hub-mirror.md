@@ -15,14 +15,14 @@ Both registries serve the original `linux/amd64` and `linux/arm64` images.
    and deployment refs limited to protected `main` and the project's restricted stable release tags.
    Set its variable `DOCKERHUB_CONFIRMED_REPOSITORY` to `docker.io/enthouan/simplelogin-mcp` only
    after confirming ownership. The job also checks the repository through the anonymous Hub API.
-3. For a personal namespace use a dedicated Docker publishing account with collaborator access
-   to this repository and a short-lived personal access token with **Read & Write** repository
-   permission. Leave Delete and Cloud Sandboxes access disabled. Docker applies a PAT's permission
-   to every repository accessible to that account. Limit the account's other memberships and
-   repository access. Store its Docker ID and token as environment secrets `DOCKERHUB_USERNAME`
-   and `DOCKERHUB_TOKEN`. Keep the secret value in the secret store throughout provisioning.
+3. For this personal namespace use Docker ID `enthouan` and a personal access token with
+   **Read & Write** repository permission. Leave Delete and Cloud Sandboxes access disabled.
+   Docker applies the token's permissions to the repositories the account can access. Choose its
+   expiration when creating it. Store the Docker ID and token as the environment secrets
+   `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. Transfer the token directly from Docker's
+   one-time display into the protected secret.
    [Docker access tokens](https://docs.docker.com/security/access-tokens/)
-4. To rotate, create a replacement with the same restricted account and permissions, replace
+4. To rotate, create a replacement with the same account and permissions, replace
    the environment secret, verify the new credential during an approved copy, and revoke the old
    token in Docker Hub. For suspected exposure, deactivate it immediately, remove the affected
    secret and inspect the repository tags before permitting another write.
@@ -82,10 +82,9 @@ gh run rerun "$RUN_ID" --repo "$repo" --job "$MIRROR_JOB_ID"
   compare numerically across all three components. A newer destination is preserved, and an
   older retry leaves an absent or stale alias to the newest eligible tag. Use that newer release's
   commit and verified digest to recover its alias.
-- A missing or moved selected tag, missing trust evidence, or a mismatched source digest ends
-  recovery. Historical copies require the same policy, two-platform trust and offline discovery
-  as new releases. The historical `v1.0.0` image lacks the required SBOM. Rebuilding, generating
-  replacement attestations, or rerunning a historical release workflow would change the evidence.
+- A missing or moved selected tag, missing required evidence, or a mismatched source digest ends
+  recovery. Normal recovery requires the current release policy. The fixed historical backfill
+  below checks each original under the policy documented for its version.
 
 ## Preview and approve a backfill
 
@@ -116,3 +115,37 @@ run URL, attempt and job, anonymous graph verification, native smoke, exact-tag 
 `latest` read-back. Record the primary jobs and the public overview separately. Keep issue #153
 open until the approved production write, verified retry and published overview have evidence.
 A preview or a pre-existing identical exact tag alone cannot demonstrate the initial copy.
+
+### Original releases through 1.0.2
+
+The one-time backfill covers the 13 releases in the [pinned list](../.github/docker-hub-history.json).
+Every entry fixes the original Git tag object, source commit, GHCR tag and index digest.
+`v0.1.0` and `v0.2.0` used lightweight Git tags and included `v` in their GHCR tag.
+Docker Hub uses plain numeric tags for all versions.
+
+| Original versions | Per-platform evidence                  | Built-in health check |
+| ----------------- | -------------------------------------- | --------------------- |
+| 0.1.0–1.0.0       | Original SLSA provenance, no SPDX SBOM | HTTP on loopback      |
+| 1.0.1–1.0.2       | Max-mode SLSA provenance and SPDX SBOM | HTTP on loopback      |
+| 1.0.3 onward      | Max-mode SLSA provenance and SPDX SBOM | Stdio or HTTP         |
+
+For each pinned image, the preview verifies both architectures, hashes every referenced object,
+and checks provenance subjects against the original platform digests. The native test exercises
+stdio discovery against the selected commit's complete catalog. The first five releases used
+literal tool registrations before the generated catalog existed. A second network-isolated
+container exercises the original HTTP health check. The writer repeats the anonymous checks
+against Docker Hub. Historical copies preserve exactly the evidence the build produced.
+
+To preview this fixed batch on protected `main`, run:
+
+```bash
+gh workflow run docker-hub-mirror.yml --repo enthouan/simplelogin-mcp --ref main \
+  -f tag=v1.0.5 -f revision=810cdbaf161c085cfc7d5377d880cdd9ec92e848 \
+  -f digest=sha256:282b6580824c44dc1f229a9d16e7acf53201af4740ae8ca4ad7c82da4dde1a03 \
+  -f include_history=true -f publish=false
+```
+
+After approval, use the same inputs with `publish=true`. The historical batch can create or
+repair only the listed exact tags. The regular v1.0.5 recovery owns its exact tag and the
+eligible stable alias. Use regular recovery for v1.0.3 and v1.0.4. A retry verifies any
+already completed copies before proceeding to the next tag.

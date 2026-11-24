@@ -25,7 +25,7 @@ import {
 const source = `ghcr.io/${repository}`;
 const destination = `docker.io/${repository}`;
 type Git = (args: string[]) => string;
-const git: Git = (args) =>
+export const git: Git = (args) =>
   execFileSync('git', args, {
     encoding: 'utf8',
     timeout: 60_000,
@@ -346,7 +346,7 @@ export function copyImage(
   }
 }
 
-function summary(line: string) {
+export function summary(line: string) {
   process.stdout.write(`${line}\n`);
   if (process.env['GITHUB_STEP_SUMMARY'])
     appendFileSync(process.env['GITHUB_STEP_SUMMARY'], `${line}\n\n`);

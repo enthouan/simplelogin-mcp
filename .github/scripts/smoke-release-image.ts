@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -12,6 +13,7 @@ import {
   getDefaultEnvironment,
 } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { TOOL_NAMES } from '../../src/tools/catalog.js';
+import { git } from './docker-hub-mirror.ts';
 import {
   digestPattern,
   object,
@@ -86,6 +88,26 @@ export function releaseExpectations(
   return { version, names };
 }
 
+// The first five releases registered tools as string literals before the generated catalog existed.
+export function originalToolNames(sources: string[]): string[] {
+  const names = sources.flatMap((source) => {
+    const registrations = [
+      ...source.matchAll(/\bserver\.registerTool\(\s*'([A-Za-z0-9_.-]+)'\s*,/g),
+    ];
+    assert.equal(
+      registrations.length,
+      [...source.matchAll(/\bserver\.registerTool\(/g)].length,
+      'Unknown historical tool registration',
+    );
+    return registrations.map((match) => match[1]!);
+  });
+  assert(
+    names.length > 0 && new Set(names).size === names.length,
+    'Missing or duplicate historical tool names',
+  );
+  return names;
+}
+
 export async function withAnonymousDocker<T>(use: (config: string) => Promise<T>): Promise<T> {
   const config = mkdtempSync(join(tmpdir(), 'simplelogin-anonymous-pull-'));
   try {
@@ -109,10 +131,53 @@ function docker(args: string[], env: NodeJS.ProcessEnv, allowFailure = false): s
   return result.stdout ?? '';
 }
 
+async function historicalHttpHealth(image: string, name: string, env: NodeJS.ProcessEnv) {
+  try {
+    docker(
+      [
+        'run',
+        '--detach',
+        '--rm',
+        '--name',
+        name,
+        '--network=none',
+        '--pull=never',
+        '--health-interval=1s',
+        '--health-start-period=1s',
+        '-e',
+        'TRANSPORT=http',
+        '-e',
+        // Only loopback exists under --network=none. Serve both localhost address families:
+        // the early wget probe resolves localhost, while later builds probe 127.0.0.1.
+        'HOST=::',
+        '-e',
+        'MCP_AUTH_TOKEN=isolated-historical-health-test',
+        '-e',
+        'PORT=3000',
+        '-e',
+        'SL_API_KEY=registry-smoke-not-a-real-key',
+        '-e',
+        'SL_API_URL=http://127.0.0.1:9',
+        image,
+      ],
+      env,
+    );
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const status = docker(['inspect', '--format', '{{.State.Health.Status}}', name], env).trim();
+      if (status === 'healthy') return;
+      await delay(1000);
+    }
+    throw new Error('The historical image failed its original HTTP health check');
+  } finally {
+    docker(['rm', '--force', name], env, true);
+  }
+}
+
 async function smoke(
   image: string,
   expected: { version: string; names: readonly string[] },
   dockerConfig?: string,
+  historical = false,
 ): Promise<void> {
   const name = `simplelogin-registry-smoke-${randomUUID()}`;
   const args = smokeArguments(image, name);
@@ -152,6 +217,13 @@ async function smoke(
       }
     } while (cursor !== undefined);
     verifyDiscovery(client.getServerVersion(), names, expected.version, expected.names);
+    if (historical) {
+      await historicalHttpHealth(image, name + '-http', env);
+      process.stdout.write(
+        `Native ${process.arch} historical smoke passed: ${expected.version}, ${names.length} stdio tools, original HTTP health check on isolated loopback.\n`,
+      );
+      return;
+    }
     const health: unknown = JSON.parse(
       docker(['inspect', '--format', '{{json .Config.Healthcheck.Test}}', name], env),
     );
@@ -176,6 +248,30 @@ async function smoke(
 
 async function main(): Promise<void> {
   const image = process.argv[2] ?? '';
+  if (image === '--history') {
+    const host = process.argv[3];
+    assert(host === 'ghcr.io' || host === 'docker.io', 'Unexpected historical registry');
+    const { historicalImages } = await import('./docker-hub-history.ts');
+    for (const { version, revision, digest } of historicalImages) {
+      const expected =
+        git(['ls-tree', '--name-only', revision, 'TOOL_CATALOG.md']) === 'TOOL_CATALOG.md'
+          ? releaseExpectations(revision)
+          : {
+              version,
+              names: originalToolNames(
+                git(['ls-tree', '-r', '--name-only', revision, 'src/tools'])
+                  .split('\n')
+                  .filter((path) => path.endsWith('.ts'))
+                  .map((path) => git(['show', `${revision}:${path}`])),
+              ),
+            };
+      assert.equal(expected.version, version);
+      await withAnonymousDocker((config) =>
+        smoke(`${host}/enthouan/simplelogin-mcp@${digest}`, expected, config, true),
+      );
+    }
+    return;
+  }
   const revision = process.argv[3];
   const expected =
     revision === undefined

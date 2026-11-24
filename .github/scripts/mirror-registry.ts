@@ -154,6 +154,7 @@ function attestation(
   layer: Record<string, unknown>,
   value: unknown,
   subject: string,
+  requireMaxProvenance: boolean,
 ): 'provenance' | 'sbom' | undefined {
   const statement = object(value);
   assert(
@@ -188,10 +189,12 @@ function attestation(
     return 'sbom';
   }
   if (type === 'https://slsa.dev/provenance/v0.2' || type === 'https://slsa.dev/provenance/v1') {
-    const config = type.endsWith('/v1')
-      ? object(object(predicate['buildDefinition'])['internalParameters'])['buildConfig']
-      : predicate['buildConfig'];
-    assert(Object.keys(object(config)).length > 0, 'Missing max-mode provenance');
+    if (requireMaxProvenance) {
+      const config = type.endsWith('/v1')
+        ? object(object(predicate['buildDefinition'])['internalParameters'])['buildConfig']
+        : predicate['buildConfig'];
+      assert(Object.keys(object(config)).length > 0, 'Missing max-mode provenance');
+    }
     return 'provenance';
   }
   return undefined;
@@ -232,6 +235,7 @@ function runtimeArchitecture(
   item: Record<string, unknown>,
   image: Record<string, unknown>,
   expected: Identity,
+  historicalTag?: string,
 ) {
   const platform = object(item['platform']);
   const arch = platform['architecture'];
@@ -241,18 +245,38 @@ function runtimeArchitecture(
   );
   assert(image['os'] === 'linux' && image['architecture'] === arch, 'Config platform mismatch');
   const runtime = object(image['config']);
-  assert.deepEqual(
-    imageLabels(runtime['Labels']),
-    { version: expected.version, revision: expected.revision },
-    'Config identity mismatch',
-  );
+  if (historicalTag) {
+    const labels = object(runtime['Labels']);
+    assert.equal(labels['org.opencontainers.image.source'], `https://github.com/${repository}`);
+    assert.equal(labels['org.opencontainers.image.revision'], expected.revision);
+    assert.equal(labels['org.opencontainers.image.version'], historicalTag);
+    const health = object(runtime['Healthcheck'])['Test'];
+    const commands = [
+      'wget -qO- http://localhost:3000/health || exit 1',
+      `node -e "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"`,
+    ];
+    assert(
+      Array.isArray(health) &&
+        health.length === 2 &&
+        health[0] === 'CMD-SHELL' &&
+        typeof health[1] === 'string' &&
+        commands.includes(health[1]),
+      'Unexpected historical HTTP health check',
+    );
+  } else {
+    assert.deepEqual(
+      imageLabels(runtime['Labels']),
+      { version: expected.version, revision: expected.revision },
+      'Config identity mismatch',
+    );
+    assert.deepEqual(
+      object(runtime['Healthcheck'])['Test'],
+      ['CMD', 'node', 'dist/healthcheck.js'],
+      'Unexpected image health check',
+    );
+  }
   assert(runtime['User'] === 'node', 'Unexpected image user');
   assert.deepEqual(runtime['Cmd'], ['node', 'dist/index.js'], 'Unexpected image command');
-  assert.deepEqual(
-    object(runtime['Healthcheck'])['Test'],
-    ['CMD', 'node', 'dist/healthcheck.js'],
-    'Unexpected image health check',
-  );
   return arch;
 }
 
@@ -350,17 +374,22 @@ export class PublicRegistry {
     );
   }
 
-  private async index(ref: string) {
-    assert(
-      ref === 'latest' || versionPattern.test(ref) || digestPattern.test(ref),
-      'Invalid index ref',
-    );
+  private async rawIndex(ref: string) {
     const { digest, json } = await this.read('manifests', ref, true);
     assert(
       json['schemaVersion'] === 2 && json['mediaType'] === indexType,
       'Expected an OCI image index',
     );
     assert(json['subject'] === undefined, 'Unexpected release index subject');
+    return { digest, json };
+  }
+
+  private async index(ref: string) {
+    assert(
+      ref === 'latest' || versionPattern.test(ref) || digestPattern.test(ref),
+      'Invalid index ref',
+    );
+    const { digest, json } = await this.rawIndex(ref);
     return {
       identity: { ...imageLabels(json['annotations']), digest },
       manifests: objects(json['manifests']),
@@ -376,10 +405,43 @@ export class PublicRegistry {
     }
   }
 
+  // Early GHCR tags used a leading v and stored identity only in each platform config.
+  async historicalTagDigest(tag: string): Promise<string | null> {
+    assert(versionPattern.test(tag.replace(/^v/, '')), 'Expected an exact historical tag');
+    try {
+      return (await this.rawIndex(tag)).digest;
+    } catch (error) {
+      if (error instanceof MissingContent) return null;
+      throw error;
+    }
+  }
+
+  async verifyHistorical(expected: Identity, sourceTag: string, requireSbom: boolean) {
+    assert(
+      digestPattern.test(expected.digest) && revisionPattern.test(expected.revision),
+      'Invalid historical identity',
+    );
+    assert(
+      versionPattern.test(expected.version) && sourceTag.replace(/^v/, '') === expected.version,
+      'Invalid historical version',
+    );
+    const { json } = await this.rawIndex(expected.digest);
+    return this.verifyManifests(expected, objects(json['manifests']), { sourceTag, requireSbom });
+  }
+
   // Hash every referenced byte, including compressed filesystem layers. Only JSON is buffered.
   async verify(expected: Identity): Promise<Record<string, string>> {
     const { identity, manifests } = await this.index(expected.digest);
     assert.deepEqual(identity, expected, 'Index differs from selected release');
+    return this.verifyManifests(expected, manifests);
+  }
+
+  private async verifyManifests(
+    expected: Identity,
+    manifests: Record<string, unknown>[],
+    history?: { sourceTag: string; requireSbom: boolean },
+  ): Promise<Record<string, string>> {
+    const requireSbom = history?.requireSbom ?? true;
     const platforms: Record<string, string> = {};
     const evidence = new Map<string, Set<string>>();
     for (const item of manifests) {
@@ -394,7 +456,7 @@ export class PublicRegistry {
       const { json: image } = await this.read('blobs', config.digest, true, config);
       const target = attestationTarget(item, json, manifests);
       if (target === undefined) {
-        const arch = runtimeArchitecture(item, image, expected);
+        const arch = runtimeArchitecture(item, image, expected, history?.sourceTag);
         assert(!(arch in platforms), 'Duplicate runtime platform');
         platforms[arch] = desc.digest;
       } else if (!evidence.has(target)) {
@@ -407,7 +469,7 @@ export class PublicRegistry {
         const { json: content } = await this.read('blobs', blob.digest, target !== undefined, blob);
         if (target !== undefined) {
           assert(blob.mediaType === 'application/vnd.in-toto+json', 'Unexpected attestation layer');
-          const type = attestation(layer, content, target);
+          const type = attestation(layer, content, target, requireSbom);
           if (type !== undefined) evidence.get(target)!.add(type);
         }
       }
@@ -416,7 +478,7 @@ export class PublicRegistry {
     for (const digest of Object.values(platforms)) {
       const types = evidence.get(digest);
       assert(
-        types?.has('provenance') && types.has('sbom'),
+        types?.has('provenance') && (!requireSbom || types.has('sbom')),
         `Missing provenance or SBOM for ${digest}`,
       );
     }

@@ -226,6 +226,9 @@ selected tag, commit and verified digest as described in [mirror recovery](../..
 Check the matching index, both platform digests, original attestations, native offline discovery
 and stable `latest` decision. Record an actual authorized copy, its verified retry and the published
 overview before closing #153. Keep owner provisioning and publication evidence distinct.
+The manual `include_history` option is scoped to the 13 pinned originals through v1.0.2 and
+requires the v1.0.5 recovery inputs. Verify the historical evidence and exact-tag decisions
+against the [original-image table](../../../docs/docker-hub-mirror.md#original-releases-through-102).
 
 The tag workflow must include a successful `registry` job for the exact release. Before any image
 push, the read-only policy job validates version alignment, annotated tag identity, checkout/event

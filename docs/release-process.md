@@ -369,6 +369,8 @@ Docker Hub preview and mirror. A secondary publication failure turns the overall
 the primary jobs and read-backs have succeeded, continue the approved GitHub Release and recover
 the mirror independently. The GHCR writer releases its lock before the mirror waits for approval.
 Use the [mirror-only retry, approved backfill and overview procedure](docker-hub-mirror.md).
+For the 13 original releases through v1.0.2, the manual backfill verifies the pinned digests,
+original per-platform attestations and HTTP health checks. New releases use the full release gate.
 
 ## GitHub Release
 

@@ -5,6 +5,11 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import {
+  checkHistoryDispatch,
+  checkHistoryTags,
+  historicalImages,
+} from '../.github/scripts/docker-hub-history.js';
+import {
   compareVersions,
   copyImage,
   freshReleases,
@@ -14,6 +19,7 @@ import {
 } from '../.github/scripts/docker-hub-mirror.js';
 import { type Identity, MissingContent } from '../.github/scripts/mirror-registry.js';
 import {
+  originalToolNames,
   releaseExpectations,
   smokeArguments,
   verifyDiscovery,
@@ -190,6 +196,98 @@ function state(initial: Record<string, Identity> = {}) {
   const publish = (name: string) => publishTag(name, selected, deps, copy, report, wait);
   return { tags, deps, copy, publish, report, wait };
 }
+
+describe('pinned historical originals', () => {
+  it('restricts the batch to the thirteen original exact releases through 1.0.2', () => {
+    expect(historicalImages.map((image) => image.version)).toEqual([
+      '0.1.0',
+      '0.2.0',
+      '0.3.0',
+      '0.4.0',
+      '0.5.0',
+      '0.6.0',
+      '0.7.0',
+      '0.8.0',
+      '0.8.1',
+      '0.9.0',
+      '1.0.0',
+      '1.0.1',
+      '1.0.2',
+    ]);
+    expect(new Set(historicalImages.map((image) => image.digest)).size).toBe(13);
+    expect(
+      historicalImages
+        .filter((image) => image.sourceTag.startsWith('v'))
+        .map((image) => image.version),
+    ).toEqual(['0.1.0', '0.2.0']);
+  });
+
+  it('requires the approved anchor on protected main, using the normal recovery identity checks', () => {
+    const anchor = {
+      ...env,
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_WORKFLOW_REF: `${repo}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`,
+      RELEASE_TAG: 'v1.0.5',
+      RELEASE_COMMIT: '810cdbaf161c085cfc7d5377d880cdd9ec92e848',
+      RELEASE_IMAGE_DIGEST:
+        'sha256:282b6580824c44dc1f229a9d16e7acf53201af4740ae8ca4ad7c82da4dde1a03',
+    };
+    const run = (args: string[]) => {
+      if (args[0] === 'rev-parse')
+        return args[1] === 'HEAD' ? env.GITHUB_SHA : anchor.RELEASE_COMMIT;
+      if (args[1] === anchor.RELEASE_COMMIT + ':server.json')
+        return JSON.stringify({
+          ...manifest,
+          version: '1.0.5',
+          packages: [{ ...manifest.packages[0], identifier: `ghcr.io/${repo}:1.0.5` }],
+        });
+      if (args[1] === anchor.RELEASE_COMMIT + ':package.json') return '{"version":"1.0.5"}';
+      return releaseGit(args);
+    };
+    expect(() => checkHistoryDispatch(anchor, run)).not.toThrow();
+    for (const overrides of [
+      { GITHUB_EVENT_NAME: 'push' },
+      { GITHUB_REF: 'refs/heads/feature' },
+      { RELEASE_TAG: 'v1.0.6' },
+      { RELEASE_COMMIT: other.revision },
+      { RELEASE_IMAGE_DIGEST: other.digest },
+    ])
+      expect(() => checkHistoryDispatch({ ...anchor, ...overrides }, run)).toThrow();
+  });
+
+  it('rejects missing tags, changed annotated tag objects and changed peeled targets', () => {
+    const [early, annotated] = [historicalImages[0]!, historicalImages[2]!];
+    const refs = [
+      `${early.revision}\trefs/tags/v${early.version}`,
+      `${annotated.tagObject}\trefs/tags/v${annotated.version}`,
+      `${annotated.revision}\trefs/tags/v${annotated.version}^{}`,
+    ];
+    const tags = (refs: string[]) => checkHistoryTags([early, annotated], () => refs.join('\n'));
+    expect(tags(refs)).toEqual(
+      new Map([
+        [early.version, early.revision],
+        [annotated.version, annotated.revision],
+      ]),
+    );
+    for (let i = 0; i < refs.length; i++) {
+      expect(() => tags(refs.filter((_, n) => i !== n))).toThrow();
+      expect(() =>
+        tags(refs.map((ref, n) => (n === i ? ref.replace(/^[a-f0-9]+/, revision) : ref))),
+      ).toThrow();
+    }
+  });
+
+  it('requires distinct literal tool names in releases that predate the generated catalog', () => {
+    const source = "server.registerTool(\n  'lookup', description, {});";
+    expect(originalToolNames([source, "server.registerTool('list', config);"])).toEqual([
+      'lookup',
+      'list',
+    ]);
+    for (const files of [[], [source, source], [source, 'server.registerTool(computed, config);']])
+      expect(() => originalToolNames(files)).toThrow();
+  });
+});
 
 describe('immutable exact tags and stable latest', () => {
   it('copies missing tags once, confirms each graph, and verifies identical retries without writes', async () => {
@@ -512,14 +610,23 @@ describe('mirror workflow wiring', () => {
       /build-push-action|mcp-publisher|mcp-registry\.ts publish|docker build /,
     );
   });
-  it('keeps owner credentials in the two writer steps, with trusted checkout, installation and preview first', () => {
+  it('keeps owner credentials in the writer steps, with trusted checkout, installation and preview first', () => {
     expect(writer.environment).toBe('docker-hub-mirror');
     const steps = writer.steps!;
     const privileged = steps.filter((step) => JSON.stringify(step).includes('secrets.'));
     expect(privileged.map((step) => step.run)).toEqual([
       'node .github/scripts/docker-hub-mirror.ts exact',
       'node .github/scripts/docker-hub-mirror.ts latest',
+      'node .github/scripts/docker-hub-history.ts publish',
     ]);
+    expect(mirror.on['workflow_dispatch']?.inputs?.['include_history']?.default).toBe(false);
+    expect(mirror.on['workflow_call']?.inputs?.['include_history']).toBeUndefined();
+    const historySteps = [...preview.steps!, ...steps].filter((step) =>
+      /docker-hub-history\.ts|--history/.test(step.run ?? ''),
+    );
+    expect(historySteps).toHaveLength(3);
+    for (const step of historySteps)
+      expect(step.if).toBe("github.event_name == 'workflow_dispatch' && inputs.include_history");
     expect(JSON.stringify(preview)).not.toContain('secrets.');
     for (const job of [preview, writer]) {
       const checkout = job.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));

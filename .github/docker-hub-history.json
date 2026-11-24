@@ -1,0 +1,80 @@
+[
+  {
+    "sourceTag": "v0.1.0",
+    "tagObject": "b29bea0f4cabae5b5f2a5106d4ad9da71e787d0f",
+    "revision": "b29bea0f4cabae5b5f2a5106d4ad9da71e787d0f",
+    "digest": "sha256:2092d71adfa5270ae6736625446710779539b9e9d7d28800731345e9037b533f"
+  },
+  {
+    "sourceTag": "v0.2.0",
+    "tagObject": "73169e802e15f39670e3b81d361ae2a09e232652",
+    "revision": "73169e802e15f39670e3b81d361ae2a09e232652",
+    "digest": "sha256:9113fb90c761ee3c8319b8019b4b49efc0d5f4cf0e204cb949646784b5ccbf62"
+  },
+  {
+    "sourceTag": "0.3.0",
+    "tagObject": "1f77a50ad2b8bb16b7d323f9c3a3636d01b467cd",
+    "revision": "be031f2908269dcb4934f1fc1e3da6998a9e5a4a",
+    "digest": "sha256:fb5e2b96a26096cf476d1052785e28b6accc08c30b7dbb7dc4701a38607478f4"
+  },
+  {
+    "sourceTag": "0.4.0",
+    "tagObject": "c0cd9efb3c9218c46bdd6b0474bb1b0720ad23b2",
+    "revision": "e6807aa8b5f5f4feaf693a22d22676932be58f27",
+    "digest": "sha256:3cd2e8aa7b090ef59720cdadbeab8cf0aa5bc531f4cef294e7236bdba8b1b26a"
+  },
+  {
+    "sourceTag": "0.5.0",
+    "tagObject": "d58b0459cf31c0ed52fb69233474b6334fb93555",
+    "revision": "ad2d17ecf0f08f7e3c7958c32b777e8be3986a1f",
+    "digest": "sha256:d2d6b2bd98b078704d2141cb7f79ad6c285d2218c46d097c99d09fdd478effd1"
+  },
+  {
+    "sourceTag": "0.6.0",
+    "tagObject": "ed1461cf2b90b1a2e534bd64181622d64657ccd7",
+    "revision": "c4f1d354a4518b0a2a47e1ee7e95f9ca9019203a",
+    "digest": "sha256:e01a5be2e04d858ba050d1d36dcc214daeb9036f7890b52d49a70e22f3f4be15"
+  },
+  {
+    "sourceTag": "0.7.0",
+    "tagObject": "8294ca99a776eb6e24d7bf684581272ef92af802",
+    "revision": "7b5ad0d9f81d0fb3753b46266c77c60d9d994eb4",
+    "digest": "sha256:27c85e8ee17f5c410878cf5e682fee42433920c4b88d5bc8fbb451eb17dd15f1"
+  },
+  {
+    "sourceTag": "0.8.0",
+    "tagObject": "c960d2a0202729c5d6da1e99b2601eaad4e2f244",
+    "revision": "3bafd14d3a1a324c9e88f01cc16fe4c802125761",
+    "digest": "sha256:3c851e865a23f417e553167bd1147235df2f11cbee5f12b4d4480f33715d26c0"
+  },
+  {
+    "sourceTag": "0.8.1",
+    "tagObject": "882d4277ec15e7265d852f3df1aba7125efe35f1",
+    "revision": "96d47905317aea49b7e0be31248225d013f0ba68",
+    "digest": "sha256:1355cdde3ece31e43882af4e050d7cc4b82277e210d45a164405090311c8e665"
+  },
+  {
+    "sourceTag": "0.9.0",
+    "tagObject": "f5df46bd77d68b689005156a4a47d6f219643272",
+    "revision": "d1c28b54408c4e6f850e9cfc34fcf5e6c1fdaeb8",
+    "digest": "sha256:c815d7e4fec2518feb9ec1860847fe6e7f96e1c269454926f121f4c8e28f4484"
+  },
+  {
+    "sourceTag": "1.0.0",
+    "tagObject": "f50abff92681b540274fa1427278354807fac215",
+    "revision": "3e9b94ae977df377ecf0cdd2e96ef4bcf2a10c68",
+    "digest": "sha256:847243e08876caab367a0bb98bc4d80dd04bacc92c0224a11172507498d34704"
+  },
+  {
+    "sourceTag": "1.0.1",
+    "tagObject": "915549fbe1970a1b2e6ebe507847eca8258b46a0",
+    "revision": "69f2fb5f39df11483d3ec2e315ca3daf8af8bbc1",
+    "digest": "sha256:4a33ee53bb5c2338fabe9a128c3bb00e5b677470a0235fb43f87b2e90c15fe4e"
+  },
+  {
+    "sourceTag": "1.0.2",
+    "tagObject": "eb829c16ec6a52a9e60fd34effc402fb43641fbd",
+    "revision": "c6e702b72a12c1612f67d9347b313e4d588865a2",
+    "digest": "sha256:a8419bdbdde01eb04a099982272e78a3595d5aeeff525b1cc358c91fa166f43a"
+  }
+]

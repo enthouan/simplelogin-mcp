@@ -30,6 +30,10 @@ on:
         description: Request the protected Docker Hub copy after preview
         type: boolean
         default: false
+      include_history:
+        description: Also backfill the thirteen pinned historical exact tags (v1.0.5 recovery only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -73,6 +77,13 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec tsx .github/scripts/smoke-release-image.ts "ghcr.io/enthouan/simplelogin-mcp@$RELEASE_IMAGE_DIGEST" "$RELEASE_COMMIT" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Preview the approved historical originals and exercise their native images
+        if: github.event_name == 'workflow_dispatch' && inputs.include_history
+        run: |
+          set -euo pipefail
+          node .github/scripts/docker-hub-history.ts preview
+          pnpm exec tsx .github/scripts/smoke-release-image.ts --history ghcr.io | tee -a "$GITHUB_STEP_SUMMARY"
 
   mirror:
     needs: preview
@@ -132,6 +143,17 @@ jobs:
       - name: Recheck release ownership and verify stable latest
         env: *publisher
         run: node .github/scripts/docker-hub-mirror.ts latest
+
+      - name: Copy the thirteen pinned historical exact tags and verify their original graphs
+        if: github.event_name == 'workflow_dispatch' && inputs.include_history
+        env: *publisher
+        run: node .github/scripts/docker-hub-history.ts publish
+
+      - name: Exercise the historical Docker Hub images anonymously on the native platform
+        if: github.event_name == 'workflow_dispatch' && inputs.include_history
+        run: |
+          set -euo pipefail
+          pnpm exec tsx .github/scripts/smoke-release-image.ts --history docker.io | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Remove the job's temporary publisher files on every outcome
         if: always() && steps.regctl.outputs.directory != ''
