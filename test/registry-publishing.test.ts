@@ -622,13 +622,13 @@ interface WorkflowJob {
   if?: string;
   permissions: Record<string, string>;
   outputs?: Record<string, string>;
-  concurrency?: { group: string; 'cancel-in-progress': boolean };
+  concurrency?: { group: string; 'cancel-in-progress': boolean; queue?: string };
   steps: WorkflowStep[];
 }
 
 interface ReleaseWorkflow {
   on: Record<string, unknown>;
-  concurrency: { group: string; 'cancel-in-progress': boolean; queue: string };
+  concurrency?: { group: string; 'cancel-in-progress': boolean; queue: string };
   permissions: Record<string, string>;
   jobs: { docker: WorkflowJob; registry: WorkflowJob; 'release-policy': WorkflowJob };
 }
@@ -703,7 +703,8 @@ describe('Registry workflow wiring', () => {
 
   it('queues image writers and gates aliases and Registry on verified offline image startup', () => {
     const workflow = releaseWorkflow();
-    expect(workflow.concurrency).toEqual({
+    expect(workflow.concurrency).toBeUndefined();
+    expect(workflow.jobs.docker.concurrency).toEqual({
       group: 'release-publishing-${{ github.repository }}',
       'cancel-in-progress': false,
       queue: 'max',

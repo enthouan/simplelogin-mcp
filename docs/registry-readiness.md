@@ -120,6 +120,15 @@ Keep `registry/docker-mcp/server.yaml` on an explicit image tag and matching ful
 update that pair only when preparing a separately approved Docker submission. Do not clear the
 source pin or advance the Docker entry automatically with `package.json.version`.
 
+## Docker Hub distribution
+
+Stable release images can be mirrored byte-for-byte from GHCR to
+`docker.io/enthouan/simplelogin-mcp`. Compare the index digest and the anonymous graph
+verification for both platforms in the mirror job summary. The official MCP Registry and
+installation defaults use GHCR. Docker Hub distribution is independent of Docker MCP Catalog
+acceptance and Docker-managed building or signing. Record actual mirror publication and overview
+evidence on issue #153. [Mirror policy and recovery](docker-hub-mirror.md)
+
 ## Docker MCP Registry
 
 Submission candidate files live under [registry/docker-mcp](../registry/docker-mcp):

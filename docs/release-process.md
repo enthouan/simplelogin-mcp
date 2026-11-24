@@ -4,6 +4,8 @@ This is the public maintainer checklist for publishing `simplelogin-mcp`. The re
 protected `main` branch, pull-request validation, semver tags, GitHub Releases, and GHCR images.
 Stable release tags also publish the matching `server.json` to the official MCP Registry after the
 tagged Docker image is published and verified.
+The independent [Docker Hub mirror](docker-hub-mirror.md) copies the verified stable image
+after a maintainer reviews the destination, digest and proposed tags.
 
 The durable [image trust policy](registry-readiness.md#supply-chain-and-image-trust) requires every
 future image published from `main` or a semver tag to carry explicit max-mode BuildKit SLSA
@@ -187,7 +189,7 @@ Image writers are serialized across main and release tags, with pending runs que
 replacing each other using GitHub's documented
 [`queue: max` concurrency setting](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 The current actionlint v1.7.12 schema does not yet recognize `queue`; when using that version,
-lint this workflow with `actionlint -ignore '^unexpected key "queue" for "concurrency" section' .github/workflows/release.yml`
+lint the two writer workflows with `actionlint -ignore '^unexpected key "queue" for "concurrency" section' .github/workflows/{release,docker-hub-mirror}.yml`
 and lint the other workflows normally. The workflow contract tests separately require the exact
 queue configuration. Remove this narrow compatibility exception when actionlint supports it.
 
@@ -220,7 +222,7 @@ Watch the release workflow runs:
 ```bash
 gh run list --repo enthouan/simplelogin-mcp --limit 10 \
   --json databaseId,name,headBranch,headSha,status,conclusion,event,createdAt,url
-gh run watch <run-id> --repo enthouan/simplelogin-mcp --exit-status
+gh run view <run-id> --repo enthouan/simplelogin-mcp --json jobs --jq '.jobs[] | {name,status,conclusion,url}'
 ```
 
 Verify the published images before announcing the release. The helper prints the immutable index
@@ -284,7 +286,7 @@ verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y
 verify_image_trust ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
 ```
 
-Run the check only after both the `main` and semver-tag workflows have completed successfully. The
+Run the check after the `docker` jobs on both `main` and the semver tag succeed. The
 `latest` check covers the default-branch publication; `X.Y.Z` and `X.Y` cover the tag publication;
 the immutable `sha-<full-main-sha>` tag ties the evidence back to the source commit. Record the
 resolved index digest and the two platform digests in the release evidence.
@@ -360,9 +362,19 @@ has successfully authenticated with GitHub OIDC, published its new Registry vers
 the exact-version read-back. Local validation, green PR checks and an existing-entry no-op do not
 prove that production write path. Record the tag run, version URL and image digest as evidence.
 
+## Docker Hub mirror status
+
+Report the tag run's `release-policy`, `docker` and `registry` conclusions separately from the
+Docker Hub preview and mirror. A secondary publication failure turns the overall run red. When
+the primary jobs and read-backs have succeeded, continue the approved GitHub Release and recover
+the mirror independently. The GHCR writer releases its lock before the mirror waits for approval.
+Use the [mirror-only retry, approved backfill and overview procedure](docker-hub-mirror.md).
+For the 13 original releases through v1.0.2, the manual backfill verifies the pinned digests,
+original per-platform attestations and HTTP health checks. New releases use the full release gate.
+
 ## GitHub Release
 
-Create the GitHub Release after the tag workflow, GHCR image checks, and exact-version Registry
+Create the GitHub Release after the tag policy and Docker jobs, GHCR image checks, and exact-version Registry
 verification pass. Use title `vX.Y.Z` and release notes from that version's changelog section:
 
 ```bash
@@ -380,7 +392,7 @@ gh release view vX.Y.Z --repo enthouan/simplelogin-mcp \
 
 ## Milestone Closure
 
-Close the milestone only after the release, tag workflow, GHCR images, and exact-version official
+Close the milestone only after the release, primary publication jobs, GHCR images, and exact-version official
 MCP Registry entry are verified:
 
 ```bash

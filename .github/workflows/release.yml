@@ -1,6 +1,6 @@
 name: release
 
-# Publish GHCR images on main/tags, then Registry metadata on stable release tags.
+# Publish GHCR images on main/tags. Stable tags also publish Registry metadata and a Docker Hub mirror.
 on:
   push:
     branches: [main]
@@ -8,13 +8,6 @@ on:
 
 permissions:
   contents: read
-
-# Serialize all image writers, including main, so alias checks cannot race another release.
-# Queue pending releases instead of replacing an already pending run.
-concurrency:
-  group: release-publishing-${{ github.repository }}
-  cancel-in-progress: false
-  queue: max
 
 jobs:
   release-policy:
@@ -46,6 +39,11 @@ jobs:
 
   docker:
     needs: release-policy
+    # Release the GHCR writer lock before either downstream publication or mirror approval.
+    concurrency:
+      group: release-publishing-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -213,3 +211,17 @@ jobs:
       - name: Remove temporary Registry credentials
         if: always()
         run: node .github/scripts/mcp-registry.ts logout
+
+  mirror:
+    needs: docker
+    if: >-
+      github.repository == 'enthouan/simplelogin-mcp' &&
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
+      !contains(github.ref_name, '-') && !contains(github.ref_name, '+')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/docker-hub-mirror.yml
+    with:
+      tag: ${{ github.ref_name }}
+      revision: ${{ needs.docker.outputs.revision }}
+      digest: ${{ needs.docker.outputs.digest }}

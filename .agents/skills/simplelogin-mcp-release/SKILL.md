@@ -14,12 +14,16 @@ tag, GitHub Release, GHCR, or roadmap housekeeping steps.
   `check` status.
 - Never merge a PR unless the user explicitly approves merging that specific PR. Passing checks,
   GitHub review approval, or a release request is not enough by itself.
-- The release PR merge approval is the only normal approval boundary. After the approved release PR
+- Release PR merge approval covers the primary release publications. After the approved release PR
   is merged, continue through tag push, workflow/GHCR verification, GitHub Release creation, and
   milestone closure for that exact version without asking for a second publish approval.
 - Stable release tags also publish the committed `server.json` to the official MCP Registry after
   Docker succeeds. This normal automated publication is covered by the same release approval.
   The Registry job uses GitHub Actions OIDC; do not start a device login or add a publishing secret.
+- Docker Hub is a separate, approval-gated stable mirror. Confirm namespace ownership and
+  environment setup, review the actual digest, ref and alias plan, and obtain approval for the
+  concrete copy before releasing publisher credentials. Overview publication and historical
+  backfills each require explicit approval. Follow [the mirror runbook](../../../docs/docker-hub-mirror.md).
 - Use branch names like `release-v0.3.0`; the branch name intentionally includes `v` to match
   the tag and PR title.
 - Use the PR title and squash commit subject `vX.Y.Z`, with no `release` suffix. GitHub can derive
@@ -183,7 +187,7 @@ is verified as Done in the project. The prior merge approval covers the normal
 release-side effects for the exact `vX.Y.Z`: tag push, GHCR publish
 verification, GitHub Release creation, and milestone closure.
 
-Stop and ask for explicit approval only when a corrective action would rewrite
+For primary publication, stop and ask for explicit approval when a corrective action would rewrite
 history or replace published release state, such as moving/deleting a tag,
 force-pushing, rewriting `main`, or replacing an existing GitHub Release.
 
@@ -211,8 +215,20 @@ publishes `X.Y.Z`, moving minor `X.Y`, and `sha-<full-main-sha>`.
 gh run list --repo enthouan/simplelogin-mcp --limit 10 \
   --json databaseId,name,headBranch,headSha,status,conclusion,event,createdAt,url
 gh run watch <main-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
-gh run watch <tag-release-run-id> --repo enthouan/simplelogin-mcp --exit-status
+gh run view <tag-release-run-id> --repo enthouan/simplelogin-mcp --json jobs \
+  --jq '.jobs[] | {name,status,conclusion,url}'
 ```
+
+Report the tag run's primary jobs and the Docker Hub preview/mirror separately. When only the
+secondary job fails or waits for approval, continue after the primary jobs and read-backs pass.
+Retry the mirror job by databaseId or dispatch `docker-hub-mirror.yml` on protected `main` with the
+selected tag, commit and verified digest as described in [mirror recovery](../../../docs/docker-hub-mirror.md#retry-an-interrupted-copy).
+Check the matching index, both platform digests, original attestations, native offline discovery
+and stable `latest` decision. Record an actual authorized copy, its verified retry and the published
+overview before closing #153. Keep owner provisioning and publication evidence distinct.
+The manual `include_history` option is scoped to the 13 pinned originals through v1.0.2 and
+requires the v1.0.5 recovery inputs. Verify the historical evidence and exact-tag decisions
+against the [original-image table](../../../docs/docker-hub-mirror.md#original-releases-through-102).
 
 The tag workflow must include a successful `registry` job for the exact release. Before any image
 push, the read-only policy job validates version alignment, annotated tag identity, checkout/event
@@ -301,12 +317,12 @@ verify_image_trust ghcr.io/enthouan/simplelogin-mcp:X.Y
 verify_image_trust ghcr.io/enthouan/simplelogin-mcp:sha-<full-main-sha>
 ```
 
-Run all four checks only after both workflows succeed. `latest` verifies the main publication;
+Run all four checks after the main and tag Docker jobs succeed. `latest` verifies the main publication;
 `X.Y.Z` and `X.Y` verify the tag publication; and the immutable `sha-<full-main-sha>` tag ties the
 evidence to the source commit. Record every resolved index and platform digest. Do not create the
 GitHub Release if any platform is missing max provenance or its native SPDX SBOM.
 
-Create the GitHub Release after the tag workflow and GHCR image checks pass.
+Create the GitHub Release after the primary tag jobs, GHCR image checks and exact Registry read-back pass.
 Use the title `vX.Y.Z` exactly, without `release` or any other suffix. Use the
 changelog section as notes.
 
@@ -328,7 +344,7 @@ gh api repos/enthouan/simplelogin-mcp/milestones --paginate \
 git status --short --branch
 ```
 
-Close the milestone after the release and image publish are verified:
+Close the release milestone after its required work and primary publications are verified:
 
 ```bash
 gh api -X PATCH repos/enthouan/simplelogin-mcp/milestones/<number> -f state=closed
