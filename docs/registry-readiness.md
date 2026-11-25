@@ -140,14 +140,14 @@ Submission candidate files live under [registry/docker-mcp](../registry/docker-m
   against the selected release's actual tool listing before changing the submitted metadata.
 - `readme.md`: short submission README that points users to the project documentation.
 
-The selected candidate is the self-provided `ghcr.io/enthouan/simplelogin-mcp:1.0.2` image and
-released source commit `c6e702b72a12c1612f67d9347b313e4d588865a2`. The Docker expectations in
+The selected candidate is the self-provided `ghcr.io/enthouan/simplelogin-mcp:1.0.5` image and
+released source commit `810cdbaf161c085cfc7d5377d880cdd9ec92e848`. The Docker expectations in
 `test/registry.test.ts`, including the staged tools hash, deliberately follow neither
 `package.json.version` nor the current checkout's tool catalog automatically.
-See [the validation record](docker-mcp-validation.md) for the immutable digest, current Toolkit
-workflow, and the released image's stdio health-check limitation. The owner approved submission
-with that limitation disclosed; [Docker PR #5609](https://github.com/docker/mcp-registry/pull/5609)
-tracks upstream checks and review.
+See [the validation record](docker-mcp-validation.md) for the immutable digest, matching Docker Hub
+mirror, current Toolkit checks, and passing offline stdio health check. The owner approved this
+refresh from v1.0.2; [Docker PR #5609](https://github.com/docker/mcp-registry/pull/5609) tracks
+upstream checks and review. Docker Hub availability does not imply MCP Catalog acceptance.
 
 Submission workflow:
 

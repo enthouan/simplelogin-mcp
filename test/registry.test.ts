@@ -8,8 +8,8 @@ const REGISTRY_NAME = 'io.github.enthouan/simplelogin-mcp';
 const GHCR_IMAGE = 'ghcr.io/enthouan/simplelogin-mcp';
 // Docker submission releases are selected explicitly, independently of package.json.version.
 const DOCKER_MCP_RELEASE = {
-  version: '1.0.2',
-  sourceCommit: 'c6e702b72a12c1612f67d9347b313e4d588865a2',
+  version: '1.0.5',
+  sourceCommit: '810cdbaf161c085cfc7d5377d880cdd9ec92e848',
   // Reviewed against the selected image's actual MCP listing, including all 60 arguments.
   // Update only with an intentional Docker submission change, not a checkout/package bump.
   toolsSha256: 'ae77321f2460b09281080bf80aa76b17a66edb217b4e4417e2d2c17fccdad487',
