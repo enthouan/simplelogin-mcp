@@ -189,7 +189,7 @@ Image writers are serialized across main and release tags, with pending runs que
 replacing each other using GitHub's documented
 [`queue: max` concurrency setting](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 The current actionlint v1.7.12 schema does not yet recognize `queue`; when using that version,
-lint the two writer workflows with `actionlint -ignore '^unexpected key "queue" for "concurrency" section' .github/workflows/{release,docker-hub-mirror}.yml`
+lint the two writer workflows with `actionlint -ignore '^unexpected key "queue" for "concurrency" section' .github/workflows/{release,dockerhub}.yml`
 and lint the other workflows normally. The workflow contract tests separately require the exact
 queue configuration. Remove this narrow compatibility exception when actionlint supports it.
 

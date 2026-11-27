@@ -75,7 +75,7 @@ export function selectedRelease(env: NodeJS.ProcessEnv, run: Git): Identity {
     );
     assert(
       env['GITHUB_WORKFLOW_REF'] ===
-        `${repository}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`,
+        `${repository}/.github/workflows/dockerhub.yml@refs/heads/main`,
       'Unexpected recovery workflow',
     );
     assert(
@@ -312,7 +312,7 @@ export function copyImage(
   const token = env['DOCKERHUB_TOKEN'];
   assert(
     user && token,
-    'Provision DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in the docker-hub-mirror environment',
+    'Provision DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in the dockerhub environment',
   );
   const dir = mkdtempSync(join(env['MIRROR_TEMP'] ?? tmpdir(), 'simplelogin-mirror-auth-'));
   // regctl never inherits the runner's home, Docker config, publishing secret env, or helpers.

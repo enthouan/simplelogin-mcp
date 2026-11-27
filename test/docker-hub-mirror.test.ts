@@ -87,7 +87,7 @@ describe('mirror release identity', () => {
     const dispatch = {
       ...env,
       GITHUB_EVENT_NAME: 'workflow_dispatch',
-      GITHUB_WORKFLOW_REF: `${repo}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`,
+      GITHUB_WORKFLOW_REF: `${repo}/.github/workflows/dockerhub.yml@refs/heads/main`,
       GITHUB_REF: 'refs/heads/main',
       GITHUB_SHA: other.revision,
     };
@@ -106,6 +106,10 @@ describe('mirror release identity', () => {
       'refs/remotes/origin/main',
     ]);
     expect(() => selectedRelease({ ...dispatch, GITHUB_REF: 'refs/heads/topic' }, run)).toThrow();
+    const oldWorkflowRef = `${repo}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`;
+    expect(() =>
+      selectedRelease({ ...dispatch, GITHUB_WORKFLOW_REF: oldWorkflowRef }, run),
+    ).toThrow('Unexpected recovery workflow');
     expect(() => selectedRelease(dispatch, releaseGit)).toThrow('implementation');
     for (const [command, value] of [
       ['cat-file', 'commit'],
@@ -227,7 +231,7 @@ describe('pinned historical originals', () => {
       ...env,
       GITHUB_EVENT_NAME: 'workflow_dispatch',
       GITHUB_REF: 'refs/heads/main',
-      GITHUB_WORKFLOW_REF: `${repo}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`,
+      GITHUB_WORKFLOW_REF: `${repo}/.github/workflows/dockerhub.yml@refs/heads/main`,
       RELEASE_TAG: 'v1.0.5',
       RELEASE_COMMIT: '810cdbaf161c085cfc7d5377d880cdd9ec92e848',
       RELEASE_IMAGE_DIGEST:
@@ -571,12 +575,12 @@ function workflow(name: string) {
 }
 describe('mirror workflow wiring', () => {
   const release = workflow('release');
-  const mirror = workflow('docker-hub-mirror');
+  const mirror = workflow('dockerhub');
   const preview = mirror.jobs['preview']!;
   const writer = mirror.jobs['mirror']!;
   const caller = release.jobs['mirror']!;
   it('fans out from verified GHCR without granting publishing permissions to the secondary workflow', () => {
-    expect(caller.uses).toBe('./.github/workflows/docker-hub-mirror.yml');
+    expect(caller.uses).toBe('./.github/workflows/dockerhub.yml');
     expect(caller.needs).toBe('docker');
     expect(release.jobs['registry']?.needs).toBe('docker');
     expect(caller.if).toBe(release.jobs['registry']?.if);
@@ -611,7 +615,7 @@ describe('mirror workflow wiring', () => {
     );
   });
   it('keeps owner credentials in the writer steps, with trusted checkout, installation and preview first', () => {
-    expect(writer.environment).toBe('docker-hub-mirror');
+    expect(writer.environment).toBe('dockerhub');
     const steps = writer.steps!;
     const privileged = steps.filter((step) => JSON.stringify(step).includes('secrets.'));
     expect(privileged.map((step) => step.run)).toEqual([

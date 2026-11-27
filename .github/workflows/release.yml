@@ -220,7 +220,7 @@ jobs:
       !contains(github.ref_name, '-') && !contains(github.ref_name, '+')
     permissions:
       contents: read
-    uses: ./.github/workflows/docker-hub-mirror.yml
+    uses: ./.github/workflows/dockerhub.yml
     with:
       tag: ${{ github.ref_name }}
       revision: ${{ needs.docker.outputs.revision }}
