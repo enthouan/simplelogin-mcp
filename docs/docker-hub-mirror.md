@@ -11,8 +11,9 @@ Both registries serve the original `linux/amd64` and `linux/arm64` images.
    `enthouan/simplelogin-mcp` as **public** and verify its name and visibility signed out. A public
    404 is inconclusive about ownership. Restrict tag writers to this workflow. Docker registry tag
    updates have no cross-client compare-and-swap guarantee.
-2. Configure the GitHub environment **docker-hub-mirror** with a required maintainer reviewer
-   and deployment refs limited to protected `main` and the project's restricted stable release tags.
+2. Configure the GitHub environment **dockerhub** with `enthouan` as its required reviewer.
+   Allow self-review and disable administrator bypass. Under **Selected branches and tags**, add
+   one branch rule for `main` and one tag rule for `v*.*.*`.
    Set its variable `DOCKERHUB_CONFIRMED_REPOSITORY` to `docker.io/enthouan/simplelogin-mcp` only
    after confirming ownership. The job also checks the repository through the anonymous Hub API.
 3. For this personal namespace use Docker ID `enthouan` and a personal access token with
@@ -22,13 +23,35 @@ Both registries serve the original `linux/amd64` and `linux/arm64` images.
    `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. Transfer the token directly from Docker's
    one-time display into the protected secret.
    [Docker access tokens](https://docs.docker.com/security/access-tokens/)
-4. To rotate, create a replacement with the same account and permissions, replace
-   the environment secret, verify the new credential during an approved copy, and revoke the old
+4. To rotate, create a replacement with the same account and permissions, update each environment
+   that uses the old token, verify the new credential during an approved copy, and revoke the old
    token in Docker Hub. For suspected exposure, deactivate it immediately, remove the affected
    secret and inspect the repository tags before permitting another write.
 
 Apply the reviewed [overview](docker-hub-overview.md) to the Docker Hub repository description
 only after separate approval. Read the rendered public Overview back and record its URL.
+
+### Migrate from `docker-hub-mirror`
+
+Provision `dockerhub` before merging the workflow change. GitHub has no documented in-place
+rename, and referencing a missing environment can create it without protection rules.
+[GitHub environment settings](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+
+1. Check for pending approvals and in-progress deployments. Compare the source environment's
+   current settings with the setup above. Apply its protections to `dockerhub` first, then set
+   the confirmed repository variable.
+2. Have the owner set `DOCKERHUB_USERNAME` and supply `DOCKERHUB_TOKEN` from its original secure
+   storage using the local interactive prompt from
+   `gh secret set DOCKERHUB_TOKEN --repo enthouan/simplelogin-mcp --env dockerhub`.
+   GitHub exposes only secret metadata. If the token is unavailable, obtain separate approval for
+   a new Docker Hub token with the permissions above and keep the old credential valid for reruns.
+3. Read back both environments' reviewers, self-review and bypass settings, wait timer, custom
+   protection rules, branch and tag policies, variable values and secret names. Have the owner
+   confirm the credential source and scope before authorizing the workflow switch.
+
+Keep `docker-hub-mirror` protected until the workflow change is on `main` and any pending
+deployments have finished. At retirement, check which runs and release tags still reference it.
+Historical deployment entries may retain the old name.
 
 ## What a release copies
 
@@ -58,6 +81,10 @@ has its own status. A successful primary publication can proceed to its GitHub R
 the maintainer recovers the secondary destination.
 
 ## Retry an interrupted copy
+
+After retiring `docker-hub-mirror`, recover a copy that used it with a fresh dispatch from
+updated `main`. Rerunning the old job uses its original workflow and can recreate the old
+environment without its protections or credentials.
 
 Inspect the job summaries and the public exact tag and alias. When the workflow implementation is
 still appropriate, use the **mirror job's databaseId** from the failed attempt. After approval,

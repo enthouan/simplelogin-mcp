@@ -611,7 +611,7 @@ describe('mirror workflow wiring', () => {
     );
   });
   it('keeps owner credentials in the writer steps, with trusted checkout, installation and preview first', () => {
-    expect(writer.environment).toBe('docker-hub-mirror');
+    expect(writer.environment).toBe('dockerhub');
     const steps = writer.steps!;
     const privileged = steps.filter((step) => JSON.stringify(step).includes('secrets.'));
     expect(privileged.map((step) => step.run)).toEqual([

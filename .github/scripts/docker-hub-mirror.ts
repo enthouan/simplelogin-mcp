@@ -312,7 +312,7 @@ export function copyImage(
   const token = env['DOCKERHUB_TOKEN'];
   assert(
     user && token,
-    'Provision DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in the docker-hub-mirror environment',
+    'Provision DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in the dockerhub environment',
   );
   const dir = mkdtempSync(join(env['MIRROR_TEMP'] ?? tmpdir(), 'simplelogin-mirror-auth-'));
   // regctl never inherits the runner's home, Docker config, publishing secret env, or helpers.
