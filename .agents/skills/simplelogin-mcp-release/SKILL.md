@@ -221,7 +221,7 @@ gh run view <tag-release-run-id> --repo enthouan/simplelogin-mcp --json jobs \
 
 Report the tag run's primary jobs and the Docker Hub preview/mirror separately. When only the
 secondary job fails or waits for approval, continue after the primary jobs and read-backs pass.
-Retry the mirror job by databaseId or dispatch `docker-hub-mirror.yml` on protected `main` with the
+Retry the mirror job by databaseId or dispatch `dockerhub.yml` on protected `main` with the
 selected tag, commit and verified digest as described in [mirror recovery](../../../docs/docker-hub-mirror.md#retry-an-interrupted-copy).
 Check the matching index, both platform digests, original attestations, native offline discovery
 and stable `latest` decision. Record an actual authorized copy, its verified retry and the published

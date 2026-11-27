@@ -75,7 +75,7 @@ export function selectedRelease(env: NodeJS.ProcessEnv, run: Git): Identity {
     );
     assert(
       env['GITHUB_WORKFLOW_REF'] ===
-        `${repository}/.github/workflows/docker-hub-mirror.yml@refs/heads/main`,
+        `${repository}/.github/workflows/dockerhub.yml@refs/heads/main`,
       'Unexpected recovery workflow',
     );
     assert(

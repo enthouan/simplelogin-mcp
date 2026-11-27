@@ -123,7 +123,7 @@ exact GHCR tag/digest, complete source graph and offline discovery.
 
 ```bash
 repo=enthouan/simplelogin-mcp
-gh workflow run docker-hub-mirror.yml --repo "$repo" --ref main \
+gh workflow run dockerhub.yml --repo "$repo" --ref main \
   -f tag="$RELEASE_TAG" -f revision="$RELEASE_COMMIT" -f digest="$RELEASE_IMAGE_DIGEST" -f publish=false
 ```
 
@@ -132,7 +132,7 @@ Obtain explicit approval for that release, commit, digest, workflow/ref, exact t
 environment for the selected run.
 
 ```bash
-gh workflow run docker-hub-mirror.yml --repo "$repo" --ref main \
+gh workflow run dockerhub.yml --repo "$repo" --ref main \
   -f tag="$RELEASE_TAG" -f revision="$RELEASE_COMMIT" -f digest="$RELEASE_IMAGE_DIGEST" -f publish=true
 gh run view "$RUN_ID" --repo "$repo" --json headSha,attempt,jobs,url
 ```
@@ -166,7 +166,7 @@ against Docker Hub. Historical copies preserve exactly the evidence the build pr
 To preview this fixed batch on protected `main`, run:
 
 ```bash
-gh workflow run docker-hub-mirror.yml --repo enthouan/simplelogin-mcp --ref main \
+gh workflow run dockerhub.yml --repo enthouan/simplelogin-mcp --ref main \
   -f tag=v1.0.5 -f revision=810cdbaf161c085cfc7d5377d880cdd9ec92e848 \
   -f digest=sha256:282b6580824c44dc1f229a9d16e7acf53201af4740ae8ca4ad7c82da4dde1a03 \
   -f include_history=true -f publish=false
